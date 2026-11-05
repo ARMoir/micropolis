@@ -8,6 +8,9 @@
 
 /* 120x100 16-bit, column-major map, comfortably under a 64K DOS data segment. */
 unsigned short city_tiles[CITY_TILES];
+/* Preserve each original file's 3120 history and settings bytes when editing. */
+static unsigned char city_header[3120];
+
 
 #define CITY_FILE_LENGTH 27120L
 #define CITY_MAP_OFFSET   3120L
@@ -35,7 +38,12 @@ int city_load(const char *path)
         return 0;
     }
     size = ftell(f);
-    if (size != CITY_FILE_LENGTH || fseek(f, CITY_MAP_OFFSET, SEEK_SET) != 0) {
+    if (size != CITY_FILE_LENGTH || fseek(f, 0L, SEEK_SET) != 0) {
+        fclose(f);
+        return 0;
+    }
+
+    if (fread(city_header, 1U, sizeof(city_header), f) != sizeof(city_header)) {
         fclose(f);
         return 0;
     }
@@ -60,8 +68,46 @@ int city_load(const char *path)
     return 1;
 }
 
+void city_set(unsigned int x, unsigned int y, unsigned short tile)
+{
+    if (x < CITY_WIDTH && y < CITY_HEIGHT)
+        city_tiles[x * CITY_HEIGHT + y] = tile;
+}
+
+/* Export a separate editor copy; the application never writes its input path. */
+int city_save_as(const char *path)
+{
+    FILE *f;
+    unsigned int x, y;
+    unsigned short tile;
+    int okay = 1;
+
+    f = fopen(path, "wb");
+    if (f == NULL)
+        return 0;
+    if (fwrite(city_header, 1U, sizeof(city_header), f) != sizeof(city_header))
+        okay = 0;
+    for (x = 0; okay && x < CITY_WIDTH; ++x) {
+        for (y = 0; y < CITY_HEIGHT; ++y) {
+            tile = city_tiles[x * CITY_HEIGHT + y];
+            if (fputc((tile >> 8) & 255U, f) == EOF ||
+                fputc(tile & 255U, f) == EOF) {
+                okay = 0;
+                break;
+            }
+        }
+    }
+    if (fclose(f) != 0)
+        okay = 0;
+    return okay;
+}
+
 void city_make_demo(void)
 {
+    unsigned int n;
+    for (n = 0; n < sizeof(city_header); ++n)
+        city_header[n] = 0;
+
     unsigned int x, y;
     /* The demo uses real Micropolis tile-ID ranges for the render test.
      * Nothing here is saved to disk or simulated.
