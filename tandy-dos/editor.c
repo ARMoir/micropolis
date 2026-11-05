@@ -20,6 +20,7 @@ const char *edit_tool_name(enum edit_tool tool)
     case EDIT_RESIDENTIAL: return "RES ZONE";
     case EDIT_COMMERCIAL:  return "COM ZONE";
     case EDIT_INDUSTRIAL:  return "IND ZONE";
+    case EDIT_COAL:        return "COAL";
     case EDIT_BULLDOZE:    return "DOZE";
     default:               return "INSPECT";
     }
@@ -54,6 +55,30 @@ int edit_place(enum edit_tool tool, unsigned int x, unsigned int y)
             city_set(x, y, 66U | BURNBIT | BULLBIT);
         else
             city_set(x, y, 208U | BURNBIT | BULLBIT | CONDBIT);
+        return 1;
+    }
+
+    if (tool == EDIT_COAL) {
+        if (x == 0U || y == 0U ||
+            x >= CITY_WIDTH - 2U || y >= CITY_HEIGHT - 2U)
+            return 0;
+        left = x - 1U;
+        top = y - 1U;
+        for (j = 0U; j < 4U; ++j)
+            for (i = 0U; i < 4U; ++i)
+                if ((city_at(left + i, top + j) & TILE_ID) != 0U)
+                    return 0;
+        /* Original w_tool.c check4x4 with COALBASE 745 and aniFlag. */
+        for (j = 0U; j < 4U; ++j)
+            for (i = 0U; i < 4U; ++i) {
+                tile = (unsigned short)(745U + j * 4U + i +
+                                        BURNBIT + CONDBIT);
+                if (i == 1U && j == 1U)
+                    tile |= ZONEBIT;
+                if (i == 1U && j == 2U)
+                    tile |= 2048U; /* ANIMBIT for smoke tile */
+                city_set(left + i, top + j, tile);
+            }
         return 1;
     }
 
