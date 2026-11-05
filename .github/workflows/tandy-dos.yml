@@ -29,6 +29,14 @@ jobs:
           cc -std=c89 -Wall -Wextra -pedantic \
             -o test-city tandy-dos/city.c tandy-dos/tests/test_city.c
           ./test-city
+          cc -std=c89 -Wall -Wextra -pedantic \
+            -o test-editor tandy-dos/city.c tandy-dos/editor.c tandy-dos/tests/test_editor.c
+          ./test-editor
+
+      - name: Convert original Micropolis tile art to Tandy format
+        run: |
+          python3 tandy-dos/tools/convert_tiles.py micropolis-activity/images/tiles.xpm TILES.DAT
+          test "$(wc -c < TILES.DAT)" -eq 30720
 
       - name: Set up Open Watcom (16-bit DOS)
         uses: open-watcom/setup-watcom@v1
@@ -38,8 +46,8 @@ jobs:
 
       - name: Build native 8086-compatible DOS executable
         run: |
-          wcl -bcl=dos -0 -ms -q -fe=MICROPOL.EXE \
-            tandy-dos/tandy.c tandy-dos/city.c
+          wcl -bcl=dos -0 -ml -q -fe=MICROPOL.EXE \
+            tandy-dos/tandy.c tandy-dos/city.c tandy-dos/editor.c
           test -s MICROPOL.EXE
           file MICROPOL.EXE
 
@@ -49,5 +57,6 @@ jobs:
           name: micropolis-tandy-ex-dos
           path: |
             MICROPOL.EXE
+            TILES.DAT
             tandy-dos/README.md
           if-no-files-found: error
