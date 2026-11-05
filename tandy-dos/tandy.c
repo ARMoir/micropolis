@@ -486,7 +486,8 @@ static void keyboard_loop(void)
         }
         if (old_tool != selected_tool || cursor_x != prev_cx ||
             cursor_y != prev_cy || scroll_x != prev_x ||
-            scroll_y != prev_y || ascii == ' ' || scan == 0x3cU)
+            scroll_y != prev_y || ascii == ' ' || scan == 0x3cU ||
+            ascii == 'p' || ascii == 'P')
             draw_status();
     }
 }
