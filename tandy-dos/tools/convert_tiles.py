@@ -89,6 +89,23 @@ def convert(source: Path, preserve_traffic: bool = False) -> bytes:
                         samples.count(c), -samples.index(c) if c in samples else -100))
                 hi = get(sx)
                 lo = get(sx + 2)
+
+                # Horizontal road dashes are only ONE original pixel row
+                # tall (row 7 of 16). Majority-voting the 2x2 source
+                # blocks discards them in favor of the gray row above.
+                # Restore paired white road-marking pixels at destination
+                # row 3, without touching normal terrain or buildings.
+                # This also preserves stripes in horizontal road variants
+                # containing traffic and in road T intersections.
+                if 64 <= tile <= 207 and sy == 6:
+                    white = lookup["%"]
+                    if (lookup[bottom[sx]] == white and
+                            lookup[bottom[sx + 1]] == white):
+                        hi = white
+                    if (lookup[bottom[sx + 2]] == white and
+                            lookup[bottom[sx + 3]] == white):
+                        lo = white
+
                 packed.append((hi << 4) | lo)
     assert len(packed) == 960 * 32
     return bytes(packed)
