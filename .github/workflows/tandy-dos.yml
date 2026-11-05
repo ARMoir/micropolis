@@ -37,6 +37,8 @@ jobs:
         run: |
           python3 tandy-dos/tools/convert_tiles.py micropolis-activity/images/tiles.xpm TILES.DAT
           test "$(wc -c < TILES.DAT)" -eq 30720
+          cp micropolis-activity/cities/happisle.cty HAPPISLE.CTY
+          test "$(wc -c < HAPPISLE.CTY)" -eq 27120
 
       - name: Set up Open Watcom (16-bit DOS)
         uses: open-watcom/setup-watcom@v1
@@ -58,5 +60,7 @@ jobs:
           path: |
             MICROPOL.EXE
             TILES.DAT
+            HAPPISLE.CTY
+            COPYING
             tandy-dos/README.md
           if-no-files-found: error
