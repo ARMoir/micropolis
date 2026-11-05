@@ -5,6 +5,7 @@
  */
 #include "city.h"
 #include "editor.h"
+#include "connections.h"
 
 #define TILE_ID  1023U
 #define BULLBIT  4096U
@@ -45,6 +46,7 @@ int edit_place(enum edit_tool tool, unsigned int x, unsigned int y)
         if (tile == 0U || (tile >= 1U && tile <= 20U))
             return 0; /* don't delete waterways */
         city_set(x, y, 0U);
+        connections_fix_cross(x, y);
         return 1;
     }
     if (tool == EDIT_ROAD || tool == EDIT_POWER) {
@@ -54,7 +56,8 @@ int edit_place(enum edit_tool tool, unsigned int x, unsigned int y)
         if (tool == EDIT_ROAD)
             city_set(x, y, 66U | BURNBIT | BULLBIT);
         else
-            city_set(x, y, 208U | BURNBIT | BULLBIT | CONDBIT);
+            city_set(x, y, 210U | BURNBIT | BULLBIT | CONDBIT);
+        connections_fix_cross(x, y);
         return 1;
     }
 
