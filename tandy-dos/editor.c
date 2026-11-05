@@ -7,6 +7,7 @@
 #include "editor.h"
 
 #define TILE_ID  1023U
+#define BULLBIT  4096U
 #define BURNBIT  8192U
 #define CONDBIT 16384U
 #define ZONEBIT  1024U
@@ -50,9 +51,9 @@ int edit_place(enum edit_tool tool, unsigned int x, unsigned int y)
         if (tile > 43U || (tile >= 1U && tile <= 20U))
             return 0;
         if (tool == EDIT_ROAD)
-            city_set(x, y, 66U | BURNBIT | CONDBIT);
+            city_set(x, y, 66U | BURNBIT | BULLBIT);
         else
-            city_set(x, y, 208U | BURNBIT | CONDBIT);
+            city_set(x, y, 208U | BURNBIT | BULLBIT | CONDBIT);
         return 1;
     }
 
