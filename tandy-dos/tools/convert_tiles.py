@@ -44,7 +44,7 @@ def _nearest(rgb: tuple[int, int, int]) -> int:
 
 
 def convert(source: Path) -> bytes:
-    quoted = re.findall(r'^\s*"([^"]*)",?\s*$', source.read_text(), re.M)
+    quoted = re.findall(r'^\s*"([^"]*)"', source.read_text(), re.M)
     if not quoted:
         raise ValueError("No XPM data found")
     width, height, colors, cpp = map(int, quoted[0].split()[:4])
