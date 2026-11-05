@@ -6,6 +6,11 @@ on:
     paths:
       - 'tandy-dos/**'
       - '.github/workflows/tandy-dos.yml'
+  pull_request:
+    branches: [master]
+    paths:
+      - 'tandy-dos/**'
+      - '.github/workflows/tandy-dos.yml'
   workflow_dispatch:
 
 permissions:
