@@ -263,6 +263,111 @@ static void bios_text(unsigned int row, unsigned int column,
     }
 }
 
+/* SimCity-style compact toolbox, custom-drawn in Tandy mode 9.
+ * All of these pixels are OUTSIDE the map's VRAM scrolling rectangle.
+ */
+static const unsigned short tool_icons[8] = {
+    0U, 66U, 210U, 244U, 427U, 616U, 44U, 750U
+};
+static const char *const tool_labels[8] = {
+    "INS", "RD", "PWR", "RES", "COM", "IND", "DOZ", "PLT"
+};
+
+/* Small overview map uses the real city tiles. Unlike the city window,
+ * it is a static, coarse preview and can be repainted after edits/pans.
+ */
+static void draw_overview(void)
+{
+    unsigned int px, py, mx, my, id, ox, oy, w, h;
+    unsigned char color;
+    for (py = 0U; py < 13U; ++py) {
+        my = py * CITY_HEIGHT / 13U;
+        for (px = 0U; px < 72U; ++px) {
+            mx = px * CITY_WIDTH / 72U;
+            id = city_at(mx, my) & TILE_MASK;
+            color = 2U;
+            if (id >= 1U && id <= 20U) color = 1U;
+            else if (id >= 21U && id <= 43U) color = 10U;
+            else if (id >= 64U && id <= 207U) color = 8U;
+            else if (id >= 208U && id <= 239U) color = 7U;
+            else if (id >= 240U && id <= 422U) color = 10U;
+            else if (id >= 423U && id <= 611U) color = 9U;
+            else if (id >= 612U && id <= 692U) color = 6U;
+            else if (id >= 693U) color = 15U;
+            pixel(4U + px, 169U + py, color);
+        }
+    }
+    ox = 4U + scroll_x * 72U / CITY_WIDTH;
+    oy = 169U + scroll_y * 13U / CITY_HEIGHT;
+    w = VIEW_W * 72U / CITY_WIDTH;
+    h = VIEW_H * 13U / CITY_HEIGHT;
+    if (h < 2U) h = 2U;
+    for (px = 0U; px < w; ++px) {
+        pixel(ox + px, oy, 14U);
+        pixel(ox + px, oy + h - 1U, 14U);
+    }
+    for (py = 0U; py < h; ++py) {
+        pixel(ox, oy + py, 14U);
+        pixel(ox + w - 1U, oy + py, 14U);
+    }
+}
+
+static void draw_toolbox(void)
+{
+    unsigned int x, y, n, bx, by, ix, iy, src;
+    unsigned char color, packed;
+    /* Cool gray left bezel. No draw calls touch city pixels (x >= 80). */
+    for (y = 8U; y < UI_FOOTER_Y; y += 8U)
+        for (x = 0U; x < UI_TOOLBOX_W; x += 8U)
+            solid_tile(x, y, 7U);
+
+    for (y = 8U; y < UI_FOOTER_Y; ++y) {
+        pixel(78U, y, 8U);
+        pixel(79U, y, 0U);
+    }
+    bios_text(1U, 0U, "FUNDS: --", 0U);
+    bios_text(2U, 0U, "EDITOR ONLY", 0U);
+    bios_text(3U, 2U, "TOOLS", 1U);
+
+    for (n = 0U; n < 8U; ++n) {
+        bx = 4U + (n & 1U) * 40U;
+        by = UI_BUTTON_TOP + (n >> 1) * UI_BUTTON_SIZE;
+        color = (unsigned char)((unsigned int)selected_tool == n ?
+                                14U : 8U);
+        box_pixels(bx, by, 34U, 32U, color);
+        box_pixels(bx + 2U, by + 2U, 30U, 27U, 15U);
+        box_pixels(bx + 5U, by + 3U, 24U, 19U, 7U);
+        /* Draw authentic 8x8 Micropolis artwork enlarged to 16x16.
+         * Source stays in TILES.DAT, we do not need another sprites file.
+         */
+        if (art_data != NULL) {
+            src = tool_icons[n] * 32U;
+            for (iy = 0U; iy < 8U; ++iy)
+                for (ix = 0U; ix < 8U; ++ix) {
+                    packed = art_data[src + iy * 4U + (ix >> 1)];
+                    color = (unsigned char)((ix & 1U) ?
+                            (packed & 15U) : (packed >> 4));
+                    box_pixels(bx + 9U + ix * 2U, by + 4U + iy * 2U,
+                               2U, 2U, color);
+                }
+        }
+        bios_text((by + 24U) / 8U,
+                  (bx / 8U) + 1U, tool_labels[n],
+                  (unsigned char)((unsigned int)selected_tool == n ?
+                                  4U : 1U));
+    }
+    bios_text(20U, 2U, "MAP", 1U);
+    draw_overview();
+}
+
+static void draw_footer(void)
+{
+    unsigned int x;
+    for (x = 0U; x < SCREEN_W; x += 8U)
+        solid_tile(x, UI_FOOTER_Y, 1U);
+    bios_text(23U, 1U, "MICROPOLIS   TANDY 1000   16 COLOR", 15U);
+}
+
 /* Redraw only the moving edge.  For a one-tile scroll, use a direct
  * 8-pixel (four-byte) VRAM shift rather than re-rendering 840 map tiles.
  * Keep both title and bottom control bands untouched while scrolling.
@@ -476,33 +581,28 @@ static void render_full(void)
     unsigned int x, y;
     mouse_pointer_hide();
 
+    /* Cyan DOS-style top menu bar spanning all 40 columns. */
+    for (x = 0U; x < SCREEN_W; x += 8U)
+        solid_tile(x, 0U, 3U);
+    bios_text(0U, 0U, " SYSTEM   TOOLS   VIEW   HELP", 0U);
 
-    /* Draw all 25 text-row-equivalent bands. The map occupies 21 rows. */
-    for (x = 0; x < VIEW_W; ++x) {
-        solid_tile(x * 8U, 0U, 1);
-        solid_tile(x * 8U, 8U, 1);
-        solid_tile(x * 8U, 184U, 1);
-        solid_tile(x * 8U, 192U, 1);
-    }
-    for (y = 0; y < VIEW_H; ++y) {
-        for (x = 0; x < VIEW_W; ++x) {
-            draw_city_tile(x * 8U, VIEW_Y + y * 8U,
+    /* City is a fixed rectangular window to the right of the toolbox. */
+    for (y = 0U; y < VIEW_H; ++y)
+        for (x = 0U; x < VIEW_W; ++x)
+            draw_city_tile(VIEW_X + x * 8U, VIEW_Y + y * 8U,
                            scroll_x + x, scroll_y + y);
-        }
-    }
-    bios_text(0, 0, "MICROPOLIS FILE  TOOLS  VIEW   HELP", 15);
-    bios_text(1, 0, "0 INS 1 RD 2 WIRE 3 R 4 C 5 I 6 DZ 7 PL", 14);
-    if (mouse_on)
-        bios_text(23, 0, "MOUSE LEFT:BUILD RIGHT:TOOLS F2 SAVE", 15);
-    else
-        bios_text(23, 0, "ARROWS PAN IJKL CUR SPACE F2 SAVE P SCAN", 15);
+
+    draw_toolbox();
+    draw_footer();
     draw_status();
+
     if (info_page != 0)
         draw_info_page();
     else if (open_menu != MENU_NONE)
         draw_menu_popup();
     else
         draw_cursor();
+
     mouse_pointer_show();
 }
 
@@ -539,6 +639,7 @@ static void select_tool(unsigned int number)
     case 7U: selected_tool = EDIT_COAL; break;
     }
     last_action = "SELECT";
+    draw_toolbox();
 }
 
 static void apply_selected_tool(void)
@@ -550,6 +651,7 @@ static void apply_selected_tool(void)
         last_action = "PLACED";
         redraw_edit_area();
         draw_cursor();
+        draw_overview();
     } else {
         last_action = "BLOCKED";
     }
@@ -844,6 +946,7 @@ static void keyboard_loop(void)
             scroll_y = next_y;
             scroll_one_tile(prev_x, prev_y);
             draw_cursor();
+            draw_overview();
         } else if (cursor_x != prev_cx || cursor_y != prev_cy) {
             next_cx = cursor_x;
             next_cy = cursor_y;
