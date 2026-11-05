@@ -4,6 +4,18 @@
 #ifndef TANDY_UI_H
 #define TANDY_UI_H
 
+/* One 8-pixel top menu row, classic left toolbox, city window to the
+ * right, and two bottom status rows. 30x22 visible tiles.
+ */
+#define UI_MAP_X       80U
+#define UI_MAP_Y        8U
+#define UI_MAP_COLS    30U
+#define UI_MAP_ROWS    22U
+#define UI_FOOTER_Y   184U
+#define UI_TOOLBOX_W   80U
+#define UI_BUTTON_TOP  32U
+#define UI_BUTTON_SIZE 32U
+
 enum ui_menu {
     MENU_NONE = -1,
     MENU_FILE = 0,
