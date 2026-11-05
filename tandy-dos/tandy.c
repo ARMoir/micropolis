@@ -7,6 +7,7 @@
 #include <dos.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <conio.h>
 #include "city.h"
 #include "editor.h"
@@ -488,10 +489,7 @@ static void render_full(void)
                            scroll_x + x, scroll_y + y);
         }
     }
-    if (art_data != NULL)
-        bios_text(0, 0, "MICROPOLIS FILE  TOOLS  VIEW   HELP", 15);
-    else
-        bios_text(0, 0, "MICROPOLIS FILE  TOOLS  VIEW   HELP", 15);
+    bios_text(0, 0, "MICROPOLIS FILE  TOOLS  VIEW   HELP", 15);
     bios_text(1, 0, "0 INS 1 RD 2 WIRE 3 R 4 C 5 I 6 DZ 7 PL", 14);
     if (mouse_on)
         bios_text(23, 0, "MOUSE LEFT:BUILD RIGHT:TOOLS F2 SAVE", 15);
@@ -866,16 +864,22 @@ static void keyboard_loop(void)
 
 int main(int argc, char **argv)
 {
-    if (argc > 1) {
-        if (!city_load(argv[1])) {
+    int i, have_city = 0, allow_mouse = 1;
+    for (i = 1; i < argc; ++i) {
+        if (strcmp(argv[i], "/NOMOUSE") == 0 ||
+            strcmp(argv[i], "-NOMOUSE") == 0) {
+            allow_mouse = 0;
+        } else if (!have_city && city_load(argv[i])) {
+            have_city = 1;
+        } else {
             fprintf(stderr,
-                    "Cannot open normal 27120-byte Micropolis city: %s\n",
-                    argv[1]);
+                    "Unrecognized argument or invalid 27120-byte city: %s\n",
+                    argv[i]);
             return 1;
         }
-    } else {
-        city_make_demo();
     }
+    if (!have_city)
+        city_make_demo();
 
     old_mode = current_video_mode();
     set_video_mode(9);
@@ -886,7 +890,7 @@ int main(int argc, char **argv)
     }
     video = (volatile unsigned char far *)MK_FP(0xb800, 0);
     (void)load_original_art();
-    mouse_on = mouse_init();
+    mouse_on = allow_mouse ? mouse_init() : 0;
     if (mouse_on) {
         struct mouse_state state;
         if (mouse_poll(&state)) {
