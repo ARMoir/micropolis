@@ -27,8 +27,12 @@ project. It targets the NEC V20-equipped Tandy 1000 EX.
   plant centers, using the original conductor flags and 700/2000 tile capacities.
   Triggered manually using P; no automatic simulation ticking yet.
 - **Save as a new .CTY file**, never overwrite an existing file.
-- **On-screen File / Tools / View / Help menus**, keyboard shortcuts, and
-  clickable tool strip.
+- **Classic city-builder layout:** cyan top menu bar, beveled left-side
+  two-column construction toolbox with miniature authentic Micropolis
+  tile icons, city window to the right, a compact city overview, and
+  two-line bottom status area. All fit native 320x200x16 Tandy video.
+- **On-screen System / Tools / View / Help menus**, keyboard shortcuts,
+  and clickable sidebar toolbox.
 - **Optional DOS mouse support** using INT 33h, with its own small software
   arrow to work in Tandy graphics mode 9 even if the mouse driver's own
   cursor graphics do not support that video mode.
@@ -63,8 +67,11 @@ file stays unchanged.
 
 ### New menus and mouse support
 
-The top row is a clickable menu bar: **FILE / TOOLS / VIEW / HELP**.
-The second row is a clickable tool strip (0-7). Menus contain real
+The top row is a clickable menu bar: **SYSTEM / TOOLS / VIEW / HELP**.
+The left side contains eight clickable beveled tool buttons (0-7),
+arranged in two columns and four rows. The main city viewport fills
+the rightmost **240x176 pixels (30x22 tiles)**, with a compact world
+overview map below the buttons and a 16-pixel status footer. Menus contain real
 commands for saving a copy of the city, exit, changing tools, manual
 power scan, center cursor, and help pages. They are available without
 a mouse: press **F** (File), **T** (Tools), **V** (View), **H** (Help),
@@ -95,10 +102,10 @@ MICROPOL HAPPISLE.CTY /NOMOUSE
 ```
 
 Mouse controls: left-click a **menu name** to open its dropdown,
-left-click a **tool** in the second row to select it, left-click the
-map to apply that tool, and right-click for the **Tools** dropdown.
+left-click a **tool icon** in the left sidebar to select it, left-click
+the main city window to apply that tool, and right-click for the **Tools** dropdown.
 Click and drag while using **Road**, **Power line**, or **Bulldoze** to
-paint consecutive tiles. The map's yellow selection outline follows
+paint consecutive tiles. The main map's yellow selection outline follows
 the mouse, while a small black-and-white pointer shows the exact
 pointer position. DOS keyboard shortcuts remain functional.
 
@@ -125,7 +132,7 @@ to its 320-pixel Tandy screen.
 | P | Recalculate powered tiles and show the count in the bottom status bar |
 | Space | Apply the selected tool at the cursor |
 | F2 | Save a **new** city file in the current directory |
-| F / T / V / H (or F10 for File) | Open File / Tools / View / Help menu |
+| F / T / V / H (or F10 for System) | Open System / Tools / View / Help menu |
 | Arrow keys + Enter (menu open) | Navigate and choose menu items |
 | Esc | Close menu/help window; otherwise exit and restore DOS video mode |
 
@@ -221,3 +228,29 @@ horizontal traffic and T-junction variants. The change affects only
 **When upgrading, copy both the new TILES.DAT and MICROPOL.EXE** to the
 same directory on your DOS CF card. The stripe fix needs the new
 `TILES.DAT` even if the executable is unchanged.
+
+## Classic DOS city layout
+
+The earlier full-width map with a horizontal text tool strip has been
+replaced with a classic late-1980s/early-1990s city-builder layout, using
+the supplied original SimCity DOS screen as visual inspiration.
+
+- Cyan SYSTEM/TOOLS/VIEW/HELP top-row menu, with working submenus.
+- Gray left sidebar with eight large beveled icon buttons, each using
+  authentic reduced Micropolis graphics and a short tool label.
+- Right-side city at 30 tiles wide by 22 tiles tall, panning within the
+  original 120x100 world. It remains a 16-color native Tandy mode-9
+  framebuffer, not a VGA-only UI.
+- Lower left mini-overview of the actual loaded map and bright viewport
+  outline to show what area you are viewing.
+- Two-line lower status strip with the selected tool and cursor map
+  coordinates. The `FUNDS: --` line is intentionally a placeholder until
+  the real Micropolis economic simulation is ported.
+
+The fast-scroll routine now shifts only the 240-pixel-wide right-side
+city area instead of sliding the controls and map together. This reduces
+VRAM traffic per pan, but the new toolbox and minimap should be
+performance-tested on the real V20.
+
+Tool numbers, keyboard panning, map editing, save-as, power scan,
+optional DOS mouse handling and `/NOMOUSE` are unchanged.
