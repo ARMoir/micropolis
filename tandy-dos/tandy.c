@@ -326,13 +326,15 @@ static void draw_toolbox(void)
         pixel(79U, y, 0U);
     }
     bios_text(1U, 0U, "FUNDS: --", 0U);
-    bios_text(2U, 0U, "EDITOR ONLY", 0U);
+    bios_text(2U, 0U, "EDIT MODE", 0U);
     bios_text(3U, 2U, "TOOLS", 1U);
 
     for (n = 0U; n < 8U; ++n) {
         bx = 4U + (n & 1U) * 40U;
         by = UI_BUTTON_TOP + (n >> 1) * UI_BUTTON_SIZE;
-        color = (unsigned char)((unsigned int)selected_tool == n ?
+        color = (unsigned char)(((n == 6U && selected_tool == EDIT_BULLDOZE) ||
+                                (n == 7U && selected_tool == EDIT_COAL) ||
+                                (n < 6U && (unsigned int)selected_tool == n)) ?
                                 14U : 8U);
         box_pixels(bx, by, 34U, 32U, color);
         box_pixels(bx + 2U, by + 2U, 30U, 27U, 15U);
@@ -353,7 +355,9 @@ static void draw_toolbox(void)
         }
         bios_text((by + 24U) / 8U,
                   (bx / 8U) + 1U, tool_labels[n],
-                  (unsigned char)((unsigned int)selected_tool == n ?
+                  (unsigned char)(((n == 6U && selected_tool == EDIT_BULLDOZE) ||
+                                  (n == 7U && selected_tool == EDIT_COAL) ||
+                                  (n < 6U && (unsigned int)selected_tool == n)) ?
                                   4U : 1U));
     }
     bios_text(20U, 2U, "MAP", 1U);
