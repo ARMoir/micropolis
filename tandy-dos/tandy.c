@@ -17,9 +17,10 @@
 
 #define SCREEN_W 320U
 #define SCREEN_H 200U
-#define VIEW_W    40U
-#define VIEW_H    21U
-#define VIEW_Y    16U
+#define VIEW_X    UI_MAP_X
+#define VIEW_Y    UI_MAP_Y
+#define VIEW_W    UI_MAP_COLS
+#define VIEW_H    UI_MAP_ROWS
 #define TILE_MASK 1023U
 #define ART_TILES 960U
 #define ART_BYTES 30720U
@@ -269,7 +270,7 @@ static void bios_text(unsigned int row, unsigned int column,
 static void draw_cursor(void)
 {
     unsigned int x, y;
-    unsigned int px = cursor_x * 8U;
+    unsigned int px = VIEW_X + cursor_x * 8U;
     unsigned int py = VIEW_Y + cursor_y * 8U;
 
     /* Yellow hardware pixel outline, drawn after map scrolling/blitting. */
@@ -285,7 +286,7 @@ static void draw_cursor(void)
 
 static void erase_cursor(void)
 {
-    draw_city_tile(cursor_x * 8U, VIEW_Y + cursor_y * 8U,
+    draw_city_tile(VIEW_X + cursor_x * 8U, VIEW_Y + cursor_y * 8U,
                    scroll_x + cursor_x, scroll_y + cursor_y);
 }
 
@@ -298,7 +299,7 @@ static void redraw_edit_area(void)
     max_y = cursor_y + 2U < VIEW_H ? cursor_y + 2U : VIEW_H - 1U;
     for (y = min_y; y <= max_y; ++y)
         for (x = min_x; x <= max_x; ++x)
-            draw_city_tile(x * 8U, VIEW_Y + y * 8U,
+            draw_city_tile(VIEW_X + x * 8U, VIEW_Y + y * 8U,
                            scroll_x + x, scroll_y + y);
 }
 
@@ -306,7 +307,7 @@ static void draw_status(void)
 {
     unsigned int x;
     char status[41];
-    for (x = 0; x < VIEW_W; ++x)
+    for (x = 0; x < SCREEN_W / 8U; ++x)
         solid_tile(x * 8U, 192U, 1);
     sprintf(status, "%-8s X:%03u Y:%03u  %-10s",
             edit_tool_name(selected_tool),
@@ -367,9 +368,9 @@ static void draw_menu_popup(void)
     count = ui_menu_count(open_menu);
     for (j = 0U; j < count; ++j) {
         for (col = 0U; col < 16U; ++col)
-            solid_tile((origin + col) * 8U, (2U + j) * 8U,
+            solid_tile((origin + col) * 8U, (1U + j) * 8U,
                        (unsigned char)(j == menu_highlight ? 5U : 1U));
-        bios_text(2U + j, origin + 1U, ui_menu_item(open_menu, j),
+        bios_text(1U + j, origin + 1U, ui_menu_item(open_menu, j),
                   (unsigned char)(j == menu_highlight ? 15U : 14U));
     }
 }
@@ -422,46 +423,46 @@ static void scroll_one_tile(unsigned int previous_x, unsigned int previous_y)
     if (scroll_y == previous_y && scroll_x == previous_x + 1U) {
         /* Camera right, image left: work left-to-right. */
         for (y = VIEW_Y; y < VIEW_Y + VIEW_H * 8U; ++y) {
-            dst = vram_offset(0U, y);
-            for (i = 0; i < 156U; ++i)
+            dst = vram_offset(VIEW_X, y);
+            for (i = 0; i < VIEW_W * 4U - 4U; ++i)
                 video[dst + i] = video[dst + i + 4U];
         }
         for (y = 0; y < VIEW_H; ++y)
-            draw_city_tile(312U, VIEW_Y + y * 8U,
+            draw_city_tile(VIEW_X + (VIEW_W - 1U) * 8U, VIEW_Y + y * 8U,
                            scroll_x + VIEW_W - 1U, scroll_y + y);
 
     } else if (scroll_y == previous_y && previous_x == scroll_x + 1U) {
         /* Camera left, image right: work right-to-left. */
         for (y = VIEW_Y; y < VIEW_Y + VIEW_H * 8U; ++y) {
-            dst = vram_offset(0U, y);
-            for (i = 160U; i > 4U; --i)
+            dst = vram_offset(VIEW_X, y);
+            for (i = VIEW_W * 4U; i > 4U; --i)
                 video[dst + i - 1U] = video[dst + i - 5U];
         }
         for (y = 0; y < VIEW_H; ++y)
-            draw_city_tile(0U, VIEW_Y + y * 8U, scroll_x, scroll_y + y);
+            draw_city_tile(VIEW_X, VIEW_Y + y * 8U, scroll_x, scroll_y + y);
 
     } else if (scroll_x == previous_x && scroll_y == previous_y + 1U) {
         /* Camera down, image up: copy scanlines top-to-bottom. */
         for (y = VIEW_Y; y < VIEW_Y + (VIEW_H - 1U) * 8U; ++y) {
-            dst = vram_offset(0U, y);
-            src = vram_offset(0U, y + 8U);
-            for (i = 0; i < 160U; ++i)
+            dst = vram_offset(VIEW_X, y);
+            src = vram_offset(VIEW_X, y + 8U);
+            for (i = 0; i < VIEW_W * 4U; ++i)
                 video[dst + i] = video[src + i];
         }
         for (x = 0; x < VIEW_W; ++x)
-            draw_city_tile(x * 8U, VIEW_Y + (VIEW_H - 1U) * 8U,
+            draw_city_tile(VIEW_X + x * 8U, VIEW_Y + (VIEW_H - 1U) * 8U,
                            scroll_x + x, scroll_y + VIEW_H - 1U);
 
     } else if (scroll_x == previous_x && previous_y == scroll_y + 1U) {
         /* Camera up, image down: copy scanlines bottom-to-top. */
         for (y = VIEW_Y + VIEW_H * 8U - 1U; y >= VIEW_Y + 8U; --y) {
-            dst = vram_offset(0U, y);
-            src = vram_offset(0U, y - 8U);
-            for (i = 0; i < 160U; ++i)
+            dst = vram_offset(VIEW_X, y);
+            src = vram_offset(VIEW_X, y - 8U);
+            for (i = 0; i < VIEW_W * 4U; ++i)
                 video[dst + i] = video[src + i];
         }
         for (x = 0; x < VIEW_W; ++x)
-            draw_city_tile(x * 8U, VIEW_Y,
+            draw_city_tile(VIEW_X + x * 8U, VIEW_Y,
                            scroll_x + x, scroll_y);
     } else {
         /* Reserved for future jumps/teleports; only 1-tile steps today. */
@@ -624,8 +625,9 @@ static void handle_mouse(void)
     if (moved) {
         mouse_pointer_hide();
         if (info_page == 0 && open_menu == MENU_NONE &&
-            state.y >= VIEW_Y && state.y < VIEW_Y + VIEW_H * 8U) {
-            next_x = state.x / 8U;
+            state.x >= VIEW_X && state.y >= VIEW_Y &&
+            state.y < VIEW_Y + VIEW_H * 8U) {
+            next_x = (state.x - VIEW_X) / 8U;
             next_y = (state.y - VIEW_Y) / 8U;
             if (next_x != cursor_x || next_y != cursor_y) {
                 erase_cursor();
@@ -684,7 +686,7 @@ static void handle_mouse(void)
                 if (toolbar >= 0) {
                     select_tool((unsigned int)toolbar);
                     draw_status();
-                } else if (state.y >= VIEW_Y &&
+                } else if (state.x >= VIEW_X && state.y >= VIEW_Y &&
                            state.y < VIEW_Y + VIEW_H * 8U) {
                     apply_selected_tool();
                 }
