@@ -186,7 +186,9 @@ static void draw_status(void)
     char status[41];
     for (x = 0; x < VIEW_W; ++x)
         solid_tile(x * 8U, 192U, 1);
-    draw_status();
+    sprintf(status, "VIEW  X:%03u Y:%03u   120x100 CITY MAP",
+            scroll_x, scroll_y);
+    bios_text(24, 0, status, 11);
 }
 
 static void render_full(void);
