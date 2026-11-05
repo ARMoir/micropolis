@@ -206,3 +206,18 @@ replaces the tiny 8x8 traffic-vehicle detail on vertical road variants with
 the original clean Micropolis vertical-road art, avoiding speckled lanes.
 Other tiles keep their original converted appearance. This needs a fresh
 real-hardware check.
+
+## Horizontal road centerline fix
+
+The real Tandy graphics test showed that horizontal roads lost their white
+dashed lane markings. This was a graphics-conversion issue, not a road
+connection issue: in the original 16x16 tile artwork, the horizontal dashes
+are only one pixel high (source row 7). Our 2x2 majority downsampling
+discarded that detail. The converter now specifically preserves paired
+original white road-marking pixels in output row 3 of the 8x8 tile, including
+horizontal traffic and T-junction variants. The change affects only
+`TILES.DAT`, not the city files, scroll logic, or road-placement rules.
+
+**When upgrading, copy both the new TILES.DAT and MICROPOL.EXE** to the
+same directory on your DOS CF card. The stripe fix needs the new
+`TILES.DAT` even if the executable is unchanged.
