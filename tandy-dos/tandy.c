@@ -526,20 +526,278 @@ static int save_city_new_file(void)
     return 0;
 }
 
+/* Map number-row shortcuts, toolbar, and Tools menu onto one function. */
+static void select_tool(unsigned int number)
+{
+    switch (number) {
+    case 0U: selected_tool = EDIT_INSPECT; break;
+    case 1U: selected_tool = EDIT_ROAD; break;
+    case 2U: selected_tool = EDIT_POWER; break;
+    case 3U: selected_tool = EDIT_RESIDENTIAL; break;
+    case 4U: selected_tool = EDIT_COMMERCIAL; break;
+    case 5U: selected_tool = EDIT_INDUSTRIAL; break;
+    case 6U: selected_tool = EDIT_BULLDOZE; break;
+    case 7U: selected_tool = EDIT_COAL; break;
+    }
+    last_action = "SELECT";
+}
+
+static void apply_selected_tool(void)
+{
+    if (selected_tool == EDIT_INSPECT) {
+        last_action = "INSPECT";
+    } else if (edit_place(selected_tool, scroll_x + cursor_x,
+                          scroll_y + cursor_y)) {
+        last_action = "PLACED";
+        redraw_edit_area();
+        draw_cursor();
+    } else {
+        last_action = "BLOCKED";
+    }
+    draw_status();
+}
+
+static void run_menu_action(enum ui_action action)
+{
+    unsigned int powered;
+    switch (action) {
+    case UI_SAVE:
+        last_action = save_city_new_file() ? "SAVED" : "SAVE ERR";
+        break;
+    case UI_EXIT:
+        exit_requested = 1;
+        break;
+    case UI_TOOL_INSPECT: select_tool(0U); break;
+    case UI_TOOL_ROAD: select_tool(1U); break;
+    case UI_TOOL_POWER: select_tool(2U); break;
+    case UI_TOOL_RES: select_tool(3U); break;
+    case UI_TOOL_COM: select_tool(4U); break;
+    case UI_TOOL_IND: select_tool(5U); break;
+    case UI_TOOL_DOZE: select_tool(6U); break;
+    case UI_TOOL_COAL: select_tool(7U); break;
+    case UI_SCAN_POWER:
+        powered = engine_power_scan();
+        sprintf(power_message, "PWR:%04u", powered);
+        last_action = power_message;
+        break;
+    case UI_CENTER_CURSOR:
+        cursor_x = VIEW_W / 2U;
+        cursor_y = VIEW_H / 2U;
+        last_action = "CENTER";
+        break;
+    case UI_HELP_KEYS: info_page = 1; break;
+    case UI_HELP_MOUSE: info_page = 2; break;
+    case UI_HELP_ABOUT: info_page = 3; break;
+    default: break;
+    }
+}
+
+static void show_menu(enum ui_menu menu)
+{
+    open_menu = menu;
+    menu_highlight = 0U;
+    render_full();
+}
+
+/* Mouse movement paints no pixels besides a tiny 8x8 arrow, unless it
+ * crosses into a new map tile. Dragging only edits single-tile tools,
+ * preventing accidental 3x3/4x4 buildings during a mouse stroke.
+ */
+static int drag_enabled(void)
+{
+    return selected_tool == EDIT_ROAD ||
+           selected_tool == EDIT_POWER ||
+           selected_tool == EDIT_BULLDOZE;
+}
+
+static void handle_mouse(void)
+{
+    struct mouse_state state;
+    unsigned int next_x, next_y;
+    int menu, item, toolbar;
+    int left_press, right_press, moved;
+
+    if (!mouse_poll(&state))
+        return;
+    left_press = (state.buttons & 1U) && !(mouse_buttons & 1U);
+    right_press = (state.buttons & 2U) && !(mouse_buttons & 2U);
+    moved = state.x != mouse_x || state.y != mouse_y;
+
+    if (moved) {
+        mouse_pointer_hide();
+        if (info_page == 0 && open_menu == MENU_NONE &&
+            state.y >= VIEW_Y && state.y < VIEW_Y + VIEW_H * 8U) {
+            next_x = state.x / 8U;
+            next_y = (state.y - VIEW_Y) / 8U;
+            if (next_x != cursor_x || next_y != cursor_y) {
+                erase_cursor();
+                cursor_x = next_x;
+                cursor_y = next_y;
+                draw_cursor();
+                if ((state.buttons & 1U) && (mouse_buttons & 1U) &&
+                    drag_enabled())
+                    apply_selected_tool();
+                else
+                    draw_status();
+            }
+        } else if (open_menu != MENU_NONE) {
+            item = ui_dropdown_hit(open_menu, state.x, state.y);
+            if (item >= 0 && (unsigned int)item != menu_highlight) {
+                menu_highlight = (unsigned int)item;
+                draw_menu_popup();
+            }
+        }
+        mouse_x = state.x;
+        mouse_y = state.y;
+        mouse_pointer_show();
+    }
+
+    if (left_press) {
+        mouse_pointer_hide();
+        if (info_page != 0) {
+            info_page = 0;
+            render_full();
+        } else if (open_menu != MENU_NONE) {
+            menu = ui_header_hit(state.x, state.y);
+            if (menu != MENU_NONE) {
+                if (menu == open_menu) {
+                    open_menu = MENU_NONE;
+                    render_full();
+                } else
+                    show_menu((enum ui_menu)menu);
+            } else {
+                item = ui_dropdown_hit(open_menu, state.x, state.y);
+                if (item >= 0) {
+                    enum ui_action command =
+                        ui_menu_command(open_menu, (unsigned int)item);
+                    open_menu = MENU_NONE;
+                    run_menu_action(command);
+                } else
+                    open_menu = MENU_NONE;
+                if (!exit_requested)
+                    render_full();
+            }
+        } else {
+            menu = ui_header_hit(state.x, state.y);
+            if (menu != MENU_NONE)
+                show_menu((enum ui_menu)menu);
+            else {
+                toolbar = ui_toolbar_hit(state.x, state.y);
+                if (toolbar >= 0) {
+                    select_tool((unsigned int)toolbar);
+                    draw_status();
+                } else if (state.y >= VIEW_Y &&
+                           state.y < VIEW_Y + VIEW_H * 8U) {
+                    apply_selected_tool();
+                }
+            }
+        }
+        mouse_pointer_show();
+    }
+    if (right_press) {
+        mouse_pointer_hide();
+        if (info_page != 0) {
+            info_page = 0;
+            render_full();
+        } else if (open_menu == MENU_TOOLS) {
+            open_menu = MENU_NONE;
+            render_full();
+        } else
+            show_menu(MENU_TOOLS);
+        mouse_pointer_show();
+    }
+
+    mouse_buttons = state.buttons;
+}
+
 static void keyboard_loop(void)
 {
     union REGS r;
     unsigned int prev_x, prev_y, prev_cx, prev_cy;
+    unsigned int next_x, next_y, next_cx, next_cy;
     unsigned char ascii, scan;
     enum edit_tool old_tool;
+    enum ui_menu next_menu;
 
-    for (;;) {
-        r.h.ah = 0; /* BIOS keyboard, no DOS resident TSR required */
+    while (!exit_requested) {
+        if (mouse_on) {
+            handle_mouse();
+            if (!kbhit())
+                continue; /* poll mouse without blocking DOS keyboard */
+        }
+
+        r.h.ah = 0U;
         int86(0x16, &r, &r);
         ascii = r.h.al;
         scan = r.h.ah;
-        if (ascii == 27U)
+        mouse_pointer_hide();
+
+        if (info_page != 0) {
+            info_page = 0;
+            render_full();
+            continue;
+        }
+
+        if (open_menu != MENU_NONE) {
+            next_menu = open_menu;
+            if (ascii == 27U) {
+                open_menu = MENU_NONE;
+                render_full();
+            } else if (ascii == 13U || ascii == ' ') {
+                enum ui_action command =
+                    ui_menu_command(open_menu, menu_highlight);
+                open_menu = MENU_NONE;
+                run_menu_action(command);
+                if (!exit_requested)
+                    render_full();
+            } else if (scan == 0x48U) {
+                if (menu_highlight > 0U)
+                    --menu_highlight;
+                draw_menu_popup();
+            } else if (scan == 0x50U) {
+                if (menu_highlight + 1U < ui_menu_count(open_menu))
+                    ++menu_highlight;
+                draw_menu_popup();
+            } else if (scan == 0x4bU) {
+                next_menu = (enum ui_menu)
+                    ((open_menu + 3) % 4);
+                show_menu(next_menu);
+            } else if (scan == 0x4dU) {
+                next_menu = (enum ui_menu)
+                    ((open_menu + 1) % 4);
+                show_menu(next_menu);
+            } else if (ascii == 'f' || ascii == 'F')
+                show_menu(MENU_FILE);
+            else if (ascii == 't' || ascii == 'T')
+                show_menu(MENU_TOOLS);
+            else if (ascii == 'v' || ascii == 'V')
+                show_menu(MENU_VIEW);
+            else if (ascii == 'h' || ascii == 'H')
+                show_menu(MENU_HELP);
+            mouse_pointer_show();
+            continue;
+        }
+
+        if (ascii == 27U) {
+            exit_requested = 1;
             break;
+        }
+        if (ascii == 'f' || ascii == 'F' || scan == 0x44U) {
+            show_menu(MENU_FILE);
+            continue;
+        }
+        if (ascii == 't' || ascii == 'T') {
+            show_menu(MENU_TOOLS);
+            continue;
+        }
+        if (ascii == 'v' || ascii == 'V') {
+            show_menu(MENU_VIEW);
+            continue;
+        }
+        if (ascii == 'h' || ascii == 'H') {
+            show_menu(MENU_HELP);
+            continue;
+        }
 
         prev_x = scroll_x;
         prev_y = scroll_y;
@@ -547,17 +805,17 @@ static void keyboard_loop(void)
         prev_cy = cursor_y;
         old_tool = selected_tool;
 
-        if ((scan == 0x4bU || ascii == 'a' || ascii == 'A')
-            && scroll_x > 0U)
+        if ((scan == 0x4bU || ascii == 'a' || ascii == 'A') &&
+            scroll_x > 0U)
             --scroll_x;
-        else if ((scan == 0x4dU || ascii == 'd' || ascii == 'D')
-                 && scroll_x < CITY_WIDTH - VIEW_W)
+        else if ((scan == 0x4dU || ascii == 'd' || ascii == 'D') &&
+                 scroll_x < CITY_WIDTH - VIEW_W)
             ++scroll_x;
-        else if ((scan == 0x48U || ascii == 'w' || ascii == 'W')
-                 && scroll_y > 0U)
+        else if ((scan == 0x48U || ascii == 'w' || ascii == 'W') &&
+                 scroll_y > 0U)
             --scroll_y;
-        else if ((scan == 0x50U || ascii == 's' || ascii == 'S')
-                 && scroll_y < CITY_HEIGHT - VIEW_H)
+        else if ((scan == 0x50U || ascii == 's' || ascii == 'S') &&
+                 scroll_y < CITY_HEIGHT - VIEW_H)
             ++scroll_y;
         else if ((ascii == 'j' || ascii == 'J') && cursor_x > 0U)
             --cursor_x;
@@ -567,39 +825,18 @@ static void keyboard_loop(void)
             --cursor_y;
         else if ((ascii == 'k' || ascii == 'K') && cursor_y < VIEW_H - 1U)
             ++cursor_y;
-        else if (ascii >= '0' && ascii <= '7') {
-            if (ascii == '0') selected_tool = EDIT_INSPECT;
-            if (ascii == '1') selected_tool = EDIT_ROAD;
-            if (ascii == '2') selected_tool = EDIT_POWER;
-            if (ascii == '3') selected_tool = EDIT_RESIDENTIAL;
-            if (ascii == '4') selected_tool = EDIT_COMMERCIAL;
-            if (ascii == '5') selected_tool = EDIT_INDUSTRIAL;
-            if (ascii == '6') selected_tool = EDIT_BULLDOZE;
-            if (ascii == '7') selected_tool = EDIT_COAL;
-            last_action = "SELECT";
-        } else if (ascii == ' ') {
-            if (selected_tool == EDIT_INSPECT) {
-                last_action = "INSPECT";
-            } else if (edit_place(selected_tool,
-                                  scroll_x + cursor_x,
-                                  scroll_y + cursor_y)) {
-                last_action = "PLACED";
-                redraw_edit_area();
-                draw_cursor();
-            } else
-                last_action = "BLOCKED";
-        } else if (ascii == 'p' || ascii == 'P') {
-            unsigned int powered = engine_power_scan();
-            sprintf(power_message, "PWR:%04u", powered);
-            last_action = power_message;
-        } else if (scan == 0x3cU) { /* F2, never overwrite input city. */
-            last_action = save_city_new_file() ? "SAVED" : "SAVE ERR";
-        }
+        else if (ascii >= '0' && ascii <= '7')
+            select_tool((unsigned int)(ascii - '0'));
+        else if (ascii == ' ')
+            apply_selected_tool();
+        else if (ascii == 'p' || ascii == 'P')
+            run_menu_action(UI_SCAN_POWER);
+        else if (scan == 0x3cU)
+            run_menu_action(UI_SAVE);
 
         if (scroll_x != prev_x || scroll_y != prev_y) {
-            /* Remove overlay before shifting VRAM, then redraw the overlay. */
-            /* Undo scroll coordinate to redraw old tile before panning. */
-            unsigned int next_x = scroll_x, next_y = scroll_y;
+            next_x = scroll_x;
+            next_y = scroll_y;
             scroll_x = prev_x;
             scroll_y = prev_y;
             erase_cursor();
@@ -608,7 +845,8 @@ static void keyboard_loop(void)
             scroll_one_tile(prev_x, prev_y);
             draw_cursor();
         } else if (cursor_x != prev_cx || cursor_y != prev_cy) {
-            unsigned int next_cx = cursor_x, next_cy = cursor_y;
+            next_cx = cursor_x;
+            next_cy = cursor_y;
             cursor_x = prev_cx;
             cursor_y = prev_cy;
             erase_cursor();
@@ -616,11 +854,13 @@ static void keyboard_loop(void)
             cursor_y = next_cy;
             draw_cursor();
         }
+
         if (old_tool != selected_tool || cursor_x != prev_cx ||
             cursor_y != prev_cy || scroll_x != prev_x ||
             scroll_y != prev_y || ascii == ' ' || scan == 0x3cU ||
             ascii == 'p' || ascii == 'P')
             draw_status();
+        mouse_pointer_show();
     }
 }
 
@@ -646,8 +886,19 @@ int main(int argc, char **argv)
     }
     video = (volatile unsigned char far *)MK_FP(0xb800, 0);
     (void)load_original_art();
+    mouse_on = mouse_init();
+    if (mouse_on) {
+        struct mouse_state state;
+        if (mouse_poll(&state)) {
+            mouse_x = state.x;
+            mouse_y = state.y;
+            mouse_buttons = state.buttons;
+        }
+    }
     render_full();
     keyboard_loop();
+    mouse_pointer_hide();
+    mouse_shutdown();
     set_video_mode(old_mode);
     if (art_data != NULL)
         free(art_data); /* art buffer used only in graphics mode */
