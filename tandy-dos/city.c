@@ -104,11 +104,10 @@ int city_save_as(const char *path)
 
 void city_make_demo(void)
 {
-    unsigned int n;
+    unsigned int n, x, y;
     for (n = 0; n < sizeof(city_header); ++n)
         city_header[n] = 0;
 
-    unsigned int x, y;
     /* The demo uses real Micropolis tile-ID ranges for the render test.
      * Nothing here is saved to disk or simulated.
      */
