@@ -27,6 +27,13 @@ project. It targets the NEC V20-equipped Tandy 1000 EX.
   plant centers, using the original conductor flags and 700/2000 tile capacities.
   Triggered manually using P; no automatic simulation ticking yet.
 - **Save as a new .CTY file**, never overwrite an existing file.
+- **On-screen File / Tools / View / Help menus**, keyboard shortcuts, and
+  clickable tool strip.
+- **Optional DOS mouse support** using INT 33h, with its own small software
+  arrow to work in Tandy graphics mode 9 even if the mouse driver's own
+  cursor graphics do not support that video mode.
+- Left-click to select a tool or build, right-click for Tools menu, and
+  click-drag to paint roads, wires or bulldozer tiles. No mouse required.
 - Original demo-city generator and fallback colored glyph art if TILES.DAT
   isn't present.
 
@@ -54,6 +61,53 @@ The first command displays the built-in generated terrain/buildings.
 The second loads the included **original Micropolis city map**. The map
 file stays unchanged.
 
+### New menus and mouse support
+
+The top row is a clickable menu bar: **FILE / TOOLS / VIEW / HELP**.
+The second row is a clickable tool strip (0-7). Menus contain real
+commands for saving a copy of the city, exit, changing tools, manual
+power scan, center cursor, and help pages. They are available without
+a mouse: press **F** (File), **T** (Tools), **V** (View), **H** (Help),
+or **F10** (File). In an open menu use arrow keys, Enter and Esc.
+Esc closes a menu or help window before it exits the program.
+
+**A DOS mouse driver must be loaded before running MICROPOL.**
+Micropolis checks for the Microsoft-compatible INT 33h API. For a
+serial mouse, [CuteMouse](https://cutemouse.sourceforge.net/) is a
+lightweight option. With CuteMouse on COM1, for example:
+
+```dos
+CTMOUSE /S1
+MICROPOL HAPPISLE.CTY
+```
+
+Use `CTMOUSE /S2` if the mouse actually uses COM2. The COM number
+depends on the hardware and how the serial interface is configured.
+The program does **not** talk to serial registers directly; the
+external TSR detects the device and handles mouse input. A generic
+`MOUSE.COM` driver that implements INT 33h also works.
+
+If you do not have a mouse attached, Micropolis still works using the
+keyboard alone. To bypass mouse detection explicitly, run:
+
+```dos
+MICROPOL HAPPISLE.CTY /NOMOUSE
+```
+
+Mouse controls: left-click a **menu name** to open its dropdown,
+left-click a **tool** in the second row to select it, left-click the
+map to apply that tool, and right-click for the **Tools** dropdown.
+Click and drag while using **Road**, **Power line**, or **Bulldoze** to
+paint consecutive tiles. The map's yellow selection outline follows
+the mouse, while a small black-and-white pointer shows the exact
+pointer position. DOS keyboard shortcuts remain functional.
+
+**Mouse movement and the cursor need testing on the real Tandy 1000
+EX**, especially with a serial mouse driver. This hardware has unusual
+video mode-9 memory and mouse-driver coordinate behavior; the
+application maps conventional INT 33h 640-pixel virtual X coordinates
+to its 320-pixel Tandy screen.
+
 ### Keyboard controls
 
 | Key | Action |
@@ -71,7 +125,9 @@ file stays unchanged.
 | P | Recalculate powered tiles and show the count in the bottom status bar |
 | Space | Apply the selected tool at the cursor |
 | F2 | Save a **new** city file in the current directory |
-| Esc | Exit and restore DOS video mode |
+| F / T / V / H (or F10 for File) | Open File / Tools / View / Help menu |
+| Arrow keys + Enter (menu open) | Navigate and choose menu items |
+| Esc | Close menu/help window; otherwise exit and restore DOS video mode |
 
 F2 finds the first available `CITY0001.CTY`, `CITY0002.CTY`,
 and so on. It never overwrites a file that already exists. Copy the
@@ -101,7 +157,7 @@ To build manually with Open Watcom for DOS:
 
 ```sh
 python3 tandy-dos/tools/convert_tiles.py micropolis-activity/images/tiles.xpm TILES.DAT
-wcl -bcl=dos -0 -ml -q -fe=MICROPOL.EXE tandy-dos/tandy.c tandy-dos/city.c tandy-dos/editor.c tandy-dos/engine.c
+wcl -bcl=dos -0 -ml -q -fe=MICROPOL.EXE tandy-dos/tandy.c tandy-dos/city.c tandy-dos/editor.c tandy-dos/connections.c tandy-dos/engine.c tandy-dos/ui.c tandy-dos/mouse.c
 ```
 
 Host-side regression tests for loading/saving cities and editing zones:
@@ -109,10 +165,12 @@ Host-side regression tests for loading/saving cities and editing zones:
 ```sh
 cc -std=c89 -Wall -Wextra -pedantic -o test-city tandy-dos/city.c tandy-dos/tests/test_city.c
 ./test-city
-cc -std=c89 -Wall -Wextra -pedantic -o test-editor tandy-dos/city.c tandy-dos/editor.c tandy-dos/tests/test_editor.c
+cc -std=c89 -Wall -Wextra -pedantic -o test-editor tandy-dos/city.c tandy-dos/editor.c tandy-dos/connections.c tandy-dos/tests/test_editor.c
 ./test-editor
 cc -std=c89 -Wall -Wextra -pedantic -o test-engine tandy-dos/city.c tandy-dos/engine.c tandy-dos/tests/test_engine.c
 ./test-engine
+cc -std=c89 -Wall -Wextra -pedantic -o test-ui tandy-dos/ui.c tandy-dos/tests/test_ui.c
+./test-ui
 ```
 
 ## Remaining simulation-port work
