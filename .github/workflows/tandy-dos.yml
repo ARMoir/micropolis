@@ -1,0 +1,48 @@
+name: Micropolis Tandy EX (16-bit DOS)
+
+on:
+  push:
+    branches: [tandy-dos-port]
+    paths:
+      - 'tandy-dos/**'
+      - '.github/workflows/tandy-dos.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Validate city files and cross-compile 8086 DOS EXE
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out Micropolis
+        uses: actions/checkout@v4
+
+      - name: Check original Micropolis city-file parser
+        run: |
+          cc -std=c89 -Wall -Wextra -pedantic \
+            -o test-city tandy-dos/city.c tandy-dos/tests/test_city.c
+          ./test-city
+
+      - name: Set up Open Watcom (16-bit DOS)
+        uses: open-watcom/setup-watcom@v1
+        with:
+          version: '2.0'
+          target: dos
+
+      - name: Build native 8086-compatible DOS executable
+        run: |
+          wcl -bt=dos -0 -ms -q -fe=MICROPOL.EXE \
+            tandy-dos/tandy.c tandy-dos/city.c
+          test -s MICROPOL.EXE
+          file MICROPOL.EXE
+
+      - name: Upload hardware-test executable
+        uses: actions/upload-artifact@v4
+        with:
+          name: micropolis-tandy-ex-dos
+          path: |
+            MICROPOL.EXE
+            tandy-dos/README.md
+          if-no-files-found: error
