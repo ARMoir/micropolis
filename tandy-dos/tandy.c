@@ -370,7 +370,7 @@ static void render_full(void)
         bios_text(0, 0, "MICROPOLIS TANDY / ORIGINAL 16C ART", 15);
     else
         bios_text(0, 0, "MICROPOLIS TANDY / FALLBACK GLYPHS", 15);
-    bios_text(1, 0, "0 VIEW 1 RD 2 WIRE 3 R 4 C 5 I 6 DOZE", 14);
+    bios_text(1, 0, "0 INS 1 RD 2 WIRE 3 R 4 C 5 I 6 DZ 7 PL", 14);
     bios_text(23, 0, "ARROWS PAN IJKL CUR SPACE F2 SAVE P SCAN", 15);
     draw_status();
     draw_cursor();
@@ -436,7 +436,7 @@ static void keyboard_loop(void)
             --cursor_y;
         else if ((ascii == 'k' || ascii == 'K') && cursor_y < VIEW_H - 1U)
             ++cursor_y;
-        else if (ascii >= '0' && ascii <= '6') {
+        else if (ascii >= '0' && ascii <= '7') {
             if (ascii == '0') selected_tool = EDIT_INSPECT;
             if (ascii == '1') selected_tool = EDIT_ROAD;
             if (ascii == '2') selected_tool = EDIT_POWER;
@@ -444,6 +444,7 @@ static void keyboard_loop(void)
             if (ascii == '4') selected_tool = EDIT_COMMERCIAL;
             if (ascii == '5') selected_tool = EDIT_INDUSTRIAL;
             if (ascii == '6') selected_tool = EDIT_BULLDOZE;
+            if (ascii == '7') selected_tool = EDIT_COAL;
             last_action = "SELECT";
         } else if (ascii == ' ') {
             if (selected_tool == EDIT_INSPECT) {
