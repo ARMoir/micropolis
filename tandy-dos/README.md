@@ -10,11 +10,17 @@ project. It targets the NEC V20-equipped Tandy 1000 EX.
 
 - Tandy video BIOS mode **9: 320x200, 16 colors**, direct 4-bank B800 framebuffer.
 - Fast one-tile scrolling that shifts the existing VRAM and redraws only the exposed edge.
+- Original Micropolis road/wire connection masks, with automatic corner, T-junction,
+  four-way and straight-road orientation when placing or bulldozing nearby tiles.
 - Read-only import of original 27,120-byte .CTY city files, preserving the
   original 3,120-byte histories/settings header on save.
 - Real Micropolis artwork from `micropolis-activity/images/tiles.xpm`.
   All 960 original 16x16 tiles are scaled to 8x8 at build time and quantized
-  to the 16-color IBM PC/Tandy palette. Runtime data: **30,720-byte TILES.DAT**.
+  to the 16-color IBM PC/Tandy palette. Vertical traffic-car sprites are
+  optionally smoothed with the authentic clean road art (tile 67), since
+  those cars collapse into visual noise at 8x8. Use the converter's
+  `--preserve-traffic` flag to produce the unmodified 8x8 traffic variants.
+  Runtime data: **30,720-byte TILES.DAT**.
 - Visible cursor, road/power placement, 3x3 R/C/I zones and original 4x4 coal power plant
   placement, with original Micropolis tile IDs/flags, and a simple bulldozer.
 - First isolated simulation subsystem: power-network reachability from coal/nuclear
@@ -75,8 +81,9 @@ result from your CF card for inspection, or load it using
 Construction is intentionally conservative: roads/wires require
 empty or wooded non-water terrain, 3x3 zones require nine empty tiles,
 and the bulldozer only clears one tile. Complex building-demolition
-rules, cost calculations, road connection tile selection and full
-simulation tick scheduling are **not yet integrated**. A `BLOCKED` indicator means placement is
+rules, cost calculations and full simulation tick scheduling are
+**not yet integrated**. Road/wire adjacency tile selection is implemented,
+but rail/bridge crossings and terrain correction need further work. A `BLOCKED` indicator means placement is
 disallowed.
 
 **Important:** Although edited maps are written in the original .CTY
@@ -130,3 +137,14 @@ additional terms and notices in [COPYING](../COPYING).
 Original Micropolis and its artwork: Copyright (C) 1989-2007
 Electronic Arts Inc. No SimCity trademark rights or affiliation are
 claimed. This is a modified implementation, not the original game.
+
+## Road rendering fix
+
+The first authentic-art hardware test revealed noisy vertical roads. Two
+issues were addressed: previously, the DOS editor always placed road tile
+`66` (horizontal), instead of selecting `67` for vertical streets and
+the correct turn/junction shapes from `w_con.c`. The converter now also
+replaces the tiny 8x8 traffic-vehicle detail on vertical road variants with
+the original clean Micropolis vertical-road art, avoiding speckled lanes.
+Other tiles keep their original converted appearance. This needs a fresh
+real-hardware check.
