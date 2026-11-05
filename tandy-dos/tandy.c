@@ -9,6 +9,7 @@
 #include <stdlib.h>
 #include "city.h"
 #include "editor.h"
+#include "engine.h"
 
 #define SCREEN_W 320U
 #define SCREEN_H 200U
@@ -31,6 +32,7 @@ static unsigned int cursor_x = VIEW_W / 2U;
 static unsigned int cursor_y = VIEW_H / 2U;
 static enum edit_tool selected_tool = EDIT_INSPECT;
 static const char *last_action = "READY";
+static char power_message[12];
 
 static void set_video_mode(unsigned char mode)
 {
@@ -369,7 +371,7 @@ static void render_full(void)
     else
         bios_text(0, 0, "MICROPOLIS TANDY / FALLBACK GLYPHS", 15);
     bios_text(1, 0, "0 VIEW 1 RD 2 WIRE 3 R 4 C 5 I 6 DOZE", 14);
-    bios_text(23, 0, "ARROWS PAN  IJKL CURSOR  SPACE  F2 SAVE", 15);
+    bios_text(23, 0, "ARROWS PAN IJKL CUR SPACE F2 SAVE P SCAN", 15);
     draw_status();
     draw_cursor();
 }
@@ -454,6 +456,10 @@ static void keyboard_loop(void)
                 draw_cursor();
             } else
                 last_action = "BLOCKED";
+        } else if (ascii == 'p' || ascii == 'P') {
+            unsigned int powered = engine_power_scan();
+            sprintf(power_message, "PWR:%04u", powered);
+            last_action = power_message;
         } else if (scan == 0x3cU) { /* F2, never overwrite input city. */
             last_action = save_city_new_file() ? "SAVED" : "SAVE ERR";
         }
