@@ -344,9 +344,8 @@ static void scroll_one_tile(unsigned int previous_x, unsigned int previous_y)
         render_full();
         return;
     }
-    draw_status();
 }
-
+ 
 static void render_full(void)
 {
     unsigned int x, y;
@@ -373,6 +372,25 @@ static void render_full(void)
     bios_text(23, 0, "ARROWS PAN  IJKL CURSOR  SPACE  F2 SAVE", 15);
     draw_status();
     draw_cursor();
+}
+
+static int save_city_new_file(void)
+{
+    unsigned int slot;
+    char filename[13];
+    FILE *f;
+
+    /* DOS 8.3 filenames, never overwrite any existing source or save. */
+    for (slot = 1U; slot < 10000U; ++slot) {
+        sprintf(filename, "CITY%04u.CTY", slot);
+        f = fopen(filename, "rb");
+        if (f != NULL) {
+            fclose(f);
+            continue;
+        }
+        return city_save_as(filename);
+    }
+    return 0;
 }
 
 static void keyboard_loop(void)
@@ -437,7 +455,7 @@ static void keyboard_loop(void)
             } else
                 last_action = "BLOCKED";
         } else if (scan == 0x3cU) { /* F2, never overwrite input city. */
-            last_action = city_save_as("TANDY.CTY") ? "SAVED" : "SAVE ERR";
+            last_action = save_city_new_file() ? "SAVED" : "SAVE ERR";
         }
 
         if (scroll_x != prev_x || scroll_y != prev_y) {
