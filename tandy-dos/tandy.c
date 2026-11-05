@@ -176,10 +176,81 @@ static void bios_text(unsigned int row, unsigned int column,
     }
 }
 
-static void render(void)
+/* Redraw only the moving edge.  For a one-tile scroll, use a direct
+ * 8-pixel (four-byte) VRAM shift rather than re-rendering 840 map tiles.
+ * Keep both title and bottom control bands untouched while scrolling.
+ */
+static void draw_status(void)
+{
+    unsigned int x;
+    char status[41];
+    for (x = 0; x < VIEW_W; ++x)
+        solid_tile(x * 8U, 192U, 1);
+    draw_status();
+}
+
+static void render_full(void);
+
+static void scroll_one_tile(unsigned int previous_x, unsigned int previous_y)
+{
+    unsigned int x, y, i, dst, src;
+
+    if (scroll_y == previous_y && scroll_x == previous_x + 1U) {
+        /* Camera right, image left: work left-to-right. */
+        for (y = VIEW_Y; y < VIEW_Y + VIEW_H * 8U; ++y) {
+            dst = vram_offset(0U, y);
+            for (i = 0; i < 156U; ++i)
+                video[dst + i] = video[dst + i + 4U];
+        }
+        for (y = 0; y < VIEW_H; ++y)
+            draw_city_tile(312U, VIEW_Y + y * 8U,
+                           scroll_x + VIEW_W - 1U, scroll_y + y);
+
+    } else if (scroll_y == previous_y && previous_x == scroll_x + 1U) {
+        /* Camera left, image right: work right-to-left. */
+        for (y = VIEW_Y; y < VIEW_Y + VIEW_H * 8U; ++y) {
+            dst = vram_offset(0U, y);
+            for (i = 160U; i > 4U; --i)
+                video[dst + i - 1U] = video[dst + i - 5U];
+        }
+        for (y = 0; y < VIEW_H; ++y)
+            draw_city_tile(0U, VIEW_Y + y * 8U, scroll_x, scroll_y + y);
+
+    } else if (scroll_x == previous_x && scroll_y == previous_y + 1U) {
+        /* Camera down, image up: copy scanlines top-to-bottom. */
+        for (y = VIEW_Y; y < VIEW_Y + (VIEW_H - 1U) * 8U; ++y) {
+            dst = vram_offset(0U, y);
+            src = vram_offset(0U, y + 8U);
+            for (i = 0; i < 160U; ++i)
+                video[dst + i] = video[src + i];
+        }
+        for (x = 0; x < VIEW_W; ++x)
+            draw_city_tile(x * 8U, VIEW_Y + (VIEW_H - 1U) * 8U,
+                           scroll_x + x, scroll_y + VIEW_H - 1U);
+
+    } else if (scroll_x == previous_x && previous_y == scroll_y + 1U) {
+        /* Camera up, image down: copy scanlines bottom-to-top. */
+        for (y = VIEW_Y + VIEW_H * 8U - 1U; y >= VIEW_Y + 8U; --y) {
+            dst = vram_offset(0U, y);
+            src = vram_offset(0U, y - 8U);
+            for (i = 0; i < 160U; ++i)
+                video[dst + i] = video[src + i];
+        }
+        for (x = 0; x < VIEW_W; ++x)
+            draw_city_tile(x * 8U, VIEW_Y,
+                           scroll_x + x, scroll_y);
+    } else {
+        /* Reserved for future jumps/teleports; only 1-tile steps today. */
+        render_full();
+        return;
+    }
+    draw_status();
+}
+
+static void render_full(void)
 {
     unsigned int x, y;
-    char status[41];
+
 
     /* Draw all 25 text-row-equivalent bands. The map occupies 21 rows. */
     for (x = 0; x < VIEW_W; ++x) {
@@ -229,7 +300,7 @@ static void keyboard_loop(void)
                  && scroll_y < CITY_HEIGHT - VIEW_H)
             ++scroll_y;
         if (scroll_x != prev_x || scroll_y != prev_y)
-            render();
+            scroll_one_tile(prev_x, prev_y);
     }
 }
 
@@ -256,7 +327,7 @@ int main(int argc, char **argv)
         return 1;
     }
     video = (volatile unsigned char far *)MK_FP(0xb800, 0);
-    render();
+    render_full();
     keyboard_loop();
     set_video_mode(old_mode); /* return cleanly to DOS even after Esc */
     return 0;
