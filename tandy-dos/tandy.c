@@ -270,9 +270,7 @@ static void render_full(void)
     bios_text(0, 0, "MICROPOLIS  /  TANDY 1000  /  16 COLOR", 15);
     bios_text(1, 0, city_source, 14);
     bios_text(23, 0, "ARROWS / WASD: SCROLL     ESC: EXIT", 15);
-    sprintf(status, "VIEW  X:%03u Y:%03u   120x100 CITY MAP",
-            scroll_x, scroll_y);
-    bios_text(24, 0, status, 11);
+    draw_status();
 }
 
 static void keyboard_loop(void)
