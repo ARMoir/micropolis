@@ -476,10 +476,8 @@ int main(int argc, char **argv)
                     argv[1]);
             return 1;
         }
-        city_source = "REAL .CTY FILE   /   READ-ONLY VIEWER";
     } else {
         city_make_demo();
-        city_source = "DEMO MAP   /   SIMULATION NOT ACTIVE";
     }
 
     old_mode = current_video_mode();
@@ -495,6 +493,6 @@ int main(int argc, char **argv)
     keyboard_loop();
     set_video_mode(old_mode);
     if (art_data != NULL)
-        free(art_data); /* return cleanly to DOS even after Esc */
+        free(art_data); /* art buffer used only in graphics mode */
     return 0;
 }
