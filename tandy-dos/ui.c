@@ -82,11 +82,11 @@ int ui_toolbar_hit(unsigned int x, unsigned int y)
     column = x / 8U;
     if (column < 6U)  return 0;
     if (column < 11U) return 1;
-    if (column < 17U) return 2;
-    if (column < 21U) return 3;
-    if (column < 25U) return 4;
-    if (column < 29U) return 5;
-    if (column < 34U) return 6;
+    if (column < 18U) return 2;
+    if (column < 22U) return 3;
+    if (column < 26U) return 4;
+    if (column < 30U) return 5;
+    if (column < 35U) return 6;
     return 7;
 }
 
