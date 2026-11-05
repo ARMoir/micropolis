@@ -1,90 +1,125 @@
-# Micropolis for the Tandy 1000 EX (16-bit DOS)
+# Micropolis: Tandy 1000 EX native DOS port
 
-**Status: first hardware-test milestone; read-only map viewer. NOT yet a playable simulation.**
+**Status: original-art city editor / first engine-port milestone. Not yet a running city simulation.**
 
-This work is an experimental native DOS port of the GPL-licensed
-[Micropolis](https://github.com/SimHacker/micropolis) source, for the
-Tandy 1000 EX with NEC V20 / 8088-compatible instructions and Tandy video.
+This is an experimental native 8086-compatible, **16-bit real-mode DOS**
+adaptation of the GPL [Micropolis](https://github.com/SimHacker/micropolis)
+project. It targets the NEC V20-equipped Tandy 1000 EX.
 
-## Hardware target
+## What is now implemented
 
-- Real-mode **16-bit MS-DOS**, 8086 instruction set (works with a NEC V20).
-- Tandy extended BIOS **video mode 9: 320x200, 16 colors**.
-- 640K conventional RAM recommended, keyboard.
-- Original Tandy graphics memory at **B800:0000** in four interleaved 8K banks.
-- No VGA, 386, protected-mode DOS extender, X11, Python, or SDL required.
-- No mouse required. A selectable serial mouse backend is a future milestone.
+- Tandy video BIOS mode **9: 320x200, 16 colors**, direct 4-bank B800 framebuffer.
+- Fast one-tile scrolling that shifts the existing VRAM and redraws only the exposed edge.
+- Read-only import of original 27,120-byte .CTY city files, preserving the
+  original 3,120-byte histories/settings header on save.
+- Real Micropolis artwork from `micropolis-activity/images/tiles.xpm`.
+  All 960 original 16x16 tiles are scaled to 8x8 at build time and quantized
+  to the 16-color IBM PC/Tandy palette. Runtime data: **30,720-byte TILES.DAT**.
+- Visible cursor, road/power placement, 3x3 R/C/I zone placement with the
+  original Micropolis tile IDs and center-zone flags, and a simple bulldozer.
+- **Save as a new .CTY file**, never overwrite an existing file.
+- Original demo-city generator and fallback colored glyph art if TILES.DAT
+  isn't present.
 
-## First build: test on the real Tandy
+## Download and test on the EX
 
-Download the `micropolis-tandy-ex-dos` artifact from the
-[Tandy DOS build workflow](../../actions/workflows/tandy-dos.yml).
-Extract `MICROPOL.EXE` to your CompactFlash DOS partition.
+Go to the [Tandy DOS workflow](../../actions/workflows/tandy-dos.yml) and
+download the latest successful `micropolis-tandy-ex-dos` artifact.
 
-From the DOS prompt:
+Copy these to one directory on the DOS CompactFlash partition:
+
+```
+MICROPOL.EXE
+TILES.DAT
+HAPPISLE.CTY
+```
+
+Then launch either the built-in test map or an authentic Micropolis city:
 
 ```dos
 MICROPOL
+MICROPOL HAPPISLE.CTY
 ```
 
-This displays a generated city-style **demonstration map**. No city
-simulation is running. Arrow keys or W/A/S/D scroll the viewport one
-tile at a time. **Esc** returns to the prior DOS video mode.
+The first command displays the built-in generated terrain/buildings.
+The second loads the included **original Micropolis city map**. The map
+file stays unchanged.
 
-To view an existing normal-sized original Micropolis city:
+### Keyboard controls
 
-```dos
-MICROPOL CITY.CTY
-```
+| Key | Action |
+| --- | --- |
+| Arrow keys or W / A / S / D | Pan the city (fast VRAM shift) |
+| I / J / K / L | Move the yellow selection cursor |
+| 0 | Inspect (no placement) |
+| 1 | Road |
+| 2 | Power line |
+| 3 | Residential zone |
+| 4 | Commercial zone |
+| 5 | Industrial zone |
+| 6 | Bulldoze (one tile) |
+| Space | Apply the selected tool at the cursor |
+| F2 | Save a **new** city file in the current directory |
+| Esc | Exit and restore DOS video mode |
 
-`CITY.CTY` must be an unmodified **27,120-byte** city file. The
-viewer loads the map **read-only**. It does not save or edit files,
-and it intentionally rejects other city sizes.
+F2 finds the first available `CITY0001.CTY`, `CITY0002.CTY`,
+and so on. It never overwrites a file that already exists. Copy the
+result from your CF card for inspection, or load it using
+`MICROPOL CITY0001.CTY`.
 
-Important: original Micropolis tile IDs are displayed using a
-**provisional color-coded glyph set**, not the original graphics yet.
-The proper tile-art converter, city-editing tools, and simulation will
-come in later milestones. Don't judge final appearance by this viewer.
+Construction is intentionally conservative: roads/wires require
+empty or wooded non-water terrain, 3x3 zones require nine empty tiles,
+and the bulldozer only clears one tile. Complex building-demolition
+rules, cost calculations and power/road connection algorithms are
+**not yet integrated**. A `BLOCKED` indicator means placement is
+disallowed.
 
-If the EX does not enter graphics mode 9, the program reports the
-problem and returns to DOS. Do not use this build on a standard CGA-only PC.
+**Important:** Although edited maps are written in the original .CTY
+file layout, we have not yet integrated the original simulation rules
+or validated edited maps as playable cities in another Micropolis port.
+Keep your original save files. The generated demo has empty
+budget/history metadata and is for renderer/editor tests only.
 
-## Building
+## Cross-compiler / build
 
-The GitHub Actions workflow provisions Open Watcom 2.0 and builds an
-8086-compatible **16-bit DOS EXE**, not a 32-bit DOS4GW executable:
+The GitHub Actions workflow compiles with Open Watcom 2.0
+(`-0 -ml -bcl=dos`) into a 16-bit MS-DOS MZ executable, not DOS/4GW.
+
+To build manually with Open Watcom for DOS:
 
 ```sh
-wcl -bcl=dos -0 -ms -q -fe=MICROPOL.EXE tandy-dos/tandy.c tandy-dos/city.c
+python3 tandy-dos/tools/convert_tiles.py micropolis-activity/images/tiles.xpm TILES.DAT
+wcl -bcl=dos -0 -ml -q -fe=MICROPOL.EXE tandy-dos/tandy.c tandy-dos/city.c tandy-dos/editor.c
 ```
 
-For a host-side `.CTY` parser regression test:
+Host-side regression tests for loading/saving cities and editing zones:
 
 ```sh
 cc -std=c89 -Wall -Wextra -pedantic -o test-city tandy-dos/city.c tandy-dos/tests/test_city.c
 ./test-city
+cc -std=c89 -Wall -Wextra -pedantic -o test-editor tandy-dos/city.c tandy-dos/editor.c tandy-dos/tests/test_editor.c
+./test-editor
 ```
 
-## Porting roadmap
+## Remaining simulation-port work
 
-1. [x] Keep original repository and licensing intact; isolate work under `tandy-dos/`.
-2. [x] Real Tandy 16-color VRAM renderer and DOS keyboard/exit.
-3. [x] Original Micropolis `.CTY` format loading (read-only).
-4. [ ] Verify mode 9 and map appearance on a **real 1000 EX**.
-5. [ ] Convert authentic tile graphics to the 16-color Tandy palette.
-6. [ ] Remove X11/Tcl/Tk dependencies from the original C simulation engine,
-       adapt its allocations and data types for 16-bit segmented DOS memory.
-7. [ ] Implement simulation tick, zones, budget, edit tools, and save games.
-8. [ ] Add optional serial mouse; preserve keyboard-only operation.
-9. [ ] Benchmark and optimize simulation on the NEC V20.
+The original simulation implementation under
+`micropolis-activity/src/sim/s_*.c` still depends on X11/Tcl/Tk,
+Unix interfaces, and allocations that are unsuitable for segmented DOS
+without adaptation. Next steps are: port the power-network scanner and
+city tick/update schedule, then zoning growth and population/economy
+loops, then budgets, disasters and save-game verification. Game-state
+updates will need profiling on the V20, independently of the already
+fast map redraw.
 
-**No claim of a working game or verified real-hardware executable is made
-until CI and your Tandy have tested it.**
+Optional serial mouse, original 16x16 zoom view and optimized tile
+lookup are also planned. **Do not mistake this editor build for a
+finished, playable Micropolis simulation.**
 
 ## License
 
-Micropolis and this adaptation are distributed under the GPLv3-or-later,
-subject to the original additional terms in [COPYING](../COPYING).
-Original Micropolis: Copyright (C) 1989-2007 Electronic Arts Inc.
-No affiliation with or trademark rights from Electronic Arts or Maxis
-are implied. The modified DOS renderer and viewer are not the original game.
+Micropolis and this adaptation remain GPLv3-or-later with original
+additional terms and notices in [COPYING](../COPYING).
+Original Micropolis and its artwork: Copyright (C) 1989-2007
+Electronic Arts Inc. No SimCity trademark rights or affiliation are
+claimed. This is a modified implementation, not the original game.
