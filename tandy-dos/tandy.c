@@ -7,9 +7,12 @@
 #include <dos.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <conio.h>
 #include "city.h"
 #include "editor.h"
 #include "engine.h"
+#include "ui.h"
+#include "mouse.h"
 
 #define SCREEN_W 320U
 #define SCREEN_H 200U
@@ -33,6 +36,25 @@ static unsigned int cursor_y = VIEW_H / 2U;
 static enum edit_tool selected_tool = EDIT_INSPECT;
 static const char *last_action = "READY";
 static char power_message[12];
+
+/* Menus and mouse input are optional; keyboard remains the default.
+ * A menu is drawn only when opened. No scrolling performance penalty.
+ */
+static enum ui_menu open_menu = MENU_NONE;
+static unsigned int menu_highlight = 0U;
+static int info_page = 0;
+static int exit_requested = 0;
+static int mouse_on = 0;
+static unsigned int mouse_x = 160U, mouse_y = 100U;
+static unsigned int mouse_buttons = 0U;
+
+/* Software 8x8 mouse pointer. Driver hardware cursor is never shown:
+ * standard mouse drivers may not support Tandy 320x200 mode 9.
+ * Saving 32 packed VRAM bytes allows exact recovery of original art.
+ */
+static unsigned char mouse_saved[32];
+static unsigned int mouse_draw_x, mouse_draw_y;
+static int mouse_drawn = 0;
 
 static void set_video_mode(unsigned char mode)
 {
@@ -291,6 +313,105 @@ static void draw_status(void)
     bios_text(24, 0, status, 11);
 }
 
+
+/* The eight-pixel software pointer is much smaller than repainting a tile. */
+static void mouse_pointer_hide(void)
+{
+    unsigned int row, n, dst;
+    if (!mouse_drawn)
+        return;
+    for (row = 0U; row < 8U; ++row) {
+        dst = vram_offset(mouse_draw_x, mouse_draw_y + row);
+        for (n = 0U; n < 4U; ++n)
+            video[dst + n] = mouse_saved[row * 4U + n];
+    }
+    mouse_drawn = 0;
+}
+
+static void mouse_pointer_show(void)
+{
+    unsigned int row, n, col, dst, px, py;
+    static const char *const shape[8] = {
+        "X       ", "XX      ", "X.X     ", "X..X    ",
+        "X...X   ", "X....X  ", "X.....X ", "XXXXXXXX"
+    };
+    if (!mouse_on || mouse_drawn)
+        return;
+    px = (mouse_x > 311U ? 312U : mouse_x) & ~1U;
+    py = mouse_y > 192U ? 192U : mouse_y;
+    mouse_draw_x = px;
+    mouse_draw_y = py;
+    for (row = 0U; row < 8U; ++row) {
+        dst = vram_offset(px, py + row);
+        for (n = 0U; n < 4U; ++n)
+            mouse_saved[row * 4U + n] = video[dst + n];
+    }
+    for (row = 0U; row < 8U; ++row)
+        for (col = 0U; col < 8U; ++col)
+            if (shape[row][col] != ' ')
+                pixel(px + col, py + row,
+                      (unsigned char)(shape[row][col] == 'X' ? 0U : 15U));
+    mouse_drawn = 1;
+}
+
+/* Draw a 16-character popup over the map. It is rebuilt only on menu
+ * selection changes, leaving the VRAM-shift scrolling path untouched.
+ */
+static void draw_menu_popup(void)
+{
+    unsigned int i, j, col, origin, count;
+    if (open_menu == MENU_NONE)
+        return;
+    origin = ui_menu_origin(open_menu);
+    count = ui_menu_count(open_menu);
+    for (j = 0U; j < count; ++j) {
+        for (col = 0U; col < 16U; ++col)
+            solid_tile((origin + col) * 8U, (2U + j) * 8U,
+                       (unsigned char)(j == menu_highlight ? 5U : 1U));
+        bios_text(2U + j, origin + 1U, ui_menu_item(open_menu, j),
+                  (unsigned char)(j == menu_highlight ? 15U : 14U));
+    }
+}
+
+static void draw_info_page(void)
+{
+    unsigned int i, j;
+    if (info_page == 0)
+        return;
+    for (j = 5U; j <= 17U; ++j)
+        for (i = 1U; i < 39U; ++i)
+            solid_tile(i * 8U, j * 8U, 1U);
+
+    if (info_page == 1) {
+        bios_text(6U, 3U, "KEYBOARD CONTROLS", 15U);
+        bios_text(8U, 3U, "ARROWS / WASD  PAN CITY", 14U);
+        bios_text(9U, 3U, "I J K L       MOVE CURSOR", 14U);
+        bios_text(10U, 3U, "0..7          SELECT TOOLS", 14U);
+        bios_text(11U, 3U, "SPACE         BUILD / DOZE", 14U);
+        bios_text(12U, 3U, "F2            SAVE AS", 14U);
+        bios_text(13U, 3U, "P             POWER SCAN", 14U);
+        bios_text(14U, 3U, "F T V H       OPEN MENUS", 14U);
+        bios_text(16U, 3U, "ESC / ANY KEY TO RETURN", 15U);
+    } else if (info_page == 2) {
+        bios_text(6U, 3U, "MOUSE SUPPORT: DOS INT 33H", 15U);
+        bios_text(8U, 3U, "RUN A SERIAL MOUSE DRIVER", 14U);
+        bios_text(9U, 3U, "BEFORE STARTING MICROPOL", 14U);
+        bios_text(11U, 3U, "LEFT: MENU / BUILD / DRAW", 14U);
+        bios_text(12U, 3U, "RIGHT: TOOLS MENU", 14U);
+        bios_text(13U, 3U, "DRAG: ROADS, WIRES, DOZE", 14U);
+        bios_text(14U, 3U, "KEYBOARD ALWAYS WORKS", 14U);
+        bios_text(16U, 3U, "ESC / CLICK TO RETURN", 15U);
+    } else {
+        bios_text(6U, 3U, "MICROPOLIS TANDY 1000 DOS PORT", 15U);
+        bios_text(8U, 3U, "NATIVE 8086 / V20, 16 COLORS", 14U);
+        bios_text(9U, 3U, "MICROPOLIS GPLv3+ SOURCE", 14U);
+        bios_text(10U, 3U, "ORIGINAL ART: ELECTRONIC ARTS", 14U);
+        bios_text(12U, 3U, "EXPERIMENTAL CITY EDITOR", 14U);
+        bios_text(13U, 3U, "FULL SIMULATION NOT YET PORTED", 14U);
+        bios_text(16U, 3U, "ESC / CLICK TO RETURN", 15U);
+    }
+}
+
 static void render_full(void);
 
 static void scroll_one_tile(unsigned int previous_x, unsigned int previous_y)
@@ -351,6 +472,7 @@ static void scroll_one_tile(unsigned int previous_x, unsigned int previous_y)
 static void render_full(void)
 {
     unsigned int x, y;
+    mouse_pointer_hide();
 
 
     /* Draw all 25 text-row-equivalent bands. The map occupies 21 rows. */
@@ -367,13 +489,22 @@ static void render_full(void)
         }
     }
     if (art_data != NULL)
-        bios_text(0, 0, "MICROPOLIS TANDY / ORIGINAL 16C ART", 15);
+        bios_text(0, 0, "MICROPOLIS FILE  TOOLS  VIEW   HELP", 15);
     else
-        bios_text(0, 0, "MICROPOLIS TANDY / FALLBACK GLYPHS", 15);
+        bios_text(0, 0, "MICROPOLIS FILE  TOOLS  VIEW   HELP", 15);
     bios_text(1, 0, "0 INS 1 RD 2 WIRE 3 R 4 C 5 I 6 DZ 7 PL", 14);
-    bios_text(23, 0, "ARROWS PAN IJKL CUR SPACE F2 SAVE P SCAN", 15);
+    if (mouse_on)
+        bios_text(23, 0, "MOUSE LEFT:BUILD RIGHT:TOOLS F2 SAVE", 15);
+    else
+        bios_text(23, 0, "ARROWS PAN IJKL CUR SPACE F2 SAVE P SCAN", 15);
     draw_status();
-    draw_cursor();
+    if (info_page != 0)
+        draw_info_page();
+    else if (open_menu != MENU_NONE)
+        draw_menu_popup();
+    else
+        draw_cursor();
+    mouse_pointer_show();
 }
 
 static int save_city_new_file(void)
