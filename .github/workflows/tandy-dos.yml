@@ -38,6 +38,9 @@ jobs:
           cc -std=c89 -Wall -Wextra -pedantic \
             -o test-engine tandy-dos/city.c tandy-dos/engine.c tandy-dos/tests/test_engine.c
           ./test-engine
+          cc -std=c89 -Wall -Wextra -pedantic \
+            -o test-ui tandy-dos/ui.c tandy-dos/tests/test_ui.c
+          ./test-ui
 
       - name: Convert original Micropolis tile art to Tandy format
         run: |
@@ -64,7 +67,8 @@ jobs:
       - name: Build native 8086-compatible DOS executable
         run: |
           wcl -bcl=dos -0 -ml -q -fe=MICROPOL.EXE \
-            tandy-dos/tandy.c tandy-dos/city.c tandy-dos/editor.c tandy-dos/connections.c tandy-dos/engine.c
+            tandy-dos/tandy.c tandy-dos/city.c tandy-dos/editor.c tandy-dos/connections.c tandy-dos/engine.c \
+            tandy-dos/ui.c tandy-dos/mouse.c
           test -s MICROPOL.EXE
           file MICROPOL.EXE
 
