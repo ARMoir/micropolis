@@ -11,6 +11,7 @@ enum edit_tool {
     EDIT_RESIDENTIAL,
     EDIT_COMMERCIAL,
     EDIT_INDUSTRIAL,
+    EDIT_COAL,
     EDIT_BULLDOZE
 };
 
