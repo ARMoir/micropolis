@@ -6,7 +6,9 @@
  */
 #include <dos.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include "city.h"
+#include "editor.h"
 
 #define SCREEN_W 320U
 #define SCREEN_H 200U
@@ -14,6 +16,8 @@
 #define VIEW_H    21U
 #define VIEW_Y    16U
 #define TILE_MASK 1023U
+#define ART_TILES 960U
+#define ART_BYTES 30720U
 
 /* Tandy mode 9: 320x200x16, two pixels/byte, four 8KB interlaced banks.
  * Rows 0,4,... at B800:0000, rows 1,5,... at B800:2000 and so on.
@@ -22,7 +26,11 @@
 static volatile unsigned char far *video;
 static unsigned int scroll_x = 0, scroll_y = 0;
 static unsigned char old_mode;
-static const char *city_source;
+static unsigned char far *art_data = NULL;
+static unsigned int cursor_x = VIEW_W / 2U;
+static unsigned int cursor_y = VIEW_H / 2U;
+static enum edit_tool selected_tool = EDIT_INSPECT;
+static const char *last_action = "READY";
 
 static void set_video_mode(unsigned char mode)
 {
@@ -89,6 +97,54 @@ static int road_at(unsigned int x, unsigned int y)
     return tile >= 64U && tile <= 207U;
 }
 
+/* Original Micropolis 16x16 XPM tiles, scaled offline to 8x8 packed
+ * Tandy framebuffer bytes in TILES.DAT. No X11, sprite library or VGA.
+ * Keep tiles in a separate far heap allocation, outside the city map.
+ */
+static int load_original_art(void)
+{
+    FILE *f;
+    long length;
+    size_t count;
+    f = fopen("TILES.DAT", "rb");
+    if (f == NULL)
+        return 0;
+    if (fseek(f, 0L, SEEK_END) != 0) {
+        fclose(f);
+        return 0;
+    }
+    length = ftell(f);
+    if (length != ART_BYTES || fseek(f, 0L, SEEK_SET) != 0) {
+        fclose(f);
+        return 0;
+    }
+    art_data = (unsigned char far *)malloc(ART_BYTES);
+    if (art_data == NULL) {
+        fclose(f);
+        return 0;
+    }
+    count = fread(art_data, 1U, ART_BYTES, f);
+    fclose(f);
+    if (count != ART_BYTES) {
+        free(art_data);
+        art_data = NULL;
+        return 0;
+    }
+    return 1;
+}
+
+static void draw_original_tile(unsigned int px, unsigned int py, unsigned int tile)
+{
+    unsigned int src = tile * 32U;
+    unsigned int row, byte_index, dst;
+    for (row = 0; row < 8U; ++row) {
+        dst = vram_offset(px, py + row);
+        for (byte_index = 0; byte_index < 4U; ++byte_index)
+            video[dst + byte_index] =
+                art_data[src + row * 4U + byte_index];
+    }
+}
+
 static void draw_city_tile(unsigned int px, unsigned int py,
                            unsigned int mx, unsigned int my)
 {
@@ -96,6 +152,11 @@ static void draw_city_tile(unsigned int px, unsigned int py,
     unsigned char bg = 2;
     unsigned int i;
     int v, h;
+
+    if (art_data != NULL && t < ART_TILES) {
+        draw_original_tile(px, py, t);
+        return;
+    }
 
     /* First pass: semantic colors keyed to ORIGINAL Micropolis tile IDs.
      * Later milestones will replace symbols with converted original art.
@@ -180,14 +241,51 @@ static void bios_text(unsigned int row, unsigned int column,
  * 8-pixel (four-byte) VRAM shift rather than re-rendering 840 map tiles.
  * Keep both title and bottom control bands untouched while scrolling.
  */
+static void draw_cursor(void)
+{
+    unsigned int x, y;
+    unsigned int px = cursor_x * 8U;
+    unsigned int py = VIEW_Y + cursor_y * 8U;
+
+    /* Yellow hardware pixel outline, drawn after map scrolling/blitting. */
+    for (x = 0U; x < 8U; ++x) {
+        pixel(px + x, py, 14);
+        pixel(px + x, py + 7U, 14);
+    }
+    for (y = 0U; y < 8U; ++y) {
+        pixel(px, py + y, 14);
+        pixel(px + 7U, py + y, 14);
+    }
+}
+
+static void erase_cursor(void)
+{
+    draw_city_tile(cursor_x * 8U, VIEW_Y + cursor_y * 8U,
+                   scroll_x + cursor_x, scroll_y + cursor_y);
+}
+
+static void redraw_edit_area(void)
+{
+    unsigned int x, y, min_x, max_x, min_y, max_y;
+    min_x = cursor_x > 2U ? cursor_x - 2U : 0U;
+    min_y = cursor_y > 2U ? cursor_y - 2U : 0U;
+    max_x = cursor_x + 2U < VIEW_W ? cursor_x + 2U : VIEW_W - 1U;
+    max_y = cursor_y + 2U < VIEW_H ? cursor_y + 2U : VIEW_H - 1U;
+    for (y = min_y; y <= max_y; ++y)
+        for (x = min_x; x <= max_x; ++x)
+            draw_city_tile(x * 8U, VIEW_Y + y * 8U,
+                           scroll_x + x, scroll_y + y);
+}
+
 static void draw_status(void)
 {
     unsigned int x;
     char status[41];
     for (x = 0; x < VIEW_W; ++x)
         solid_tile(x * 8U, 192U, 1);
-    sprintf(status, "VIEW  X:%03u Y:%03u   120x100 CITY MAP",
-            scroll_x, scroll_y);
+    sprintf(status, "%-8s X:%03u Y:%03u  %-10s",
+            edit_tool_name(selected_tool),
+            scroll_x + cursor_x, scroll_y + cursor_y, last_action);
     bios_text(24, 0, status, 11);
 }
 
@@ -267,26 +365,37 @@ static void render_full(void)
                            scroll_x + x, scroll_y + y);
         }
     }
-    bios_text(0, 0, "MICROPOLIS  /  TANDY 1000  /  16 COLOR", 15);
-    bios_text(1, 0, city_source, 14);
-    bios_text(23, 0, "ARROWS / WASD: SCROLL     ESC: EXIT", 15);
+    if (art_data != NULL)
+        bios_text(0, 0, "MICROPOLIS TANDY / ORIGINAL 16C ART", 15);
+    else
+        bios_text(0, 0, "MICROPOLIS TANDY / FALLBACK GLYPHS", 15);
+    bios_text(1, 0, "0 VIEW 1 RD 2 WIRE 3 R 4 C 5 I 6 DOZE", 14);
+    bios_text(23, 0, "ARROWS PAN  IJKL CURSOR  SPACE  F2 SAVE", 15);
     draw_status();
+    draw_cursor();
 }
 
 static void keyboard_loop(void)
 {
     union REGS r;
-    unsigned int prev_x, prev_y;
+    unsigned int prev_x, prev_y, prev_cx, prev_cy;
     unsigned char ascii, scan;
+    enum edit_tool old_tool;
+
     for (;;) {
-        r.h.ah = 0; /* BIOS wait for keystroke */
+        r.h.ah = 0; /* BIOS keyboard, no DOS resident TSR required */
         int86(0x16, &r, &r);
         ascii = r.h.al;
         scan = r.h.ah;
         if (ascii == 27U)
             break;
+
         prev_x = scroll_x;
         prev_y = scroll_y;
+        prev_cx = cursor_x;
+        prev_cy = cursor_y;
+        old_tool = selected_tool;
+
         if ((scan == 0x4bU || ascii == 'a' || ascii == 'A')
             && scroll_x > 0U)
             --scroll_x;
@@ -299,8 +408,62 @@ static void keyboard_loop(void)
         else if ((scan == 0x50U || ascii == 's' || ascii == 'S')
                  && scroll_y < CITY_HEIGHT - VIEW_H)
             ++scroll_y;
-        if (scroll_x != prev_x || scroll_y != prev_y)
+        else if ((ascii == 'j' || ascii == 'J') && cursor_x > 0U)
+            --cursor_x;
+        else if ((ascii == 'l' || ascii == 'L') && cursor_x < VIEW_W - 1U)
+            ++cursor_x;
+        else if ((ascii == 'i' || ascii == 'I') && cursor_y > 0U)
+            --cursor_y;
+        else if ((ascii == 'k' || ascii == 'K') && cursor_y < VIEW_H - 1U)
+            ++cursor_y;
+        else if (ascii >= '0' && ascii <= '6') {
+            if (ascii == '0') selected_tool = EDIT_INSPECT;
+            if (ascii == '1') selected_tool = EDIT_ROAD;
+            if (ascii == '2') selected_tool = EDIT_POWER;
+            if (ascii == '3') selected_tool = EDIT_RESIDENTIAL;
+            if (ascii == '4') selected_tool = EDIT_COMMERCIAL;
+            if (ascii == '5') selected_tool = EDIT_INDUSTRIAL;
+            if (ascii == '6') selected_tool = EDIT_BULLDOZE;
+            last_action = "SELECT";
+        } else if (ascii == ' ') {
+            if (selected_tool == EDIT_INSPECT) {
+                last_action = "INSPECT";
+            } else if (edit_place(selected_tool,
+                                  scroll_x + cursor_x,
+                                  scroll_y + cursor_y)) {
+                last_action = "PLACED";
+                redraw_edit_area();
+                draw_cursor();
+            } else
+                last_action = "BLOCKED";
+        } else if (scan == 0x3cU) { /* F2, never overwrite input city. */
+            last_action = city_save_as("TANDY.CTY") ? "SAVED" : "SAVE ERR";
+        }
+
+        if (scroll_x != prev_x || scroll_y != prev_y) {
+            /* Remove overlay before shifting VRAM, then redraw the overlay. */
+            /* Undo scroll coordinate to redraw old tile before panning. */
+            unsigned int next_x = scroll_x, next_y = scroll_y;
+            scroll_x = prev_x;
+            scroll_y = prev_y;
+            erase_cursor();
+            scroll_x = next_x;
+            scroll_y = next_y;
             scroll_one_tile(prev_x, prev_y);
+            draw_cursor();
+        } else if (cursor_x != prev_cx || cursor_y != prev_cy) {
+            unsigned int next_cx = cursor_x, next_cy = cursor_y;
+            cursor_x = prev_cx;
+            cursor_y = prev_cy;
+            erase_cursor();
+            cursor_x = next_cx;
+            cursor_y = next_cy;
+            draw_cursor();
+        }
+        if (old_tool != selected_tool || cursor_x != prev_cx ||
+            cursor_y != prev_cy || scroll_x != prev_x ||
+            scroll_y != prev_y || ascii == ' ' || scan == 0x3cU)
+            draw_status();
     }
 }
 
@@ -327,8 +490,11 @@ int main(int argc, char **argv)
         return 1;
     }
     video = (volatile unsigned char far *)MK_FP(0xb800, 0);
+    (void)load_original_art();
     render_full();
     keyboard_loop();
-    set_video_mode(old_mode); /* return cleanly to DOS even after Esc */
+    set_video_mode(old_mode);
+    if (art_data != NULL)
+        free(art_data); /* return cleanly to DOS even after Esc */
     return 0;
 }
