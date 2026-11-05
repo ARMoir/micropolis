@@ -55,7 +55,7 @@ The GitHub Actions workflow provisions Open Watcom 2.0 and builds an
 8086-compatible **16-bit DOS EXE**, not a 32-bit DOS4GW executable:
 
 ```sh
-wcl -bt=dos -0 -ms -q -fe=MICROPOL.EXE tandy-dos/tandy.c tandy-dos/city.c
+wcl -bcl=dos -0 -ms -q -fe=MICROPOL.EXE tandy-dos/tandy.c tandy-dos/city.c
 ```
 
 For a host-side `.CTY` parser regression test:
