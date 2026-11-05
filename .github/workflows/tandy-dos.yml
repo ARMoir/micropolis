@@ -53,7 +53,18 @@ jobs:
               return tiles[n * 32 : (n + 1) * 32]
           assert tile(67) == tile(83) == tile(99) == tile(195), "vertical traffic smoothing mismatch"
           assert tile(66) != tile(67), "horizontal and vertical streets must differ"
-          print("Vertical traffic tile regression tests passed")
+          def pixel(n, x, y):
+              packed = tile(n)[y * 4 + x // 2]
+              return (packed & 15) if x & 1 else (packed >> 4)
+          # Original 16x16 tile 66 has white dashes on row 7 only.
+          # A plain 2x2 majority downscale erased all four dashes.
+          for n in (64, 66, 72, 74, 80, 82):
+              assert [pixel(n, x, 3) for x in (1, 2, 5, 6)] == [15] * 4, (
+                  f"missing horizontal centerline on road tile {n}"
+              )
+              assert pixel(n, 0, 3) != 15, f"centerline too wide on {n}"
+          assert tile(67) == tile(83), "vertical road fix must remain intact"
+          print("Horizontal and vertical traffic tile regression tests passed")
           PY
           cp micropolis-activity/cities/happisle.cty HAPPISLE.CTY
           test "$(wc -c < HAPPISLE.CTY)" -eq 27120
