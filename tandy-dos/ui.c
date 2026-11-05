@@ -38,9 +38,9 @@ static const enum ui_action help_cmds[] = {
 unsigned int ui_menu_origin(enum ui_menu menu)
 {
     switch (menu) {
-    case MENU_FILE:  return 10U;
-    case MENU_TOOLS: return 16U;
-    case MENU_VIEW:  return 22U;
+    case MENU_FILE:  return 1U;
+    case MENU_TOOLS: return 9U;
+    case MENU_VIEW:  return 17U;
     case MENU_HELP:  return 24U;
     default: return 0U;
     }
@@ -57,37 +57,32 @@ unsigned int ui_menu_count(enum ui_menu menu)
     }
 }
 
-/* Row zero: "MICROPOLIS FILE  TOOLS  VIEW  HELP", 40 columns.
- * These header boundaries intentionally include padding for easy clicking.
+/* Row 0: " SYSTEM   TOOLS   VIEW   HELP" (cyan bar).
+ * Toolbox occupies x=0..79; the city begins at x=80, y=8.
  */
 int ui_header_hit(unsigned int x, unsigned int y)
 {
     unsigned int column;
-    if (x >= 320U || y >= 8U)
+    if (x >= 320U || y >= UI_MAP_Y)
         return MENU_NONE;
     column = x / 8U;
-    if (column >= 11U && column <= 16U) return MENU_FILE;
-    if (column >= 17U && column <= 23U) return MENU_TOOLS;
-    if (column >= 24U && column <= 30U) return MENU_VIEW;
-    if (column >= 31U && column <= 39U) return MENU_HELP;
+    if (column >= 1U && column <= 8U) return MENU_FILE;
+    if (column >= 9U && column <= 16U) return MENU_TOOLS;
+    if (column >= 17U && column <= 24U) return MENU_VIEW;
+    if (column >= 25U && column <= 39U) return MENU_HELP;
     return MENU_NONE;
 }
 
-/* Row one, top toolbar: 0 INS 1 RD 2 WIR 3 R 4 C 5 I 6 DZ 7 PL */
+/* Two columns of 32x32 icon buttons down the left-side panel. */
 int ui_toolbar_hit(unsigned int x, unsigned int y)
 {
-    unsigned int column;
-    if (x >= 320U || y < 8U || y >= 16U)
+    unsigned int col, row;
+    if (x >= UI_TOOLBOX_W || y < UI_BUTTON_TOP ||
+        y >= UI_BUTTON_TOP + UI_BUTTON_SIZE * 4U)
         return -1;
-    column = x / 8U;
-    if (column < 6U)  return 0;
-    if (column < 11U) return 1;
-    if (column < 18U) return 2;
-    if (column < 22U) return 3;
-    if (column < 26U) return 4;
-    if (column < 30U) return 5;
-    if (column < 35U) return 6;
-    return 7;
+    col = x / 40U;
+    row = (y - UI_BUTTON_TOP) / UI_BUTTON_SIZE;
+    return (int)(row * 2U + col);
 }
 
 int ui_dropdown_hit(enum ui_menu menu, unsigned int x, unsigned int y)
@@ -97,12 +92,12 @@ int ui_dropdown_hit(enum ui_menu menu, unsigned int x, unsigned int y)
         return -1;
     col = x / 8U;
     row = y / 8U;
-    if (row < 2U || row >= 2U + ui_menu_count(menu))
+    if (row < 1U || row >= 1U + ui_menu_count(menu))
         return -1;
     if (col < ui_menu_origin(menu) ||
         col >= ui_menu_origin(menu) + 16U)
         return -1;
-    return (int)(row - 2U);
+    return (int)(row - 1U);
 }
 
 const char *ui_menu_item(enum ui_menu menu, unsigned int index)
