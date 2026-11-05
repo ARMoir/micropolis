@@ -16,6 +16,8 @@ extern unsigned short city_tiles[CITY_TILES];
  * Read-only. 0 means invalid, missing or unsupported city.
  */
 int city_load(const char *path);
+int city_save_as(const char *path);
+void city_set(unsigned int x, unsigned int y, unsigned short tile);
 void city_make_demo(void);
 unsigned short city_at(unsigned int x, unsigned int y);
 
