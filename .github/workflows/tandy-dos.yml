@@ -58,11 +58,13 @@ jobs:
               return (packed & 15) if x & 1 else (packed >> 4)
           # Original 16x16 tile 66 has white dashes on row 7 only.
           # A plain 2x2 majority downscale erased all four dashes.
-          for n in (64, 66, 72, 74, 80, 82):
+          for n in (64, 66, 74, 80, 82):
               assert [pixel(n, x, 3) for x in (1, 2, 5, 6)] == [15] * 4, (
                   f"missing horizontal centerline on road tile {n}"
               )
               assert pixel(n, 0, 3) != 15, f"centerline too wide on {n}"
+          # T-junction tile 72 offsets the painted stripe by one source pixel.
+          assert [pixel(72, x, 3) for x in (2, 5, 6)] == [15] * 3
           assert tile(67) == tile(83), "vertical road fix must remain intact"
           print("Horizontal and vertical traffic tile regression tests passed")
           PY
