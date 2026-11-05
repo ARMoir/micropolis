@@ -15,8 +15,11 @@ project. It targets the NEC V20-equipped Tandy 1000 EX.
 - Real Micropolis artwork from `micropolis-activity/images/tiles.xpm`.
   All 960 original 16x16 tiles are scaled to 8x8 at build time and quantized
   to the 16-color IBM PC/Tandy palette. Runtime data: **30,720-byte TILES.DAT**.
-- Visible cursor, road/power placement, 3x3 R/C/I zone placement with the
-  original Micropolis tile IDs and center-zone flags, and a simple bulldozer.
+- Visible cursor, road/power placement, 3x3 R/C/I zones and original 4x4 coal power plant
+  placement, with original Micropolis tile IDs/flags, and a simple bulldozer.
+- First isolated simulation subsystem: power-network reachability from coal/nuclear
+  plant centers, using the original conductor flags and 700/2000 tile capacities.
+  Triggered manually using P; no automatic simulation ticking yet.
 - **Save as a new .CTY file**, never overwrite an existing file.
 - Original demo-city generator and fallback colored glyph art if TILES.DAT
   isn't present.
@@ -58,6 +61,8 @@ file stays unchanged.
 | 4 | Commercial zone |
 | 5 | Industrial zone |
 | 6 | Bulldoze (one tile) |
+| 7 | Construct 4x4 coal power plant (16 empty tiles required) |
+| P | Recalculate powered tiles and show the count in the bottom status bar |
 | Space | Apply the selected tool at the cursor |
 | F2 | Save a **new** city file in the current directory |
 | Esc | Exit and restore DOS video mode |
@@ -70,8 +75,8 @@ result from your CF card for inspection, or load it using
 Construction is intentionally conservative: roads/wires require
 empty or wooded non-water terrain, 3x3 zones require nine empty tiles,
 and the bulldozer only clears one tile. Complex building-demolition
-rules, cost calculations and power/road connection algorithms are
-**not yet integrated**. A `BLOCKED` indicator means placement is
+rules, cost calculations, road connection tile selection and full
+simulation tick scheduling are **not yet integrated**. A `BLOCKED` indicator means placement is
 disallowed.
 
 **Important:** Although edited maps are written in the original .CTY
@@ -89,7 +94,7 @@ To build manually with Open Watcom for DOS:
 
 ```sh
 python3 tandy-dos/tools/convert_tiles.py micropolis-activity/images/tiles.xpm TILES.DAT
-wcl -bcl=dos -0 -ml -q -fe=MICROPOL.EXE tandy-dos/tandy.c tandy-dos/city.c tandy-dos/editor.c
+wcl -bcl=dos -0 -ml -q -fe=MICROPOL.EXE tandy-dos/tandy.c tandy-dos/city.c tandy-dos/editor.c tandy-dos/engine.c
 ```
 
 Host-side regression tests for loading/saving cities and editing zones:
@@ -99,6 +104,8 @@ cc -std=c89 -Wall -Wextra -pedantic -o test-city tandy-dos/city.c tandy-dos/test
 ./test-city
 cc -std=c89 -Wall -Wextra -pedantic -o test-editor tandy-dos/city.c tandy-dos/editor.c tandy-dos/tests/test_editor.c
 ./test-editor
+cc -std=c89 -Wall -Wextra -pedantic -o test-engine tandy-dos/city.c tandy-dos/engine.c tandy-dos/tests/test_engine.c
+./test-engine
 ```
 
 ## Remaining simulation-port work
@@ -106,9 +113,9 @@ cc -std=c89 -Wall -Wextra -pedantic -o test-editor tandy-dos/city.c tandy-dos/ed
 The original simulation implementation under
 `micropolis-activity/src/sim/s_*.c` still depends on X11/Tcl/Tk,
 Unix interfaces, and allocations that are unsuitable for segmented DOS
-without adaptation. Next steps are: port the power-network scanner and
-city tick/update schedule, then zoning growth and population/economy
-loops, then budgets, disasters and save-game verification. Game-state
+without adaptation. The **first power-network scan** is now isolated in `engine.c`.
+Next steps are to integrate the real city tick/update schedule, zoning
+growth and population/economy loops, then budgets, disasters and save-game verification. Game-state
 updates will need profiling on the V20, independently of the already
 fast map redraw.
 
