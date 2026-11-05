@@ -22,6 +22,10 @@ int main(void)
     assert(edit_place(EDIT_INDUSTRIAL, 60U, 60U));
     assert((city_at(60,60) & 1023U) == 616U);
     assert(!edit_place(EDIT_INDUSTRIAL, 0U, 0U)); /* bounds */
+    assert(edit_place(EDIT_COAL, 80U, 20U));
+    assert((city_at(80U,20U) & 1023U) == 750U);
+    assert((city_at(80U,20U) & 1024U) != 0U);
+    assert(!edit_place(EDIT_COAL, 80U, 20U));
     assert(edit_place(EDIT_ROAD, 3U, 3U));
     assert((city_at(3,3) & 1023U) == 66U);
     assert(!edit_place(EDIT_POWER, 3U, 3U)); /* collision */
