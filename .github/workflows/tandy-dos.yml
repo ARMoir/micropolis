@@ -33,7 +33,7 @@ jobs:
 
       - name: Build native 8086-compatible DOS executable
         run: |
-          wcl -bt=dos -0 -ms -q -fe=MICROPOL.EXE \
+          wcl -bcl=dos -0 -ms -q -fe=MICROPOL.EXE \
             tandy-dos/tandy.c tandy-dos/city.c
           test -s MICROPOL.EXE
           file MICROPOL.EXE
