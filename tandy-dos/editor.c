@@ -47,7 +47,7 @@ int edit_place(enum edit_tool tool, unsigned int x, unsigned int y)
     }
     if (tool == EDIT_ROAD || tool == EDIT_POWER) {
         /* First milestone: only empty land or vegetation. */
-        if (tile > 43U)
+        if (tile > 43U || (tile >= 1U && tile <= 20U))
             return 0;
         if (tool == EDIT_ROAD)
             city_set(x, y, 66U | BURNBIT | CONDBIT);
