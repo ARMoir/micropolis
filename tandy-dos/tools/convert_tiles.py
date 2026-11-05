@@ -43,7 +43,7 @@ def _nearest(rgb: tuple[int, int, int]) -> int:
         (rgb[k] - PALETTE[i][k]) ** 2 for k in range(3)))
 
 
-def convert(source: Path) -> bytes:
+def convert(source: Path, preserve_traffic: bool = False) -> bytes:
     quoted = re.findall(r'^\s*"([^"]*)"', source.read_text(), re.M)
     if not quoted:
         raise ValueError("No XPM data found")
@@ -64,9 +64,19 @@ def convert(source: Path) -> bytes:
     rows = quoted[1 + colors:]
     packed = bytearray()
     for tile in range(960):
+        source_tile = tile
+        # Micropolis road tiles 80..207 embed traffic-vehicle details.
+        # Their 16x16 cars become noisy streaks on north-south roads after
+        # reducing to 8x8. For straight vertical road variants use the
+        # original clean vertical-road tile 67, preserving geometry and
+        # border alignment. Horizontal roads/intersections stay untouched.
+        # Optionally keep all traffic source pixels for comparison.
+        if (not preserve_traffic and 80 <= tile <= 207 and
+                (tile & 15) == 3):
+            source_tile = 67
         for sy in range(0, 16, 2):
-            top = rows[tile * 16 + sy]
-            bottom = rows[tile * 16 + sy + 1]
+            top = rows[source_tile * 16 + sy]
+            bottom = rows[source_tile * 16 + sy + 1]
             if len(top) != 16 or len(bottom) != 16:
                 raise ValueError(f"Malformed pixel row at tile {tile}")
             for sx in range(0, 16, 4):
@@ -88,11 +98,14 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("source", type=Path)
     parser.add_argument("destination", type=Path)
+    parser.add_argument("--preserve-traffic", action="store_true",
+                        help="Keep all original 16x16 traffic details in 8x8 sprites")
     args = parser.parse_args()
-    data = convert(args.source)
+    data = convert(args.source, preserve_traffic=args.preserve_traffic)
     args.destination.parent.mkdir(parents=True, exist_ok=True)
     args.destination.write_bytes(data)
-    print(f"Converted 960 authentic Micropolis tiles to {len(data)} bytes at {args.destination}")
+    print(f"Converted 960 Micropolis tiles to {len(data)} bytes at {args.destination}"
+          f" (vertical traffic smoothing: {not args.preserve_traffic})")
 
 
 if __name__ == "__main__":
