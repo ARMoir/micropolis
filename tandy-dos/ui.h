@@ -8,6 +8,7 @@
  * 64-pixel toolbox alongside a 32x21-tile city window (y=16..183);
  * diagnostics at y=184..199. Minimap lives under compact tool grid.
  */
+#define UI_MENU_HEIGHT  8U
 #define UI_MAP_X       64U
 #define UI_MAP_Y       16U
 #define UI_MAP_COLS    32U
