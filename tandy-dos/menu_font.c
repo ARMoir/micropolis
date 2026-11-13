@@ -9,8 +9,11 @@
  */
 #include "menu_font.h"
 
-/* Rows for E,H,I,L,M,O,P,S,T,V,W,Y; a total of 84 bytes. */
-static const unsigned char font[12][7] = {
+/* Uppercase glyphs also serve the two narrow sidebar headings:
+ * TOOLS / MAP. Thirteen glyphs use only 91 bytes.
+ */
+static const unsigned char font[13][7] = {
+    {14,17,17,31,17,17,17}, /* A */
     {31,16,16,30,16,16,31}, /* E */
     {17,17,17,31,17,17,17}, /* H */
     {31, 4, 4, 4, 4, 4,31}, /* I */
@@ -27,11 +30,11 @@ static const unsigned char font[12][7] = {
 
 unsigned int menu_font_row(unsigned char ch, unsigned int row)
 {
-    static const char letters[] = "EHILMOPSTVWY";
+    static const char letters[] = "AEHILMOPSTVWY";
     unsigned int i;
     if (row >= 7U)
         return 0U;
-    for (i = 0U; i < 12U; ++i)
+    for (i = 0U; i < 13U; ++i)
         if (ch == (unsigned char)letters[i])
             return font[i][row];
     return 0U;
