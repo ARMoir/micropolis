@@ -1452,6 +1452,9 @@ int main(int argc, char **argv)
     if (!have_city) {
         city_make_demo();
         zoning_seed_from_city();
+        simulation_seed_demo();
+        scroll_x = 38U;
+        scroll_y = 20U;
     }
     simulation_init();
 
