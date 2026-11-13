@@ -114,6 +114,23 @@ int main(void)
     assert((city_at(31U,31U) & 1023U) == 269U);
     assert((city_at(30U,30U) & 1024U) != 0U);
     assert((city_at(32U,30U) & 1023U) == 66U);
-    puts("Phased RCI growth (1x1 and original 3x3), clock, taxes and persistence passed");
+    /* Demo must be playable from a cold boot without loading or editing
+     * an external city: generator supplies a coal plant + wires + roads.
+     */
+    city_make_demo();
+    zoning_clear();
+    simulation_seed_demo();
+    assert((city_at(42U,26U) & 1023U) == 750U);
+    assert((city_at(49U,30U) & 1023U) == 210U);
+    assert(zoning_at(50U,31U) == ZONE_RES);
+    assert(zoning_at(56U,31U) == ZONE_IND);
+    assert(zoning_at(59U,31U) == ZONE_COM);
+    assert(zoning_at(62U,36U) == ZONE_RES);
+    simulation_init();
+    run_months(36U);
+    assert(zoning_development_at(50U,31U) > 0U ||
+           zoning_development_at(51U,31U) > 0U ||
+           zoning_development_at(52U,31U) > 0U);
+    puts("Phased RCI growth (1x1 / 3x3), demo, clock, taxes and persistence passed");
     return 0;
 }
