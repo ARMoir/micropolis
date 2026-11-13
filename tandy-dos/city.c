@@ -99,6 +99,63 @@ unsigned short city_at(unsigned int x, unsigned int y)
     return city_tiles[x * CITY_HEIGHT + y];
 }
 
+/* Pick the densest developed RCI neighborhood, rather than defaulting
+ * to the ocean in the northwest corner of HAPPISLE. Twelve by ten
+ * 10x10-tile bins use only 240 stack bytes, scanned once at load.
+ * Prefer residential centers to show visible house construction.
+ * No simulation or rendering state is touched by this helper.
+ */
+int city_suggest_view(unsigned int view_w, unsigned int view_h,
+                      unsigned int *left, unsigned int *top)
+{
+    unsigned short bins[12U * 10U];
+    unsigned int i, x, y, id, weight, best = 0U, best_i = 0U;
+    unsigned int center_x, center_y;
+    if (left == NULL || top == NULL ||
+        view_w == 0U || view_h == 0U ||
+        view_w > CITY_WIDTH || view_h > CITY_HEIGHT)
+        return 0;
+    for (i = 0U; i < 12U * 10U; ++i)
+        bins[i] = 0U;
+    for (x = 0U; x < CITY_WIDTH; ++x) {
+        for (y = 0U; y < CITY_HEIGHT; ++y) {
+            unsigned short tile = city_at(x,y);
+            if (!(tile & 1024U))
+                continue;
+            id = tile & TILE_ID_MASK;
+            weight = 0U;
+            if (id >= 265U && id < 409U)
+                weight = 5U;
+            else if (id == 244U)
+                weight = 2U;
+            else if ((id >= 436U && id < 612U) ||
+                     (id >= 625U && id < 693U))
+                weight = 2U;
+            else if (id == 427U || id == 616U)
+                weight = 1U;
+            if (weight != 0U)
+                bins[(y/10U)*12U+x/10U] += (unsigned short)weight;
+        }
+    }
+    for (i = 0U; i < 12U * 10U; ++i) {
+        if (bins[i] > best) {
+            best = bins[i];
+            best_i = i;
+        }
+    }
+    if (best == 0U)
+        return 0;
+    center_x = (best_i % 12U) * 10U + 5U;
+    center_y = (best_i / 12U) * 10U + 5U;
+    *left = center_x > view_w/2U ? center_x-view_w/2U : 0U;
+    *top = center_y > view_h/2U ? center_y-view_h/2U : 0U;
+    if (*left > CITY_WIDTH-view_w)
+        *left = CITY_WIDTH-view_w;
+    if (*top > CITY_HEIGHT-view_h)
+        *top = CITY_HEIGHT-view_h;
+    return 1;
+}
+
 int city_load(const char *path)
 {
     FILE *f;
