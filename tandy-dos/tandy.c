@@ -782,9 +782,9 @@ static void draw_menu_popup(void)
     count = ui_menu_count(open_menu);
     for (j = 0U; j < count; ++j) {
         for (col = 0U; col < 16U; ++col)
-            solid_tile((origin + col) * 8U, (1U + j) * 8U,
+            solid_tile((origin + col) * 8U, (2U + j) * 8U,
                        (unsigned char)(j == menu_highlight ? 5U : 1U));
-        bios_text(1U + j, origin + 1U, ui_menu_item(open_menu, j),
+        bios_text(2U + j, origin + 1U, ui_menu_item(open_menu, j),
                   (unsigned char)(j == menu_highlight ? 15U : 14U));
     }
 }
@@ -1152,6 +1152,8 @@ static void handle_mouse(void)
 
     if (moved) {
         mouse_pointer_hide();
+        mouse_x = state.x;
+        mouse_y = state.y;
         if (info_page == 0 && open_menu == MENU_NONE && inside) {
             next_x = (state.x - VIEW_X) / 8U;
             next_y = (state.y - VIEW_Y) / 8U;
@@ -1189,8 +1191,11 @@ static void handle_mouse(void)
                 draw_menu_popup();
             }
         }
-        mouse_x = state.x;
-        mouse_y = state.y;
+        /* Pointer coordinates are diagnostics, not city statistics.
+         * Diffed glyph writes keep mouse motion inexpensive.
+         */
+        if (info_page == 0 && open_menu == MENU_NONE)
+            draw_status();
         mouse_pointer_show();
     }
 
@@ -1496,7 +1501,7 @@ static void keyboard_loop(void)
             scroll_y = next_y;
             scroll_one_tile(prev_x, prev_y);
             draw_cursor();
-            draw_overview();
+            draw_overview_camera();
         } else if (cursor_x != prev_cx || cursor_y != prev_cy) {
             next_cx = cursor_x;
             next_cy = cursor_y;
