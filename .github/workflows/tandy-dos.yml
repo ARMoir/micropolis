@@ -1,0 +1,112 @@
+name: Micropolis Tandy EX (16-bit DOS)
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - 'tandy-dos/**'
+      - '.github/workflows/tandy-dos.yml'
+  pull_request:
+    branches: [master]
+    paths:
+      - 'tandy-dos/**'
+      - '.github/workflows/tandy-dos.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Validate city files and cross-compile 8086 DOS EXE
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out Micropolis
+        uses: actions/checkout@v4
+
+      - name: Check original Micropolis city-file parser
+        run: |
+          cc -std=c89 -Wall -Wextra -pedantic \
+            -o test-city tandy-dos/city.c tandy-dos/tests/test_city.c
+          ./test-city
+          cc -std=c89 -Wall -Wextra -pedantic \
+            -o test-editor tandy-dos/city.c tandy-dos/editor.c tandy-dos/connections.c tandy-dos/tests/test_editor.c
+          ./test-editor
+          cc -std=c89 -Wall -Wextra -pedantic \
+            -o test-connections tandy-dos/city.c tandy-dos/editor.c tandy-dos/connections.c tandy-dos/tests/test_connections.c
+          ./test-connections
+          cc -std=c89 -Wall -Wextra -pedantic \
+            -o test-engine tandy-dos/city.c tandy-dos/engine.c tandy-dos/tests/test_engine.c
+          ./test-engine
+          cc -std=c89 -Wall -Wextra -pedantic \
+            -o test-ui tandy-dos/ui.c tandy-dos/tests/test_ui.c
+          ./test-ui
+          cc -std=c89 -Wall -Wextra -pedantic \
+            -o test-zoning tandy-dos/city.c tandy-dos/zoning.c tandy-dos/tests/test_zoning.c
+          ./test-zoning
+          cc -std=c89 -Wall -Wextra -pedantic \
+            -o test-placement tandy-dos/city.c tandy-dos/zoning.c \
+            tandy-dos/editor.c tandy-dos/connections.c \
+            tandy-dos/placement.c tandy-dos/tests/test_placement.c
+          ./test-placement
+          cc -std=c89 -Wall -Wextra -pedantic \
+            -o test-simulation tandy-dos/city.c tandy-dos/zoning.c \
+            tandy-dos/engine.c tandy-dos/simulation.c \
+            tandy-dos/tests/test_simulation.c
+          ./test-simulation micropolis-activity/cities/happisle.cty
+
+      - name: Convert original Micropolis tile art to Tandy format
+        run: |
+          python3 tandy-dos/tools/convert_tiles.py micropolis-activity/images/tiles.xpm TILES.DAT
+          test "$(wc -c < TILES.DAT)" -eq 30720
+          python3 - <<'PY'
+          from pathlib import Path
+          tiles = Path("TILES.DAT").read_bytes()
+          def tile(n):
+              return tiles[n * 32 : (n + 1) * 32]
+          assert tile(67) == tile(83) == tile(99) == tile(195), "vertical traffic smoothing mismatch"
+          assert tile(66) != tile(67), "horizontal and vertical streets must differ"
+          def pixel(n, x, y):
+              packed = tile(n)[y * 4 + x // 2]
+              return (packed & 15) if x & 1 else (packed >> 4)
+          # Original 16x16 tile 66 has white dashes on row 7 only.
+          # A plain 2x2 majority downscale erased all four dashes.
+          for n in (64, 66, 74, 80, 82):
+              assert [pixel(n, x, 3) for x in (1, 2, 5, 6)] == [15] * 4, (
+                  f"missing horizontal centerline on road tile {n}"
+              )
+              assert pixel(n, 0, 3) != 15, f"centerline too wide on {n}"
+          # T-junction tile 72 offsets the painted stripe by one source pixel.
+          assert [pixel(72, x, 3) for x in (2, 5, 6)] == [15] * 3
+          assert tile(67) == tile(83), "vertical road fix must remain intact"
+          print("Horizontal and vertical traffic tile regression tests passed")
+          PY
+          cp micropolis-activity/cities/happisle.cty HAPPISLE.CTY
+          test "$(wc -c < HAPPISLE.CTY)" -eq 27120
+
+      - name: Set up Open Watcom (16-bit DOS)
+        uses: open-watcom/setup-watcom@v1
+        with:
+          version: '2.0'
+          target: dos
+
+      - name: Build native 8086-compatible DOS executable
+        run: |
+          wcl -bcl=dos -0 -ml -q -fe=MICROPOL.EXE \
+            tandy-dos/tandy.c tandy-dos/city.c tandy-dos/editor.c tandy-dos/connections.c tandy-dos/engine.c \
+            tandy-dos/ui.c tandy-dos/mouse.c tandy-dos/zoning.c \
+            tandy-dos/placement.c tandy-dos/simulation.c
+          test -s MICROPOL.EXE
+          file MICROPOL.EXE
+
+      - name: Upload hardware-test executable
+        uses: actions/upload-artifact@v4
+        with:
+          name: micropolis-tandy-ex-dos
+          path: |
+            MICROPOL.EXE
+            TILES.DAT
+            HAPPISLE.CTY
+            COPYING
+            tandy-dos/README.md
+          if-no-files-found: error
