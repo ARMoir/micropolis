@@ -20,6 +20,11 @@ struct sim_statistics {
     unsigned int wire_tiles;
     unsigned int plants;
     unsigned int powered_tiles;
+    unsigned int growth_last_month;
+    unsigned int growth_total;
+    unsigned int lots_ready;
+    unsigned int lots_no_road;
+    unsigned int lots_no_power;
     unsigned int month;
     unsigned int year;
     long last_income;
