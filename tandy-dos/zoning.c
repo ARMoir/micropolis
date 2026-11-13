@@ -14,30 +14,61 @@
 #include <stdio.h>
 
 #define ZONING_LENGTH (CITY_WIDTH * CITY_HEIGHT)
-#define ZONING_SIZE (8L + ZONING_LENGTH)
+#define ZONING_BYTES ((ZONING_LENGTH + 3U) / 4U)
+#define ZONING_SIZE (8L + ZONING_BYTES + 2L)
 #define TILE_MASK 1023U
 #define ZONE_BIT  1024U
 
-/* Column-major, same layout as the historical Micropolis .CTY tile map.
- * Static memory rather than heap/recursion: exactly 12,000 bytes.
+/* Four independent 2-bit zone values per byte: only 3,000 bytes for
+ * 12,000 squares. This avoids overflowing the 16-bit Watcom DGROUP.
+ * Column-major square IDs still match the classic Micropolis world.
  */
-static unsigned char zone_grid[ZONING_LENGTH];
+static unsigned char zone_grid[ZONING_BYTES];
 static const unsigned char magic[8] = {
-    'T', 'Z', 'O', 'N', 1, CITY_WIDTH, CITY_HEIGHT, 0
+    'T', 'Z', 'O', 'N', 2, CITY_WIDTH, CITY_HEIGHT, 0
 };
+
+static unsigned int zone_get(unsigned int index)
+{
+    return (zone_grid[index >> 2] >> ((index & 3U) * 2U)) & 3U;
+}
+
+static void zone_put(unsigned int index, unsigned int value)
+{
+    unsigned int shift = (index & 3U) * 2U;
+    unsigned int mask = 3U << shift;
+    zone_grid[index >> 2] =
+        (unsigned char)((zone_grid[index >> 2] & ~mask) |
+                        ((value & 3U) << shift));
+}
+
+/* A cheap rolling 16-bit digest for accidental file corruption.
+ * Not cryptographic. Performed only on save/load, never while painting.
+ */
+static unsigned int hash_step(unsigned int hash, unsigned int value)
+{
+    return (((hash << 5) | (hash >> 11)) ^ value) & 65535U;
+}
+static unsigned int zoning_checksum(void)
+{
+    unsigned int i, hash = 0x4d37U;
+    for (i = 0U; i < ZONING_BYTES; ++i)
+        hash = hash_step(hash, zone_grid[i]);
+    return hash;
+}
 
 void zoning_clear(void)
 {
     unsigned int i;
-    for (i = 0U; i < ZONING_LENGTH; ++i)
-        zone_grid[i] = ZONE_NONE;
+    for (i = 0U; i < ZONING_BYTES; ++i)
+        zone_grid[i] = 0U;
 }
 
 unsigned int zoning_at(unsigned int x, unsigned int y)
 {
     if (x >= CITY_WIDTH || y >= CITY_HEIGHT)
         return ZONE_NONE;
-    return zone_grid[x * CITY_HEIGHT + y];
+    return zone_get(x * CITY_HEIGHT + y);
 }
 
 /* Preserve zoning context in imported original cities, without touching
@@ -65,8 +96,7 @@ void zoning_seed_from_city(void)
                     if ((kind == ZONE_RES && t >= 240U && t < 409U) ||
                         (kind == ZONE_COM && t >= 423U && t < 612U) ||
                         (kind == ZONE_IND && t >= 612U && t <= 692U))
-                        zone_grid[xx * CITY_HEIGHT + yy] =
-                            (unsigned char)kind;
+                        zone_put(xx * CITY_HEIGHT + yy, kind);
                 }
         }
     }
@@ -103,9 +133,9 @@ int zoning_set(unsigned int x, unsigned int y, unsigned int kind)
     if (!zoning_can_set(x, y, kind))
         return 0;
     offset = x * CITY_HEIGHT + y;
-    if (zone_grid[offset] == kind)
+    if (zone_get(offset) == kind)
         return 0;
-    zone_grid[offset] = (unsigned char)kind;
+    zone_put(offset, kind);
     return 1;
 }
 
@@ -169,24 +199,26 @@ unsigned int zoning_count(unsigned int kind)
     if (kind == ZONE_NONE || kind > ZONE_IND)
         return 0U;
     for (i = 0U; i < ZONING_LENGTH; ++i)
-        if (zone_grid[i] == kind)
+        if (zone_get(i) == kind)
             ++count;
     return count;
 }
 
-/* TZON v1: 8-byte signature/dimensions, 12,000 bytes of 0..3 values.
- * Validated fully BEFORE overwriting the current zone state on load.
- * A plain file is easier to inspect/recover on DOS than a compressed format.
+/* TZON v2: 8-byte signature/dimensions, 3,000 packed 2-bit zone bytes,
+ * and little-endian 16-bit checksum. Validate before modifying live data.
  */
 int zoning_save(const char *path)
 {
     FILE *f;
     int okay;
+    unsigned int hash = zoning_checksum();
     f = fopen(path, "wb");
     if (f == NULL)
         return 0;
     okay = fwrite(magic, 1U, sizeof(magic), f) == sizeof(magic) &&
-           fwrite(zone_grid, 1U, ZONING_LENGTH, f) == ZONING_LENGTH;
+           fwrite(zone_grid, 1U, ZONING_BYTES, f) == ZONING_BYTES &&
+           fputc(hash & 255U, f) != EOF &&
+           fputc(hash >> 8, f) != EOF;
     if (fclose(f) != 0)
         okay = 0;
     return okay;
@@ -197,8 +229,8 @@ int zoning_load(const char *path)
     FILE *f;
     long length;
     unsigned char header[8];
-    unsigned int i;
-    int value;
+    unsigned int i, hash = 0x4d37U, expected;
+    int value, low, high;
     f = fopen(path, "rb");
     if (f == NULL)
         return 0;
@@ -218,15 +250,23 @@ int zoning_load(const char *path)
             return 0;
         }
     }
-    for (i = 0U; i < ZONING_LENGTH; ++i) {
+    for (i = 0U; i < ZONING_BYTES; ++i) {
         value = fgetc(f);
-        if (value < 0 || value > (int)ZONE_IND) {
+        if (value == EOF) {
             fclose(f);
             return 0;
         }
+        hash = hash_step(hash, (unsigned int)value);
+    }
+    low = fgetc(f);
+    high = fgetc(f);
+    expected = (unsigned int)low | ((unsigned int)high << 8);
+    if (low == EOF || high == EOF || hash != expected) {
+        fclose(f);
+        return 0;
     }
     if (fseek(f, sizeof(header), SEEK_SET) != 0 ||
-        fread(zone_grid, 1U, ZONING_LENGTH, f) != ZONING_LENGTH) {
+        fread(zone_grid, 1U, ZONING_BYTES, f) != ZONING_BYTES) {
         fclose(f);
         return 0;
     }
