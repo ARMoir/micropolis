@@ -107,7 +107,7 @@ jobs:
             MICROPOL.EXE
             TILES.DAT
             HAPPISLE.CTY
-            COPYING
+            micropolis-activity/COPYING
             tandy-dos/README.md
           if-no-files-found: error
 
@@ -134,10 +134,13 @@ jobs:
           test -s MICROPOL.EXE
           test -s TILES.DAT
           test -s HAPPISLE.CTY
-          test -s COPYING
+          # The upstream GPL text is under micropolis-activity/,
+          # not the repository root. Upload/download keeps this path.
+          test -s micropolis-activity/COPYING
           test -s tandy-dos/README.md
           mkdir -p release/package
-          cp MICROPOL.EXE TILES.DAT HAPPISLE.CTY COPYING release/package/
+          cp MICROPOL.EXE TILES.DAT HAPPISLE.CTY release/package/
+          cp micropolis-activity/COPYING release/package/COPYING
           cp tandy-dos/README.md release/package/README.md
           (
             cd release/package
