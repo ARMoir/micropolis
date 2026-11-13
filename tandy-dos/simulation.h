@@ -40,6 +40,13 @@ const struct sim_statistics *simulation_stats(void);
 void simulation_last_change(unsigned int *x, unsigned int *y);
 unsigned int simulation_last_change_radius(void);
 unsigned int simulation_progress(void);
+/* Debug/profiling: full power-network scans only for network edits, not
+ * ordinary building density growth. */
+unsigned int simulation_power_scan_count(void);
+/* The coordinates of the most recent visible growth event remain valid
+ * until the next city is loaded and simulation_init() is called.
+ */
+int simulation_has_last_change(void);
 int simulation_is_paused(void);
 void simulation_set_paused(int paused);
 unsigned int simulation_speed(void);
