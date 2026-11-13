@@ -6,4 +6,5 @@
 #define TANDY_ENGINE_H
 unsigned int engine_power_scan(void);
 int engine_is_powered(unsigned int x, unsigned int y);
+void engine_shutdown(void);
 #endif
