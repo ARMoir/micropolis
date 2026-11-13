@@ -493,8 +493,8 @@ static void draw_overview(void)
 }
 
 /* Only the selected tool's TWO affected buttons need repainting.
- * Previously every tool selection and drag commit redrew the entire
- * 80x176 panel, all eight icons and labels, causing visible flicker.
+ * A drag commit never repaints the 64-pixel-wide sidebar controls;
+ * it updates the minimap and top treasury figures only.
  */
 static void draw_tool_button(unsigned int n)
 {
@@ -553,8 +553,8 @@ static void draw_toolbox(void)
 }
 
 /* BIOS glyph rendering is slower than changing pixels directly.
- * Cache the two 40-column status lines and repaint ONLY characters
- * whose contents change. Particularly important with the 7 MHz V20
+ * Cache the city stats and both 40-column debug rows. Repaint ONLY
+ * characters whose contents change. Particularly important with the 7 MHz V20
  * and an actively moving serial mouse.
  */
 static char city_shadow[41], debug_shadow[41], status_shadow[41];
@@ -603,7 +603,7 @@ static void draw_city_stats(void)
 }
 
 /* Redraw only the moving edge.  For a one-tile scroll, use a direct
- * 8-pixel (four-byte) VRAM shift rather than re-rendering 840 map tiles.
+ * 8-pixel (four-byte) VRAM shift rather than re-rendering 672 map tiles.
  * Keep both title and bottom control bands untouched while scrolling.
  */
 static void draw_cursor(void)
