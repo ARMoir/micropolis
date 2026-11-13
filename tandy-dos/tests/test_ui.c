@@ -10,6 +10,9 @@ int main(void)
     assert(ui_header_hit(20U * 8U, 3U) == MENU_VIEW);
     assert(ui_header_hit(28U * 8U, 3U) == MENU_HELP);
     assert(ui_header_hit(0U, 4U) == MENU_NONE);
+    assert(ui_header_hit(16U, 10U) == MENU_NONE);
+    assert(ui_header_hit(16U, 16U) == MENU_NONE);
+    assert(UI_MENU_HEIGHT < UI_MAP_Y);
     assert(ui_header_hit(320U, 0U) == MENU_NONE);
     assert(ui_toolbar_hit(0U, 8U) == -1);
     assert(ui_toolbar_hit(10U, 30U) == 0);
