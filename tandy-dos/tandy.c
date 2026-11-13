@@ -1354,8 +1354,7 @@ static void handle_mouse(void)
                 cursor_x = next_x;
                 cursor_y = next_y;
                 draw_cursor();
-                world_x = scroll_x + cursor_x;
-                world_y = scroll_y + cursor_y;
+                display_to_world(cursor_x,cursor_y,&world_x,&world_y);
                 if (build_drag_active && (state.buttons & 1U ||
                                          left_release)) {
                     /* Mouse polling on a 7 MHz V20 can skip cells.
@@ -1429,8 +1428,9 @@ static void handle_mouse(void)
                     if (selected_zone_kind() != ZONE_NONE ||
                         selected_tool == EDIT_ROAD ||
                         selected_tool == EDIT_POWER) {
-                        build_preview_start(scroll_x + cursor_x,
-                                            scroll_y + cursor_y);
+                        display_to_world(cursor_x,cursor_y,
+                                         &world_x,&world_y);
+                        build_preview_start(world_x,world_y);
                     } else {
                         apply_selected_tool();
                     }
@@ -1449,8 +1449,8 @@ static void handle_mouse(void)
                    selected_zone_kind() != ZONE_NONE &&
                    !build_drag_active) {
             zone_erase_active = 1;
-            zone_drag_x = scroll_x + cursor_x;
-            zone_drag_y = scroll_y + cursor_y;
+            display_to_world(cursor_x,cursor_y,
+                             &zone_drag_x,&zone_drag_y);
             apply_zone_stroke(zone_drag_x, zone_drag_y,
                               zone_drag_x, zone_drag_y, ZONE_NONE);
         } else if (open_menu == MENU_TOOLS) {
@@ -1513,13 +1513,13 @@ static void simulation_idle(void)
              * building sprite cells, not just its zone center.
              */
             redraw_zoning_brush(tx-1U,ty-1U,tx+1U,ty+1U);
-        } else if (tx >= scroll_x && tx < scroll_x + VIEW_W &&
-                   ty >= scroll_y && ty < scroll_y + VIEW_H) {
-            draw_city_tile(VIEW_X + (tx-scroll_x)*8U,
-                           VIEW_Y + (ty-scroll_y)*8U, tx, ty);
-            if (tx == scroll_x + cursor_x &&
-                ty == scroll_y + cursor_y)
-                draw_cursor();
+        } else {
+            unsigned int sx,sy;
+            if (world_to_visible(tx,ty,&sx,&sy)) {
+                draw_display_tile(sx,sy);
+                if (sx == cursor_x && sy == cursor_y)
+                    draw_cursor();
+            }
         }
     }
     if (event & SIM_EVENT_MONTH) {
@@ -1616,14 +1616,9 @@ static void keyboard_loop(void)
                 int house = simulation_last_home_change(&gx, &gy);
                 if (!house)
                     simulation_last_change(&gx, &gy);
-                scroll_x = gx > VIEW_W/2U ? gx-VIEW_W/2U : 0U;
-                scroll_y = gy > VIEW_H/2U ? gy-VIEW_H/2U : 0U;
-                if (scroll_x > CITY_WIDTH-VIEW_W)
-                    scroll_x = CITY_WIDTH-VIEW_W;
-                if (scroll_y > CITY_HEIGHT-VIEW_H)
-                    scroll_y = CITY_HEIGHT-VIEW_H;
-                cursor_x = gx-scroll_x;
-                cursor_y = gy-scroll_y;
+                view_rotation_focus(map_turns,gx,gy,VIEW_W,VIEW_H,
+                                    &scroll_x,&scroll_y,
+                                    &cursor_x,&cursor_y);
                 last_action = house ? "LAST HOUSE" : "LAST GROWTH";
                 render_full();
             } else {
@@ -1680,13 +1675,13 @@ static void keyboard_loop(void)
             scroll_x > 0U)
             --scroll_x;
         else if ((scan == 0x4dU || ascii == 'd' || ascii == 'D') &&
-                 scroll_x < CITY_WIDTH - VIEW_W)
+                 scroll_x < view_rotation_width(map_turns) - VIEW_W)
             ++scroll_x;
         else if ((scan == 0x48U || ascii == 'w' || ascii == 'W') &&
                  scroll_y > 0U)
             --scroll_y;
         else if ((scan == 0x50U || ascii == 's' || ascii == 'S') &&
-                 scroll_y < CITY_HEIGHT - VIEW_H)
+                 scroll_y < view_rotation_height(map_turns) - VIEW_H)
             ++scroll_y;
         else if ((ascii == 'j' || ascii == 'J') && cursor_x > 0U)
             --cursor_x;
