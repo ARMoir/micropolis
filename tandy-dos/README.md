@@ -89,9 +89,11 @@ MICROPOL HAPPISLE.CTY
 The first command opens the built-in **powered starter neighborhood**
 with an original 4x4 coal plant, connected power lines, roads, and empty
 residential/commercial/industrial lots ready to grow. The second loads
-the included **original Micropolis city map**. Its buildings can
-develop from vacant and already occupied original 3x3 plots, but the input file is never
-overwritten unless you explicitly save to a new file.
+the included **original Micropolis city map** and automatically focuses
+on the most developed residential neighborhood, rather than its mostly
+empty northwest ocean. Its buildings can develop from vacant and
+already occupied original 3x3 plots. The input city file is never
+overwritten unless you explicitly save a new copy.
 
 ### New menus and mouse support
 
@@ -163,6 +165,7 @@ to its 320-pixel Tandy screen.
 | 7 | Construct 4x4 coal power plant (16 empty tiles required) |
 | P | Recalculate powered tiles and show the count in the bottom status bar |
 | G | Pause / resume the live simulation |
+| Tab | Jump the viewport and selection cursor to the latest residential, commercial or industrial development (if any) |
 | + / - | Increase / decrease simulation speed (1x to 4x) |
 | Space | Purchase one zone, road or wire tile at cursor, budget permitting |
 | F2 | Save a **new** city file in the current directory |
@@ -523,3 +526,32 @@ frame rate. A build passing GitHub Actions proves 16-bit compilation
 and pixel-equivalence in tests, **not** speed on real V20 hardware.
 Please report the three times from your Tandy so the next iteration can
 decide if a tuned 8086 `REP MOVSW` copy is justified.
+
+## V20 stutter and visible house-growth fix
+
+When original 3x3 residential, commercial and industrial buildings
+advance to new density graphics, **their electrical connectivity does
+not change**. Earlier builds incorrectly re-ran the entire 120x100
+power-network flood fill after *every* such growth event, producing
+short but noticeable freezes on the NEC V20. The live simulation now
+only invalidates that expensive scan after infrastructure changes
+(roads, power lines, coal plants, bulldozing), and still performs an
+initial scan on city load. The simulation's map cursor also advances
+without the former division/modulo operation on every tile.
+
+Opening an original city now uses a one-time, low-memory neighborhood
+density scan to select a useful initial camera position. For the
+included HAPPISLE city, the regression-tested initial viewport
+contains 20 residential centers. The former northwest camera was
+showing ocean, so growth could happen without being visible.
+
+Press **Tab** during play to jump directly to the most recently
+grown building or custom 1x1 zone, highlighted by the yellow cursor.
+Tab shows `NO GROWTH` if no development has occurred yet. The camera
+does not move automatically during normal play.
+
+CI includes a no-repeat-power-scan regression over many months of
+actual development, a test verifying an infrastructure change forces
+one appropriate rescan, and a saved-city test confirming the initial
+camera shows actual homes. These are software checks; report any
+remaining periodic stalls or visual glitches from the actual Tandy.
