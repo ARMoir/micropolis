@@ -46,11 +46,11 @@ project. It targets the NEC V20-equipped Tandy 1000 EX.
 - **Optional DOS mouse support** using INT 33h, with its own small software
   arrow to work in Tandy graphics mode 9 even if the mouse driver's own
   cursor graphics do not support that video mode.
-- Left-click to select a tool or build. Hold left-click and drag R/C/I
-  tools to **paint custom zoning**; right-click or right-drag within the
-  city while an RCI tool is selected to erase *only the zoning*, never
-  buildings or roads. For other tools, right-click opens the Tools menu.
-  Keyboard zoning still works one square at a time. No mouse required.
+- Left-click to select a tool. Hold left mouse to preview R/C/I zones,
+  roads or power lines as light-colored stippled ghosts with a running
+  cost. Beyond-budget cells show red X marks. Release to purchase only
+  affordable cells, or press Esc to cancel for free. Right-click/right-drag
+  with an RCI tool erases zoning only. Keyboard Space buys one tile.
 - Original demo-city generator and fallback colored glyph art if TILES.DAT
   isn't present.
 
@@ -114,17 +114,15 @@ keyboard alone. To bypass mouse detection explicitly, run:
 MICROPOL HAPPISLE.CTY /NOMOUSE
 ```
 
-Mouse controls: left-click a **menu name** to open its dropdown,
-left-click a **tool icon** in the left sidebar to select it, left-click
-the main city window to apply that tool, and then **left-drag with a
-Residential / Commercial / Industrial tool** to draw any freeform shape.
-A click paints a *single tile*. Right-click / right-drag the city with
-a zoning tool to erase zoning without bulldozing underlying terrain or
-existing structures. With other tools, right-click opens the Tools
-dropdown. Road, power-line and bulldoze tools still support left-drag.
-The map's yellow selection outline follows the mouse, with a small
-black-and-white pointer showing the actual pointer position. Keyboard
-shortcuts remain functional.
+Mouse controls: left-click menus and sidebar tools as before. With
+Residential, Commercial, Industrial, Road or Power selected, **left-drag
+to preview a path** in ghost colors. The bottom status line displays
+the projected cost (C), funds remaining (R), accepted tiles (+), and
+rejected tiles (-). Crossed-out squares cannot be built or are too
+expensive. **Nothing is changed or paid until you release left mouse**.
+Press Esc while dragging to cancel at no cost. Right-drag with an RCI
+tool erases zoning only. Keyboard Space buys one square using the same
+fund checks. Bulldozing remains immediate, without preview.
 
 **Mouse movement and the cursor need testing on the real Tandy 1000
 EX**, especially with a serial mouse driver. This hardware has unusual
@@ -147,7 +145,7 @@ to its 320-pixel Tandy screen.
 | 6 | Bulldoze (one tile) |
 | 7 | Construct 4x4 coal power plant (16 empty tiles required) |
 | P | Recalculate powered tiles and show the count in the bottom status bar |
-| Space | Apply selected tool at cursor (zones one square) |
+| Space | Purchase one zone, road or wire tile at cursor, budget permitting |
 | F2 | Save a **new** city file in the current directory |
 | F / T / V / H (or F10 for System) | Open System / Tools / View / Help menu |
 | Arrow keys + Enter (menu open) | Navigate and choose menu items |
@@ -311,3 +309,32 @@ must choose appropriate original sprites by parcel size, including
 one-square commercial and industrial artwork, while respecting
 roads and power. This build proves editing, color borders, and
 persistence without claiming automatic development.
+
+## Transactional drag-to-build preview
+
+The construction editor now supports a two-stage drag-and-release
+workflow for Residential / Commercial / Industrial / Road / Power.
+During the drag the map and balance stay unchanged. Tiles to be built
+are rendered as light stippled ghosts over the original graphics,
+while blocked or unaffordable squares show an X. The bottom bar reports
+live construction cost and funds remaining. Repeat passes over an
+already previewed cell do not add to the price.
+
+Releasing the left button applies only the affordable cells and charges
+once. Esc cancels before committing. Missing mouse samples on the
+7 MHz NEC V20 are interpolated to avoid gaps in dragged roads/zones.
+
+**Funds are read from the actual original Micropolis CTY save header**
+(the MiscHis[50..51] 32-bit funds field), not merely a placeholder.
+Balances are debited only upon committing construction and persist in
+new CTY save files. The demo city starts with a test balance of $20,000.
+
+Current editor costs: Road $10/tile, Power line $5/tile, RCI zoning
+$12/tile. This rounds the classic $100 per nine-tile 3x3 zone to an
+individual-tile price. The budget is currently construction-only;
+tax income, city economy and full simulation growth are not ported.
+Bulldozing and coal plant placement retain their earlier simplified
+editor behavior and have no transactional preview yet.
+
+Use F2 to save a new CTY/ZON pair, and always keep the companion ZON
+file for irregular zoning. Neither preview nor cancel rewrites saves.
