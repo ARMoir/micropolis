@@ -103,6 +103,7 @@ static int process_zone(unsigned int x, unsigned int y,
                         unsigned int kind, unsigned int id)
 {
     unsigned int stage, next, roll;
+    int road, power;
     if (kind == ZONE_NONE)
         return 0;
     if (kind == ZONE_RES) ++lots_res;
@@ -115,14 +116,18 @@ static int process_zone(unsigned int x, unsigned int y,
     stage = zoning_development_at(x,y);
     next = stage;
     roll = random16();
-    if (!road_access(x,y)) {
+    /* Cache service checks once per tile: the original repeated four
+     * neighbor lookups twice, expensive on the 7 MHz V20.
+     */
+    road = road_access(x,y);
+    power = has_power(x,y);
+    if (!road)
         ++no_road_month;
-    } else if (!has_power(x,y)) {
+    else if (!power)
         ++no_power_month;
-    } else {
+    else
         ++ready_month;
-    }
-    if (!road_access(x,y) || !has_power(x,y)) {
+    if (!road || !power) {
         /* Vacancy increases gradually with lost service, not instantly. */
         if (stage != 0U && (roll & 7U) == 0U)
             next = stage - 1U;
