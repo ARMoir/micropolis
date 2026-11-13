@@ -556,14 +556,14 @@ static void draw_footer(void)
         "JAN","FEB","MAR","APR","MAY","JUN",
         "JUL","AUG","SEP","OCT","NOV","DEC"
     };
-    /* G = growth events last month, R = serviced growable lots.
+    /* G = cumulative growth events this session, R = serviced growable lots.
      * A zero R makes missing roads/power immediately visible.
      */
     sprintf(summary, "%s %u P:%lu J:%lu G:%u R:%u X%u",
             months[st->month-1U], st->year,
             st->residents,
             st->commercial_jobs + st->industrial_jobs,
-            st->growth_last_month,
+            st->growth_total,
             st->lots_ready,
             simulation_is_paused() ? 0U : simulation_speed());
     draw_status_text(23U,summary,footer_shadow,&footer_valid,15U);
@@ -752,10 +752,10 @@ static void draw_info_page(void)
         bios_text(8U, 3U, "ARROWS / WASD  PAN CITY", 14U);
         bios_text(9U, 3U, "I J K L       MOVE CURSOR", 14U);
         bios_text(10U, 3U, "0..7          SELECT TOOLS", 14U);
-        bios_text(11U, 3U, "SPACE         ZONE 1X1 / BUILD", 14U);
-        bios_text(12U, 3U, "F2            SAVE AS", 14U);
-        bios_text(13U, 3U, "P             POWER SCAN", 14U);
-        bios_text(14U, 3U, "F T V H       OPEN MENUS", 14U);
+        bios_text(11U, 3U, "SPACE         BUILD 1 TILE", 14U);
+        bios_text(12U, 3U, "G  PAUSE   +/-  SPEED", 14U);
+        bios_text(13U, 3U, "F2 SAVE     P POWER SCAN", 14U);
+        bios_text(14U, 3U, "G=GROWTH  R=READY LOTS", 14U);
         bios_text(16U, 3U, "ESC / ANY KEY TO RETURN", 15U);
     } else if (info_page == 2) {
         bios_text(6U, 3U, "MOUSE SUPPORT: DOS INT 33H", 15U);
@@ -771,8 +771,8 @@ static void draw_info_page(void)
         bios_text(8U, 3U, "NATIVE 8086 / V20, 16 COLORS", 14U);
         bios_text(9U, 3U, "MICROPOLIS GPLv3+ SOURCE", 14U);
         bios_text(10U, 3U, "ORIGINAL ART: ELECTRONIC ARTS", 14U);
-        bios_text(12U, 3U, "EXPERIMENTAL CITY EDITOR", 14U);
-        bios_text(13U, 3U, "FULL SIMULATION NOT YET PORTED", 14U);
+        bios_text(12U, 3U, "LIVE PHASED RCI SIMULATION", 14U);
+        bios_text(13U, 3U, "TRAFFIC/DISASTERS PENDING", 14U);
         bios_text(16U, 3U, "ESC / CLICK TO RETURN", 15U);
     }
 }
