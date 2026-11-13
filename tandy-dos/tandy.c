@@ -14,6 +14,7 @@
 #include "engine.h"
 #include "ui.h"
 #include "mouse.h"
+#include "zoning.h"
 
 #define SCREEN_W 320U
 #define SCREEN_H 200U
@@ -49,6 +50,10 @@ static int exit_requested = 0;
 static int mouse_on = 0;
 static unsigned int mouse_x = 160U, mouse_y = 100U;
 static unsigned int mouse_buttons = 0U;
+static int zone_drag_active = 0;
+static int zone_erase_active = 0;
+static unsigned int zone_drag_x = 0U, zone_drag_y = 0U;
+static int zone_minimap_dirty = 0;
 
 /* Software 8x8 mouse pointer. Driver hardware cursor is never shown:
  * standard mouse drivers may not support Tandy 320x200 mode 9.
@@ -171,6 +176,31 @@ static void draw_original_tile(unsigned int px, unsigned int py, unsigned int ti
     }
 }
 
+/* Zoning is a separate, non-destructive overlay on original Micropolis
+ * sprites. Draw only the OUTSIDE edges of adjoining same-type zones.
+ * This allows a single 8x8 tile to have a complete green/blue/yellow border.
+ */
+static void draw_zone_border(unsigned int px, unsigned int py,
+                             unsigned int mx, unsigned int my)
+{
+    unsigned int kind = zoning_at(mx, my);
+    unsigned int edge = zoning_edge_mask(mx, my);
+    unsigned int x, y;
+    unsigned char color;
+    if (kind == ZONE_NONE || edge == 0U)
+        return;
+    color = kind == ZONE_RES ? 10U :
+            kind == ZONE_COM ? 9U : 14U;
+    if (edge & 1U)
+        for (x = 0U; x < 8U; ++x) pixel(px + x, py, color);
+    if (edge & 2U)
+        for (y = 0U; y < 8U; ++y) pixel(px + 7U, py + y, color);
+    if (edge & 4U)
+        for (x = 0U; x < 8U; ++x) pixel(px + x, py + 7U, color);
+    if (edge & 8U)
+        for (y = 0U; y < 8U; ++y) pixel(px, py + y, color);
+}
+
 static void draw_city_tile(unsigned int px, unsigned int py,
                            unsigned int mx, unsigned int my)
 {
@@ -180,7 +210,21 @@ static void draw_city_tile(unsigned int px, unsigned int py,
     int v, h;
 
     if (art_data != NULL && t < ART_TILES) {
-        draw_original_tile(px, py, t);
+        unsigned int graphic = t;
+        /* For an empty 1x1 lot, use ORIGINAL Micropolis small tile art.
+         * Residential has actual detached house tiles. Commercial and
+         * industrial use their original empty-zone center symbols until
+         * the new small-building growth rules are implemented.
+         * Never change the underlying .CTY sprite or map tile itself.
+         */
+        if (t == 0U) {
+            unsigned int kind = zoning_at(mx, my);
+            if (kind == ZONE_RES) graphic = 249U;
+            else if (kind == ZONE_COM) graphic = 427U;
+            else if (kind == ZONE_IND) graphic = 616U;
+        }
+        draw_original_tile(px, py, graphic);
+        draw_zone_border(px, py, mx, my);
         return;
     }
 
@@ -243,6 +287,8 @@ static void draw_city_tile(unsigned int px, unsigned int py,
         box_pixels(px + 2U, py + 2U, 4U, 4U, 15);
         pixel(px + 3U, py + 3U, 12);
     }
+    /* Fallback artwork retains the same zone boundaries as TILES.DAT. */
+    draw_zone_border(px, py, mx, my);
 }
 
 static void bios_text(unsigned int row, unsigned int column,
@@ -294,6 +340,9 @@ static void draw_overview(void)
             else if (id >= 423U && id <= 611U) color = 9U;
             else if (id >= 612U && id <= 692U) color = 6U;
             else if (id >= 693U) color = 15U;
+            if (zoning_at(mx, my) == ZONE_RES) color = 10U;
+            if (zoning_at(mx, my) == ZONE_COM) color = 9U;
+            if (zoning_at(mx, my) == ZONE_IND) color = 14U;
             pixel(4U + px, 169U + py, color);
         }
     }
@@ -410,6 +459,61 @@ static void redraw_edit_area(void)
         for (x = min_x; x <= max_x; ++x)
             draw_city_tile(VIEW_X + x * 8U, VIEW_Y + y * 8U,
                            scroll_x + x, scroll_y + y);
+}
+
+/* Repaint the changed zone cells plus immediate neighbors, because
+ * adjacent same-zone boundaries join or disappear on every brush stroke.
+ * The world zone and city graphics are never modified during a repaint.
+ */
+static void draw_status(void);
+
+static void redraw_zoning_brush(unsigned int x0, unsigned int y0,
+                                unsigned int x1, unsigned int y1)
+{
+    unsigned int left, right, top, bottom, x, y, mx, my;
+    left = x0 < x1 ? x0 : x1;
+    right = x0 > x1 ? x0 : x1;
+    top = y0 < y1 ? y0 : y1;
+    bottom = y0 > y1 ? y0 : y1;
+    if (left > 0U) --left;
+    if (top > 0U) --top;
+    if (right + 1U < CITY_WIDTH) ++right;
+    if (bottom + 1U < CITY_HEIGHT) ++bottom;
+    for (mx = left; mx <= right; ++mx) {
+        if (mx < scroll_x || mx >= scroll_x + VIEW_W)
+            continue;
+        x = mx - scroll_x;
+        for (my = top; my <= bottom; ++my) {
+            if (my < scroll_y || my >= scroll_y + VIEW_H)
+                continue;
+            y = my - scroll_y;
+            draw_city_tile(VIEW_X + x * 8U, VIEW_Y + y * 8U, mx, my);
+        }
+    }
+    draw_cursor();
+}
+
+static unsigned int selected_zone_kind(void)
+{
+    if (selected_tool == EDIT_RESIDENTIAL) return ZONE_RES;
+    if (selected_tool == EDIT_COMMERCIAL) return ZONE_COM;
+    if (selected_tool == EDIT_INDUSTRIAL) return ZONE_IND;
+    return ZONE_NONE;
+}
+
+static void apply_zone_stroke(unsigned int x0, unsigned int y0,
+                              unsigned int x1, unsigned int y1,
+                              unsigned int kind)
+{
+    unsigned int changed = zoning_paint_line(x0, y0, x1, y1, kind);
+    if (changed) {
+        redraw_zoning_brush(x0, y0, x1, y1);
+        last_action = kind == ZONE_NONE ? "UNZONED" : "ZONED";
+        zone_minimap_dirty = 1;
+    } else {
+        last_action = "BLOCKED";
+    }
+    draw_status();
 }
 
 static void draw_status(void)
