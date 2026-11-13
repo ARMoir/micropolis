@@ -20,6 +20,7 @@
 #include "simulation.h"
 #include "video_ops.h"
 #include "menu_font.h"
+#include "view_rotation.h"
 
 #define SCREEN_W 320U
 #define SCREEN_H 200U
@@ -37,6 +38,8 @@
  */
 static volatile unsigned char far *video;
 static unsigned int scroll_x = 0, scroll_y = 0;
+/* View orientation only: tile artwork and the saved world stay fixed. */
+static unsigned int map_turns = 0U;
 static unsigned char old_mode;
 static unsigned char far *art_data = NULL;
 static unsigned int cursor_x = VIEW_W / 2U;
@@ -204,11 +207,35 @@ static void draw_original_tile(unsigned int px, unsigned int py, unsigned int ti
  * sprites. Draw only the OUTSIDE edges of adjoining same-type zones.
  * This allows a single 8x8 tile to have a complete green/blue/yellow border.
  */
+/* Display coordinates use a rotated virtual 100x120/120x100 map.
+ * The existing tile renderer, editing, power and simulation always
+ * consume original world coordinates. Identity orientation stays cheap.
+ */
+static void display_to_world(unsigned int sx, unsigned int sy,
+                             unsigned int *wx, unsigned int *wy)
+{
+    view_rotation_to_world(map_turns,scroll_x+sx,scroll_y+sy,wx,wy);
+}
+
+static int world_to_visible(unsigned int wx, unsigned int wy,
+                            unsigned int *sx, unsigned int *sy)
+{
+    unsigned int dx,dy;
+    view_rotation_from_world(map_turns,wx,wy,&dx,&dy);
+    if (dx<scroll_x || dy<scroll_y ||
+        dx-scroll_x>=VIEW_W || dy-scroll_y>=VIEW_H)
+        return 0;
+    *sx = dx-scroll_x;
+    *sy = dy-scroll_y;
+    return 1;
+}
+
 static void draw_zone_border(unsigned int px, unsigned int py,
                              unsigned int mx, unsigned int my)
 {
     unsigned int kind = zoning_at(mx, my);
-    unsigned int edge = zoning_edge_mask(mx, my);
+    unsigned int edge = view_rotation_edges(map_turns,
+                                            zoning_edge_mask(mx, my));
     unsigned int x, y;
     unsigned char color;
     if (kind == ZONE_NONE || edge == 0U)
@@ -383,6 +410,13 @@ static void draw_city_tile(unsigned int px, unsigned int py,
  * AH=09h writes ONE glyph at a fixed cursor without auto-advancing.
  * Explicit positioning also guarantees no accidental screen scroll.
  */
+static void draw_display_tile(unsigned int sx, unsigned int sy)
+{
+    unsigned int wx,wy;
+    display_to_world(sx,sy,&wx,&wy);
+    draw_city_tile(VIEW_X+sx*8U,VIEW_Y+sy*8U,wx,wy);
+}
+
 static void bios_text(unsigned int row, unsigned int column,
                       const char *s, unsigned char color)
 {
@@ -429,8 +463,10 @@ static int overview_valid = 0;
 
 static unsigned char overview_color(unsigned int px, unsigned int py)
 {
-    unsigned int mx = px * CITY_WIDTH / UI_MINIMAP_W;
-    unsigned int my = py * CITY_HEIGHT / UI_MINIMAP_H;
+    unsigned int mx,my;
+    unsigned int dx = px * view_rotation_width(map_turns) / UI_MINIMAP_W;
+    unsigned int dy = py * view_rotation_height(map_turns) / UI_MINIMAP_H;
+    view_rotation_to_world(map_turns,dx,dy,&mx,&my);
     unsigned int id = city_at(mx, my) & TILE_MASK;
     unsigned int kind = zoning_at(mx, my);
     unsigned char color = 2U;
@@ -482,10 +518,12 @@ static void overview_draw_outline(unsigned int x, unsigned int y,
 
 static void draw_overview_camera(void)
 {
-    unsigned int x = scroll_x * UI_MINIMAP_W / CITY_WIDTH;
-    unsigned int y = scroll_y * UI_MINIMAP_H / CITY_HEIGHT;
-    unsigned int w = VIEW_W * UI_MINIMAP_W / CITY_WIDTH;
-    unsigned int h = VIEW_H * UI_MINIMAP_H / CITY_HEIGHT;
+    unsigned int world_w = view_rotation_width(map_turns);
+    unsigned int world_h = view_rotation_height(map_turns);
+    unsigned int x = scroll_x * UI_MINIMAP_W / world_w;
+    unsigned int y = scroll_y * UI_MINIMAP_H / world_h;
+    unsigned int w = VIEW_W * UI_MINIMAP_W / world_w;
+    unsigned int h = VIEW_H * UI_MINIMAP_H / world_h;
     if (w < 2U) w = 2U;
     if (h < 2U) h = 2U;
     if (overview_valid && overview_old_x == x && overview_old_y == y &&
@@ -751,8 +789,7 @@ static void draw_cursor(void)
 
 static void erase_cursor(void)
 {
-    draw_city_tile(VIEW_X + cursor_x * 8U, VIEW_Y + cursor_y * 8U,
-                   scroll_x + cursor_x, scroll_y + cursor_y);
+    draw_display_tile(cursor_x,cursor_y);
 }
 
 static void redraw_edit_area(void)
@@ -764,8 +801,7 @@ static void redraw_edit_area(void)
     max_y = cursor_y + 2U < VIEW_H ? cursor_y + 2U : VIEW_H - 1U;
     for (y = min_y; y <= max_y; ++y)
         for (x = min_x; x <= max_x; ++x)
-            draw_city_tile(VIEW_X + x * 8U, VIEW_Y + y * 8U,
-                           scroll_x + x, scroll_y + y);
+            draw_display_tile(x,y);
 }
 
 /* Repaint the changed zone cells plus immediate neighbors, because
