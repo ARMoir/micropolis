@@ -52,6 +52,11 @@ int main(int argc, char **argv)
     assert(city_get_time()==0L);
     simulation_set_paused(0);
     run_months(32U);
+    /* Density growth does not change power conductors or plant capacity.
+     * The expensive network traversal should occur once at startup.
+     */
+    assert(simulation_power_scan_count() == 1U);
+    assert(simulation_has_last_change());
     level = zoning_development_at(15U,11U);
     assert(level > 0U && level <= 3U);
     assert((city_at(15U,11U) & 1023U) == 0U);
@@ -85,6 +90,7 @@ int main(int argc, char **argv)
     city_set(10U,10U,0U);
     simulation_mark_power_dirty();
     run_months(100U);
+    assert(simulation_power_scan_count() == 2U);
     assert(zoning_development_at(15U,11U) == 0U);
     /* An untouched authentic vacant 3x3 RCI plot must be eligible for
      * complete nine-sprite development when ring-road and power exist.
@@ -109,6 +115,8 @@ int main(int argc, char **argv)
     city_set(32U,30U,66U | 8192U | 4096U);
     simulation_init();
     run_months(24U);
+    assert(simulation_has_last_change());
+    assert(simulation_power_scan_count() == 1U);
     /* More than one density stage may develop within 24 months.
      * Confirm the entire nine-sprite group remains coherent.
      */
@@ -136,6 +144,7 @@ int main(int argc, char **argv)
     assert(zoning_at(62U,36U) == ZONE_RES);
     simulation_init();
     run_months(36U);
+    assert(simulation_power_scan_count() == 1U);
     assert(zoning_development_at(50U,31U) > 0U ||
            zoning_development_at(51U,31U) > 0U ||
            zoning_development_at(52U,31U) > 0U);
@@ -151,6 +160,8 @@ int main(int argc, char **argv)
         assert(st->powered_tiles > 0U);
         assert(st->lots_ready > 0U);
         assert(st->growth_total > 0U);
+        assert(simulation_power_scan_count() == 1U);
+        assert(simulation_has_last_change());
         printf("Original city regression: P=%lu Jobs=%lu "
                "growth=%u serviced=%u no-road=%u no-power=%u "
                "net-power=%u\n",
