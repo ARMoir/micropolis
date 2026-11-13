@@ -16,6 +16,7 @@
 #include "mouse.h"
 #include "zoning.h"
 #include "placement.h"
+#include "simulation.h"
 
 #define SCREEN_W 320U
 #define SCREEN_H 200U
@@ -57,6 +58,8 @@ static unsigned int zone_drag_x = 0U, zone_drag_y = 0U;
 static int zone_minimap_dirty = 0;
 static int build_drag_active = 0;
 static unsigned int build_drag_x = 0U, build_drag_y = 0U;
+static unsigned int sim_last_clock = 0U;
+static int sim_clock_started = 0;
 
 /* Software 8x8 mouse pointer. Driver hardware cursor is never shown:
  * standard mouse drivers may not support Tandy 320x200 mode 9.
@@ -260,11 +263,31 @@ static void draw_city_tile(unsigned int px, unsigned int py,
          * the new small-building growth rules are implemented.
          * Never change the underlying .CTY sprite or map tile itself.
          */
-        if (t == 0U) {
+        if (t == 0U || (t >= 21U && t <= 43U)) {
             unsigned int kind = zoning_at(mx, my);
-            if (kind == ZONE_RES) graphic = 249U;
-            else if (kind == ZONE_COM) graphic = 427U;
-            else if (kind == ZONE_IND) graphic = 616U;
+            unsigned int stage = zoning_development_at(mx, my);
+            /* The small-lot simulator changes ONLY the art displayed in
+             * custom-zoned empty/wooded squares. Original 3x3 .CTY
+             * building sprites are never overwritten or reinterpreted.
+             * Higher stages reuse suitable center tiles of the original
+             * 3x3 commercial/industrial building art.
+             */
+            if (kind == ZONE_RES) {
+                static const unsigned short res[4] = {
+                    244U, 249U, 252U, 258U
+                };
+                graphic = res[stage];
+            } else if (kind == ZONE_COM) {
+                static const unsigned short com[4] = {
+                    427U, 440U, 449U, 458U
+                };
+                graphic = com[stage];
+            } else if (kind == ZONE_IND) {
+                static const unsigned short ind[4] = {
+                    616U, 629U, 638U, 647U
+                };
+                graphic = ind[stage];
+            }
         }
         draw_original_tile(px, py, graphic);
         draw_zone_border(px, py, mx, my);
@@ -406,6 +429,20 @@ static void draw_overview(void)
     }
 }
 
+static void draw_funds(void)
+{
+    char money[16];
+    unsigned int x;
+    long funds = city_get_funds();
+    if (funds > 99999999L) funds = 99999999L;
+    /* Narrow status area, only redraw the changing number. */
+    for (x = 0U; x < UI_TOOLBOX_W; x += 8U)
+        solid_tile(x, 16U, 7U);
+    bios_text(1U, 0U, "FUNDS", 0U);
+    sprintf(money, "$%8ld", funds);
+    bios_text(2U, 0U, money, 0U);
+}
+
 static void draw_toolbox(void)
 {
     unsigned int x, y, n, bx, by, ix, iy, src;
@@ -419,14 +456,7 @@ static void draw_toolbox(void)
         pixel(78U, y, 8U);
         pixel(79U, y, 0U);
     }
-    bios_text(1U, 0U, "FUNDS", 0U);
-    {
-        char money[16];
-        long funds = city_get_funds();
-        if (funds > 99999999L) funds = 99999999L;
-        sprintf(money, "$%8ld", funds);
-        bios_text(2U, 0U, money, 0U);
-    }
+    draw_funds();
     bios_text(3U, 2U, "TOOLS", 1U);
 
     for (n = 0U; n < 8U; ++n) {
@@ -467,9 +497,21 @@ static void draw_toolbox(void)
 static void draw_footer(void)
 {
     unsigned int x;
+    char summary[41];
+    const struct sim_statistics *st = simulation_stats();
+    static const char *const months[12] = {
+        "JAN","FEB","MAR","APR","MAY","JUN",
+        "JUL","AUG","SEP","OCT","NOV","DEC"
+    };
     for (x = 0U; x < SCREEN_W; x += 8U)
         solid_tile(x, UI_FOOTER_Y, 1U);
-    bios_text(23U, 1U, "MICROPOLIS   TANDY 1000   16 COLOR", 15U);
+    sprintf(summary, "%s %u POP:%lu JOB:%lu %s%u",
+            months[st->month-1U], st->year,
+            st->residents,
+            st->commercial_jobs + st->industrial_jobs,
+            simulation_is_paused() ? "PAUSE" : "X",
+            simulation_is_paused() ? 0U : simulation_speed());
+    bios_text(23U, 0U, summary, 15U);
 }
 
 /* Redraw only the moving edge.  For a one-tile scroll, use a direct
@@ -874,6 +916,7 @@ static void build_preview_finish(void)
     last_action = applied ? "BUILT" : "BLOCKED";
     redraw_zoning_brush(x0, y0, x1, y1);
     if (applied != 0U) {
+        simulation_mark_power_dirty();
         /* Static minimap and sidebar funds are only repainted once
          * per completed drag, not on each V20 mouse polling event.
          */
@@ -914,6 +957,7 @@ static void apply_selected_tool(void)
         if (selected_tool == EDIT_BULLDOZE)
             erased = zoning_set(mx, my, ZONE_NONE);
         if (edit_place(selected_tool, mx, my)) {
+            simulation_mark_power_dirty();
             last_action = "PLACED";
             redraw_edit_area();
             draw_cursor();
@@ -1130,6 +1174,53 @@ static void handle_mouse(void)
     mouse_buttons = state.buttons;
 }
 
+
+/* BIOS time-of-day ticks are ~18.2 Hz and wrap at 16-bit CX:DX.
+ * Work is limited to 80..320 cells per tick, keeping keyboard and serial
+ * mouse handling responsive on the 7 MHz V20. Never process during a
+ * construction drag or over an open menu, which would otherwise be
+ * overwritten by a background tile update.
+ */
+static void simulation_idle(void)
+{
+    union REGS r;
+    unsigned int now, event, tx, ty, amount;
+    r.h.ah = 0U;
+    int86(0x1a, &r, &r);
+    now = r.x.dx;
+    if (!sim_clock_started) {
+        sim_clock_started = 1;
+        sim_last_clock = now;
+        return;
+    }
+    if ((unsigned int)(now - sim_last_clock) < 2U)
+        return;
+    sim_last_clock = now;
+    if (simulation_is_paused() || open_menu != MENU_NONE ||
+        info_page != 0 || build_drag_active || zone_erase_active)
+        return;
+    amount = 80U * simulation_speed();
+    mouse_pointer_hide();
+    event = simulation_advance(amount);
+    if (event & SIM_EVENT_TILE) {
+        simulation_last_change(&tx, &ty);
+        if (tx >= scroll_x && tx < scroll_x + VIEW_W &&
+            ty >= scroll_y && ty < scroll_y + VIEW_H) {
+            draw_city_tile(VIEW_X + (tx-scroll_x)*8U,
+                           VIEW_Y + (ty-scroll_y)*8U, tx, ty);
+            if (tx == scroll_x + cursor_x &&
+                ty == scroll_y + cursor_y)
+                draw_cursor();
+        }
+    }
+    if (event & SIM_EVENT_MONTH) {
+        draw_footer();
+        if (city_get_time() % 48L == 0L)
+            draw_funds();
+    }
+    mouse_pointer_show();
+}
+
 static void keyboard_loop(void)
 {
     union REGS r;
@@ -1140,11 +1231,11 @@ static void keyboard_loop(void)
     enum ui_menu next_menu;
 
     while (!exit_requested) {
-        if (mouse_on) {
+        simulation_idle(); /* runs even with /NOMOUSE and no keyboard */
+        if (mouse_on)
             handle_mouse();
-            if (!kbhit())
-                continue; /* poll mouse without blocking DOS keyboard */
-        }
+        if (!kbhit())
+            continue;
 
         r.h.ah = 0U;
         int86(0x16, &r, &r);
@@ -1206,6 +1297,26 @@ static void keyboard_loop(void)
             }
             exit_requested = 1;
             break;
+        }
+        if (ascii == 'g' || ascii == 'G') {
+            simulation_set_paused(!simulation_is_paused());
+            draw_footer();
+            mouse_pointer_show();
+            continue;
+        }
+        if (ascii == '+' || ascii == '=') {
+            simulation_set_speed(simulation_speed() < 4U ?
+                                 simulation_speed() + 1U : 4U);
+            draw_footer();
+            mouse_pointer_show();
+            continue;
+        }
+        if (ascii == '-' || ascii == '_') {
+            simulation_set_speed(simulation_speed() > 1U ?
+                                 simulation_speed() - 1U : 1U);
+            draw_footer();
+            mouse_pointer_show();
+            continue;
         }
         if (ascii == 'f' || ascii == 'F' || scan == 0x44U) {
             show_menu(MENU_FILE);
@@ -1337,6 +1448,7 @@ int main(int argc, char **argv)
         city_make_demo();
         zoning_seed_from_city();
     }
+    simulation_init();
 
     old_mode = current_video_mode();
     set_video_mode(9);
