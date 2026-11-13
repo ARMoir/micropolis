@@ -145,9 +145,15 @@ int main(int argc, char **argv)
         simulation_init();
         run_months(12U);
         st = simulation_stats();
+        /* Real HAPPISLE had appeared static before the occupied-3x3
+         * growth fix. Keep this as a genuine city-level regression.
+         */
+        assert(st->powered_tiles > 0U);
+        assert(st->lots_ready > 0U);
+        assert(st->growth_total > 0U);
         printf("Original city regression: P=%lu Jobs=%lu "
                "growth=%u serviced=%u no-road=%u no-power=%u "
-               "net-power=%u\\n",
+               "net-power=%u\n",
                st->residents,
                st->commercial_jobs + st->industrial_jobs,
                st->growth_total, st->lots_ready,
