@@ -491,6 +491,13 @@ static void draw_tool_button(unsigned int n)
               tool_labels[n], (unsigned char)(chosen ? 4U : 1U));
 }
 
+static unsigned int tool_button_index(enum edit_tool tool)
+{
+    if (tool == EDIT_BULLDOZE) return 6U;
+    if (tool == EDIT_COAL) return 7U;
+    return (unsigned int)tool;
+}
+
 static void draw_toolbox(void)
 {
     unsigned int x, y, n;
@@ -509,24 +516,57 @@ static void draw_toolbox(void)
     draw_overview();
 }
 
+/* BIOS glyph rendering is slower than changing pixels directly.
+ * Cache the two 40-column status lines and repaint ONLY characters
+ * whose contents change. Particularly important with the 7 MHz V20
+ * and an actively moving serial mouse.
+ */
+static char footer_shadow[41], status_shadow[41];
+static int footer_valid = 0, status_valid = 0;
+
+static void draw_status_text(unsigned int row, const char *message,
+                             char *shadow, int *valid,
+                             unsigned char color)
+{
+    unsigned int col;
+    char character[2];
+    character[1] = '\0';
+    for (col = 0U; col < 40U; ++col) {
+        unsigned char current = (unsigned char)*message;
+        if (*message) ++message;
+        if (!current) current = ' ';
+        if (!*valid || shadow[col] != (char)current) {
+            solid_tile(col*8U,row*8U,1U);
+            if (current != ' ') {
+                character[0] = (char)current;
+                bios_text(row,col,character,color);
+            }
+            shadow[col] = (char)current;
+        }
+    }
+    shadow[40] = '\0';
+    *valid = 1;
+}
+
 static void draw_footer(void)
 {
-    unsigned int x;
     char summary[41];
     const struct sim_statistics *st = simulation_stats();
     static const char *const months[12] = {
         "JAN","FEB","MAR","APR","MAY","JUN",
         "JUL","AUG","SEP","OCT","NOV","DEC"
     };
-    for (x = 0U; x < SCREEN_W; x += 8U)
-        solid_tile(x, UI_FOOTER_Y, 1U);
-    sprintf(summary, "%s %u POP:%lu JOB:%lu %s%u",
+    /* G = growth events last month, R = serviced growable lots.
+     * A zero R makes missing roads/power immediately visible.
+     */
+    sprintf(summary, "%s %u P:%lu J:%lu G:%u R:%u X%u",
             months[st->month-1U], st->year,
             st->residents,
             st->commercial_jobs + st->industrial_jobs,
-            simulation_is_paused() ? "PAUSE" : "X",
+            st->growth_last_month,
+            st->lots_ready,
             simulation_is_paused() ? 0U : simulation_speed());
-    bios_text(23U, 0U, summary, 15U);
+    draw_status_text(23U,summary,footer_shadow,&footer_valid,15U);
 }
 
 /* Redraw only the moving edge.  For a one-tile scroll, use a direct
@@ -626,10 +666,7 @@ static void apply_zone_stroke(unsigned int x0, unsigned int y0,
 
 static void draw_status(void)
 {
-    unsigned int x;
     char status[41];
-    for (x = 0; x < SCREEN_W / 8U; ++x)
-        solid_tile(x * 8U, 192U, 1);
     if (placement_active()) {
         sprintf(status, "C:%ld R:%ld +%u -%u",
                 placement_cost(), placement_remaining(),
@@ -639,9 +676,8 @@ static void draw_status(void)
                 edit_tool_name(selected_tool),
                 scroll_x + cursor_x, scroll_y + cursor_y, last_action);
     }
-    bios_text(24, 0, status, 11);
+    draw_status_text(24U,status,status_shadow,&status_valid,11U);
 }
-
 
 /* The eight-pixel software pointer is much smaller than repainting a tile. */
 static void mouse_pointer_hide(void)
@@ -815,6 +851,7 @@ static void render_full(void)
                            scroll_x + x, scroll_y + y);
 
     draw_toolbox();
+    footer_valid = status_valid = 0;
     draw_footer();
     draw_status();
 
@@ -869,7 +906,7 @@ static void build_preview_cancel(void);
 /* Map number-row shortcuts, toolbar, and Tools menu onto one function. */
 static void select_tool(unsigned int number)
 {
-    unsigned int previous = (unsigned int)selected_tool;
+    unsigned int previous = tool_button_index(selected_tool);
     if (build_drag_active)
         build_preview_cancel();
     switch (number) {
@@ -883,9 +920,9 @@ static void select_tool(unsigned int number)
     case 7U: selected_tool = EDIT_COAL; break;
     }
     last_action = "SELECT";
-    if (previous != (unsigned int)selected_tool) {
+    if (previous != tool_button_index(selected_tool)) {
         draw_tool_button(previous);
-        draw_tool_button((unsigned int)selected_tool);
+        draw_tool_button(tool_button_index(selected_tool));
     }
 }
 
