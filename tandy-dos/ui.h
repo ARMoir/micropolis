@@ -45,6 +45,8 @@ enum ui_action {
     UI_TOOL_COAL,
     UI_SCAN_POWER,
     UI_CENTER_CURSOR,
+    UI_ROTATE_CW,
+    UI_ROTATE_CCW,
     UI_HELP_KEYS,
     UI_HELP_MOUSE,
     UI_HELP_ABOUT
