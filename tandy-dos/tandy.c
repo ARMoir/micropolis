@@ -15,6 +15,7 @@
 #include "ui.h"
 #include "mouse.h"
 #include "zoning.h"
+#include "placement.h"
 
 #define SCREEN_W 320U
 #define SCREEN_H 200U
@@ -54,6 +55,8 @@ static int zone_drag_active = 0;
 static int zone_erase_active = 0;
 static unsigned int zone_drag_x = 0U, zone_drag_y = 0U;
 static int zone_minimap_dirty = 0;
+static int build_drag_active = 0;
+static unsigned int build_drag_x = 0U, build_drag_y = 0U;
 
 /* Software 8x8 mouse pointer. Driver hardware cursor is never shown:
  * standard mouse drivers may not support Tandy 320x200 mode 9.
@@ -201,6 +204,46 @@ static void draw_zone_border(unsigned int px, unsigned int py,
         for (y = 0U; y < 8U; ++y) pixel(px, py + y, color);
 }
 
+/* 2-bit pending construction state, rendered translucently over existing
+ * Micropolis graphics. Only tiles participating in the current drag are
+ * touched. Red diagonal markers indicate blocked/out-of-money squares.
+ */
+static void draw_pending_tile(unsigned int px, unsigned int py,
+                              unsigned int mx, unsigned int my)
+{
+    unsigned int state = placement_at(mx, my);
+    unsigned int ix, iy;
+    unsigned char tint;
+    if (state == PREVIEW_NONE) return;
+    if (state == PREVIEW_FUNDED) {
+        if (selected_tool == EDIT_RESIDENTIAL) tint = 10U;
+        else if (selected_tool == EDIT_COMMERCIAL) tint = 9U;
+        else if (selected_tool == EDIT_INDUSTRIAL) tint = 14U;
+        else if (selected_tool == EDIT_POWER) tint = 11U;
+        else tint = 7U; /* ghost gray road */
+        /* Alternating translucent-looking stipple keeps original tile
+         * graphics readable without extra off-screen compositing RAM.
+         */
+        for (iy = 1U; iy < 7U; iy += 2U)
+            for (ix = 1U + ((iy >> 1U) & 1U); ix < 7U; ix += 2U)
+                pixel(px + ix, py + iy, tint);
+        for (ix = 0U; ix < 8U; ix += 2U) {
+            pixel(px + ix, py, tint);
+            pixel(px + ix, py + 7U, tint);
+        }
+        for (iy = 0U; iy < 8U; iy += 2U) {
+            pixel(px, py + iy, tint);
+            pixel(px + 7U, py + iy, tint);
+        }
+    } else {
+        tint = state == PREVIEW_NO_FUNDS ? 12U : 4U;
+        for (ix = 0U; ix < 8U; ++ix) {
+            pixel(px + ix, py + ix, tint);
+            pixel(px + 7U - ix, py + ix, tint);
+        }
+    }
+}
+
 static void draw_city_tile(unsigned int px, unsigned int py,
                            unsigned int mx, unsigned int my)
 {
@@ -225,6 +268,7 @@ static void draw_city_tile(unsigned int px, unsigned int py,
         }
         draw_original_tile(px, py, graphic);
         draw_zone_border(px, py, mx, my);
+        draw_pending_tile(px, py, mx, my);
         return;
     }
 
@@ -289,6 +333,7 @@ static void draw_city_tile(unsigned int px, unsigned int py,
     }
     /* Fallback artwork retains the same zone boundaries as TILES.DAT. */
     draw_zone_border(px, py, mx, my);
+    draw_pending_tile(px, py, mx, my);
 }
 
 static void bios_text(unsigned int row, unsigned int column,
@@ -374,8 +419,14 @@ static void draw_toolbox(void)
         pixel(78U, y, 8U);
         pixel(79U, y, 0U);
     }
-    bios_text(1U, 0U, "FUNDS: --", 0U);
-    bios_text(2U, 0U, "EDIT MODE", 0U);
+    bios_text(1U, 0U, "FUNDS", 0U);
+    {
+        char money[16];
+        long funds = city_get_funds();
+        if (funds > 99999999L) funds = 99999999L;
+        sprintf(money, "$%8ld", funds);
+        bios_text(2U, 0U, money, 0U);
+    }
     bios_text(3U, 2U, "TOOLS", 1U);
 
     for (n = 0U; n < 8U; ++n) {
@@ -522,9 +573,15 @@ static void draw_status(void)
     char status[41];
     for (x = 0; x < SCREEN_W / 8U; ++x)
         solid_tile(x * 8U, 192U, 1);
-    sprintf(status, "%-8s X:%03u Y:%03u  %-10s",
-            edit_tool_name(selected_tool),
-            scroll_x + cursor_x, scroll_y + cursor_y, last_action);
+    if (placement_active()) {
+        sprintf(status, "COST:$%ld LEFT:$%ld %u OK %u X",
+                placement_cost(), placement_remaining(),
+                placement_count(), placement_rejected());
+    } else {
+        sprintf(status, "%-8s X:%03u Y:%03u  %-10s",
+                edit_tool_name(selected_tool),
+                scroll_x + cursor_x, scroll_y + cursor_y, last_action);
+    }
     bios_text(24, 0, status, 11);
 }
 
@@ -764,14 +821,87 @@ static void select_tool(unsigned int number)
     draw_toolbox();
 }
 
+static void preview_refresh(unsigned int x0, unsigned int y0,
+                            unsigned int x1, unsigned int y1)
+{
+    /* Repaint only stroke neighborhood; the translucent preview is
+     * composited by draw_city_tile and never edits the map.
+     */
+    redraw_zoning_brush(x0, y0, x1, y1);
+    draw_status();
+}
+
+static void build_preview_start(unsigned int x, unsigned int y)
+{
+    placement_begin(selected_tool);
+    build_drag_active = placement_active();
+    if (!build_drag_active)
+        return;
+    build_drag_x = x;
+    build_drag_y = y;
+    (void)placement_extend(x, y, x, y);
+    preview_refresh(x, y, x, y);
+}
+
+static void build_preview_move(unsigned int x, unsigned int y)
+{
+    unsigned int prev_x, prev_y;
+    if (!build_drag_active)
+        return;
+    prev_x = build_drag_x;
+    prev_y = build_drag_y;
+    (void)placement_extend(prev_x, prev_y, x, y);
+    build_drag_x = x;
+    build_drag_y = y;
+    preview_refresh(prev_x, prev_y, x, y);
+}
+
+static void build_preview_finish(void)
+{
+    unsigned int x0, y0, x1, y1, applied;
+    long paid;
+    if (!build_drag_active)
+        return;
+    placement_bounds(&x0, &y0, &x1, &y1);
+    paid = placement_cost();
+    applied = placement_commit();
+    build_drag_active = 0;
+    last_action = applied ? "BUILT" : "BLOCKED";
+    redraw_zoning_brush(x0, y0, x1, y1);
+    if (applied != 0U) {
+        /* Static minimap and sidebar funds are only repainted once
+         * per completed drag, not on each V20 mouse polling event.
+         */
+        draw_overview();
+        draw_toolbox();
+        (void)paid;
+    }
+    draw_status();
+}
+
+static void build_preview_cancel(void)
+{
+    unsigned int x0, y0, x1, y1;
+    if (!build_drag_active)
+        return;
+    placement_bounds(&x0, &y0, &x1, &y1);
+    placement_cancel();
+    build_drag_active = 0;
+    redraw_zoning_brush(x0, y0, x1, y1);
+    last_action = "CANCELLED";
+    draw_status();
+}
+
 static void apply_selected_tool(void)
 {
     unsigned int kind = selected_zone_kind();
     unsigned int mx = scroll_x + cursor_x;
     unsigned int my = scroll_y + cursor_y;
     int erased = 0;
-    if (kind != ZONE_NONE) {
-        apply_zone_stroke(mx, my, mx, my, kind);
+    if (kind != ZONE_NONE || selected_tool == EDIT_ROAD ||
+        selected_tool == EDIT_POWER) {
+        build_preview_start(mx, my);
+        build_preview_finish();
         return;
     }
     if (selected_tool == EDIT_INSPECT) {
