@@ -53,7 +53,7 @@ jobs:
             -o test-simulation tandy-dos/city.c tandy-dos/zoning.c \
             tandy-dos/engine.c tandy-dos/simulation.c \
             tandy-dos/tests/test_simulation.c
-          ./test-simulation
+          ./test-simulation micropolis-activity/cities/happisle.cty
 
       - name: Convert original Micropolis tile art to Tandy format
         run: |
