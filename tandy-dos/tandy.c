@@ -1592,20 +1592,37 @@ static unsigned long bench_bios_ticks(void)
 
 static void benchmark_video(void)
 {
-    unsigned int pass, row, index, off;
+    unsigned int pass, row, index, off, x, y;
     unsigned long start;
+    /* The benchmark uses REAL B800 VRAM, but never renders the main
+     * toolbar, minimap, menu or status HUD. Previous builds repeatedly
+     * called render_full() between timed passes; that was responsible
+     * for distracting toolbox refreshes and apparent screen corruption.
+     */
     mouse_pointer_hide();
+    bios_text(0U, 1U, "MICROPOL VRAM BENCHMARK", 15U);
+    bios_text(24U, 1U, "1/3 CITY TILE REDRAW", 11U);
 
-    /* Two complete redraws, including original tile art + UI. */
+    /* Only redraw the 32x21 city window, not the game interface.
+     * Same original 8x8 sprites/overlays and hardware video mode.
+     */
     start = bench_bios_ticks();
     for (pass = 0U; pass < 2U; ++pass)
-        render_full();
+        for (y = 0U; y < VIEW_H; ++y)
+            for (x = 0U; x < VIEW_W; ++x)
+                draw_city_tile(VIEW_X + x*8U, VIEW_Y + y*8U,
+                               scroll_x + x, scroll_y + y);
     bench_full_ticks = bench_bios_ticks() - start;
 
-    /* Original left-scroll inner loop, 48 runs across all 168 lines.
-     * Exclude newly exposed tile rendering to isolate VRAM throughput.
+    /* The test copies the LIVE video RAM, not a normal RAM buffer.
+     * Blank just the city viewport before each copy trial. Repeated
+     * shifts of identical black pixels have the same video-memory
+     * read/write cost, but produce no visible smearing/flickering.
+     * The toolbar/menu/status rows are never touched.
      */
-    render_full();
+    tandy_fill_region(video, VIEW_X/2U, VIEW_Y,
+                      VIEW_W*4U, VIEW_H*8U, 0U);
+    bios_text(24U, 1U, "2/3 BYTE VRAM COPY  ", 11U);
     start = bench_bios_ticks();
     for (pass = 0U; pass < 48U; ++pass)
         for (row = VIEW_Y; row < VIEW_Y + VIEW_H*8U; ++row) {
@@ -1615,8 +1632,9 @@ static void benchmark_video(void)
         }
     bench_byte_ticks = bench_bios_ticks() - start;
 
-    /* Same total rows/bytes and overlap direction as the byte loop. */
-    render_full();
+    tandy_fill_region(video, VIEW_X/2U, VIEW_Y,
+                      VIEW_W*4U, VIEW_H*8U, 0U);
+    bios_text(24U, 1U, "3/3 WORD VRAM COPY  ", 11U);
     start = bench_bios_ticks();
     for (pass = 0U; pass < 48U; ++pass)
         for (row = VIEW_Y; row < VIEW_Y + VIEW_H*8U; ++row) {
@@ -1624,7 +1642,9 @@ static void benchmark_video(void)
             tandy_move_words(video,off,off+4U,(VIEW_W*4U-4U)/2U,0);
         }
     bench_word_ticks = bench_bios_ticks() - start;
-    render_full();
+    /* The DOS text mode is restored immediately after this function.
+     * Do not redraw the entire game just to erase benchmark pixels.
+     */
 }
 
 /* Map a normal DOS 8.3 city save to its optional zone sidecar. */
@@ -1644,16 +1664,34 @@ static int zoning_sidecar_name(const char *cityname,
     return 1;
 }
 
+/* DOS options are case-insensitive regardless of the case typed in
+ * COMMAND.COM; keep argument parsing independent of DOS C extensions.
+ */
+static int dos_option_is(const char *argument, const char *name)
+{
+    unsigned char a, b;
+    if (*argument != '/' && *argument != '-')
+        return 0;
+    ++argument;
+    while (*argument && *name) {
+        a = (unsigned char)*argument++;
+        b = (unsigned char)*name++;
+        if (a >= 'a' && a <= 'z') a = (unsigned char)(a - 'a' + 'A');
+        if (b >= 'a' && b <= 'z') b = (unsigned char)(b - 'a' + 'A');
+        if (a != b)
+            return 0;
+    }
+    return *argument == '\0' && *name == '\0';
+}
+
 int main(int argc, char **argv)
 {
     int i, have_city = 0, allow_mouse = 1, bench_mode = 0;
     char sidecar[256];
     for (i = 1; i < argc; ++i) {
-        if (strcmp(argv[i], "/NOMOUSE") == 0 ||
-            strcmp(argv[i], "-NOMOUSE") == 0) {
+        if (dos_option_is(argv[i], "NOMOUSE")) {
             allow_mouse = 0;
-        } else if (strcmp(argv[i], "/BENCH") == 0 ||
-                   strcmp(argv[i], "-BENCH") == 0) {
+        } else if (dos_option_is(argv[i], "BENCH")) {
             bench_mode = 1;
             allow_mouse = 0;
         } else if (!have_city && city_load(argv[i])) {
@@ -1703,11 +1741,13 @@ int main(int argc, char **argv)
             mouse_buttons = state.buttons;
         }
     }
-    render_full();
-    if (bench_mode)
+    if (bench_mode) {
+        /* Do not create/redraw toolbar or HUD in benchmark mode. */
         benchmark_video();
-    else
+    } else {
+        render_full();
         keyboard_loop();
+    }
     mouse_pointer_hide();
     mouse_shutdown();
     engine_shutdown();
@@ -1716,7 +1756,7 @@ int main(int argc, char **argv)
         free(art_data); /* art buffer used only in graphics mode */
     if (bench_mode) {
         puts("MICROPOL /BENCH - Tandy mode 9, 32x21 city viewport");
-        printf("Full redraw x2     : %lu ticks (~%lu ms)\n",
+        printf("City tile draw x2  : %lu ticks (~%lu ms)\n",
                bench_full_ticks, bench_full_ticks*55UL);
         printf("VRAM bytes x48     : %lu ticks (~%lu ms)\n",
                bench_byte_ticks, bench_byte_ticks*55UL);
