@@ -56,7 +56,7 @@ int main(void)
     /* Corrupt one byte: reject without losing existing zone state. */
     f = fopen("testzone.zon", "r+b");
     assert(f != NULL);
-    assert(fseek(f, 8L + 4L * CITY_HEIGHT + 6L, SEEK_SET) == 0);
+    assert(fseek(f, 8L + (4L * CITY_HEIGHT + 6L) / 4L, SEEK_SET) == 0);
     assert(fputc(99, f) != EOF);
     assert(fclose(f) == 0);
     assert(!zoning_load("testzone.zon"));
