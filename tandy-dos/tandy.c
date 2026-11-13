@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later
- * Micropolis Tandy 1000 EX DOS port: hardware/display milestone.
- * NOT YET A PLAYABLE GAME: read-only city viewer, native Tandy 16-color.
+ * Micropolis Tandy 1000 EX DOS port: experimental live city builder.
+ * Native 320x200x16 rendering, flexible zoning and phased simulation.
+ * Full original Micropolis simulation fidelity is still in progress.
  * Original Micropolis: Copyright (C) 1989-2007 Electronic Arts Inc.
  * See repository COPYING and the original source's additional terms.
  */
