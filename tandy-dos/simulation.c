@@ -25,6 +25,7 @@
 static struct sim_statistics stats;
 static unsigned int cursor = 0U;
 static unsigned int last_x, last_y;
+static unsigned int last_radius = 0U;
 static unsigned int changed = 0U;
 static unsigned int power_dirty = 1U;
 static unsigned int paused = 0U;
@@ -138,6 +139,7 @@ static int process_zone(unsigned int x, unsigned int y,
         changed = 1U;
         last_x = x;
         last_y = y;
+        last_radius = 0U;
     }
     if (kind == ZONE_RES)
         pop_res += zone_developed_population(kind,next);
@@ -148,6 +150,86 @@ static int process_zone(unsigned int x, unsigned int y,
     return next != stage;
 }
 
+
+/* Original Micropolis 3x3 vacant zones use center tile IDs 244 / 427 /
+ * 616 and are composed of nine consecutive graphic tiles.
+ * Grow these as actual authentic 3x3 structures only when all nine
+ * underlying tiles still match the original vacant plot, preserving
+ * nearby edited city lots. This complements independent 1x1 growth.
+ */
+static int original_zone_road(unsigned int x, unsigned int y)
+{
+    int k, xx, yy;
+    for (k = -1; k <= 1; ++k) {
+        xx = (int)x + k;
+        yy = (int)y + k;
+        if (x >= 2U && road_tile(city_at(x-2U,(unsigned int)yy) & TILE_MASK))
+            return 1;
+        if (x + 2U < CITY_WIDTH &&
+            road_tile(city_at(x+2U,(unsigned int)yy) & TILE_MASK))
+            return 1;
+        if (y >= 2U && road_tile(city_at((unsigned int)xx,y-2U) & TILE_MASK))
+            return 1;
+        if (y + 2U < CITY_HEIGHT &&
+            road_tile(city_at((unsigned int)xx,y+2U) & TILE_MASK))
+            return 1;
+    }
+    return 0;
+}
+
+static int process_original_zone(unsigned int x, unsigned int y,
+                                 unsigned short center)
+{
+    unsigned int id = center & TILE_MASK;
+    unsigned int kind, first, developed, i, j, tile_id;
+    unsigned int *count;
+    if (!(center & ZONE_BIT) || x < 2U || y < 2U ||
+        x + 2U >= CITY_WIDTH || y + 2U >= CITY_HEIGHT)
+        return 0;
+    if (id == 244U) {
+        kind = ZONE_RES; first = 240U; developed = 261U;
+        count = &growth_res;
+    } else if (id == 427U) {
+        kind = ZONE_COM; first = 423U; developed = 432U;
+        count = &growth_com;
+    } else if (id == 616U) {
+        kind = ZONE_IND; first = 612U; developed = 621U;
+        count = &growth_ind;
+    } else {
+        return 0;
+    }
+    if (*count >= (kind == ZONE_RES ? 12U : 8U) ||
+        !original_zone_road(x,y) || !engine_is_powered(x,y))
+        return 0;
+    if (kind == ZONE_COM && pop_res <= pop_com * 2UL + 2UL)
+        return 0;
+    if (kind == ZONE_IND && pop_res <= pop_ind / 2UL)
+        return 0;
+    if ((random16() & 15U) != 0U)
+        return 0;
+
+    for (j = 0U; j < 3U; ++j)
+        for (i = 0U; i < 3U; ++i) {
+            tile_id = city_at(x + i - 1U, y + j - 1U) & TILE_MASK;
+            if (tile_id != first + j * 3U + i)
+                return 0;
+        }
+    for (j = 0U; j < 3U; ++j)
+        for (i = 0U; i < 3U; ++i) {
+            unsigned short flags = 8192U | 16384U; /* BURN/COND */
+            if (i == 1U && j == 1U)
+                flags |= 1024U | 4096U; /* authentic zone center */
+            city_set(x + i - 1U, y + j - 1U,
+                     (unsigned short)(developed + j * 3U + i + flags));
+        }
+    ++(*count);
+    changed = 1U;
+    last_x = x; last_y = y;
+    last_radius = 1U;
+    power_dirty = 1U;
+    return 1;
+}
+
 static void scan_tile(unsigned int x, unsigned int y)
 {
     unsigned short tile = city_at(x,y);
@@ -156,6 +238,9 @@ static void scan_tile(unsigned int x, unsigned int y)
     if (wire_tile(id)) ++wires;
     if (id == 750U || id == 816U) ++plants;
     survey_original(tile);
+    /* Simulate vacant authentic 3x3 zones in imported original cities. */
+    if (tile & ZONE_BIT)
+        (void)process_original_zone(x,y,tile);
     if (kind != ZONE_NONE)
         (void)process_zone(x,y,kind,id);
 }
@@ -221,6 +306,7 @@ void simulation_last_change(unsigned int *x, unsigned int *y)
 {
     *x = last_x; *y = last_y;
 }
+unsigned int simulation_last_change_radius(void) { return last_radius; }
 unsigned int simulation_progress(void) { return cursor; }
 int simulation_is_paused(void) { return paused != 0U; }
 void simulation_set_paused(int pause) { paused = pause ? 1U : 0U; }
