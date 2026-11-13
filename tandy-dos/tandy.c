@@ -932,11 +932,11 @@ static void draw_status(void)
                 placement_cost(),placement_remaining(),
                 placement_count(),placement_rejected());
     } else {
-        sprintf(status,"G:%u R:%u X%u %s %s",
+        sprintf(status,"G:%u R:%u X%u %s V:%u %s",
                 st->growth_total,st->lots_ready,
                 simulation_is_paused() ? 0U : simulation_speed(),
                 simulation_is_paused() ? "PAUSE" : "RUN",
-                last_action);
+                map_turns * 90U, last_action);
     }
     draw_status_text(24U,status,status_shadow,&status_valid,11U);
 }
