@@ -5,7 +5,7 @@
 #include <assert.h>
 #include <stdio.h>
 
-int main(void)
+int main(int argc, char **argv)
 {
     const char *name = "testcity.tmp";
     FILE *f;
@@ -41,6 +41,37 @@ int main(void)
     city_make_demo();
     assert(city_at(0, 0) == 2U);
     assert(city_at(51, 30) == 66U);
-    puts("Micropolis CTY parser test passed");
+
+    /* Opening an imported city should focus on inhabited neighborhoods,
+     * never default to an empty ocean-only corner.
+     */
+    {
+        unsigned int vx = 0U, vy = 0U;
+        assert(!city_suggest_view(32U,21U,&vx,&vy));
+        city_set(86U,74U,265U | 1024U);
+        city_set(87U,75U,274U | 1024U);
+        city_set(88U,76U,283U | 1024U);
+        assert(city_suggest_view(32U,21U,&vx,&vy));
+        assert(vx > 0U && vy > 0U);
+        assert(86U >= vx && 86U < vx+32U);
+        assert(74U >= vy && 74U < vy+21U);
+        assert(!city_suggest_view(0U,21U,&vx,&vy));
+    }
+    if (argc > 1) {
+        unsigned int vx,vy,ix,iy,centers=0U;
+        assert(city_load(argv[1]));
+        assert(city_suggest_view(32U,21U,&vx,&vy));
+        for(ix=vx; ix<vx+32U; ++ix)
+            for(iy=vy; iy<vy+21U; ++iy) {
+                unsigned short t=city_at(ix,iy);
+                unsigned int id=t&1023U;
+                if ((t&1024U) && id>=265U && id<409U)
+                    ++centers;
+            }
+        assert(centers > 0U);
+        printf("Original city view starts at %u,%u with %u "
+               "residential centers visible\n",vx,vy,centers);
+    }
+    puts("Micropolis CTY parser and neighborhood focus tests passed");
     return 0;
 }
