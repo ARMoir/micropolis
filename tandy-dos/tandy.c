@@ -639,6 +639,26 @@ static void draw_tool_button(unsigned int n)
     box_pixels(bx+3U,by+20U,24U,2U,accent);
 }
 
+/* These two narrow sidebar headings share the transparent 5x7
+ * graphics font used for the now-fixed top menu. BIOS AH=09 would
+ * create unwanted black rectangles under the glyphs in mode 9.
+ */
+static void draw_sidebar_label(unsigned int x, unsigned int y,
+                                const char *message)
+{
+    unsigned int row, col;
+    while (*message) {
+        unsigned char ch = (unsigned char)*message++;
+        for (row=0U;row<7U;++row) {
+            unsigned int bits = menu_font_row(ch,row);
+            for (col=0U;col<5U;++col)
+                if (bits & (1U << (4U-col)))
+                    pixel(x+col,y+row,15U);
+        }
+        x+=6U;
+    }
+}
+
 static void draw_toolbox(void)
 {
     unsigned int x, y, n;
@@ -649,10 +669,12 @@ static void draw_toolbox(void)
         pixel(UI_TOOLBOX_W-2U,y,8U);
         pixel(UI_TOOLBOX_W-1U,y,0U);
     }
-    bios_text(2U,1U,"TOOLS",1U);
+    box_pixels(2U,16U,59U,8U,1U);
+    draw_sidebar_label(16U,17U,"TOOLS");
     for (n = 0U; n < 8U; ++n)
         draw_tool_button(n);
-    bios_text(16U,2U,"MAP",1U);
+    box_pixels(2U,128U,59U,8U,8U);
+    draw_sidebar_label(24U,129U,"MAP");
     draw_overview();
 }
 
