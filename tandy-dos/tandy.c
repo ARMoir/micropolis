@@ -1204,8 +1204,13 @@ static void simulation_idle(void)
     event = simulation_advance(amount);
     if (event & SIM_EVENT_TILE) {
         simulation_last_change(&tx, &ty);
-        if (tx >= scroll_x && tx < scroll_x + VIEW_W &&
-            ty >= scroll_y && ty < scroll_y + VIEW_H) {
+        if (simulation_last_change_radius() != 0U) {
+            /* Redraw each of the nine actual original Micropolis
+             * building sprite cells, not just its zone center.
+             */
+            redraw_zoning_brush(tx-1U,ty-1U,tx+1U,ty+1U);
+        } else if (tx >= scroll_x && tx < scroll_x + VIEW_W &&
+                   ty >= scroll_y && ty < scroll_y + VIEW_H) {
             draw_city_tile(VIEW_X + (tx-scroll_x)*8U,
                            VIEW_Y + (ty-scroll_y)*8U, tx, ty);
             if (tx == scroll_x + cursor_x &&
