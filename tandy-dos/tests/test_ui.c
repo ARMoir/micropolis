@@ -15,6 +15,23 @@ int main(void)
     assert(UI_MENU_HEIGHT < UI_MAP_Y);
     assert(ui_header_hit(320U, 0U) == MENU_NONE);
     assert(ui_toolbar_hit(0U, 8U) == -1);
+    /* SimCity-inspired visual arrangement while preserving the stable
+     * shortcut numbers: DOZ/RD, PWR/RES, COM/IND, INS/PLT.
+     */
+    assert(ui_toolbar_tool(0U) == 6U);
+    assert(ui_toolbar_tool(1U) == 1U);
+    assert(ui_toolbar_tool(2U) == 2U);
+    assert(ui_toolbar_tool(3U) == 3U);
+    assert(ui_toolbar_tool(4U) == 4U);
+    assert(ui_toolbar_tool(5U) == 5U);
+    assert(ui_toolbar_tool(6U) == 0U);
+    assert(ui_toolbar_tool(7U) == 7U);
+    {
+        unsigned int n;
+        for(n=0U; n<8U; ++n)
+            assert(ui_toolbar_button(ui_toolbar_tool(n)) == n);
+    }
+    assert(ui_toolbar_button(8U) == 6U);
     assert(ui_toolbar_hit(10U, 30U) == 0);
     assert(ui_toolbar_hit(42U, 30U) == 1);
     assert(ui_toolbar_hit(10U, 55U) == 2);
