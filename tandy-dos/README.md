@@ -512,14 +512,32 @@ You can also test an existing city without modifying it:
 MICROPOL HAPPISLE.CTY /BENCH
 ```
 
-The benchmark temporarily enters Tandy video mode 9, measures two
-complete city redraws, then performs the same **48 passes** of
-left-shifted VRAM spans using the original byte loop and the optimized
-word copy, respectively. It restores the original DOS video mode,
-then prints BIOS clock ticks (~55 ms per tick), approximate milliseconds
-and the **byte/word copy speed ratio**. Larger ratios mean faster
-word copying; 100% means equal speed. The test does not save the city,
-change the simulation, modify the tile files or require a mouse driver.
+The benchmark enters Tandy video mode 9 but uses an isolated test
+screen rather than repeatedly rebuilding the in-game HUD. It measures
+**two city-tile-only renders** (the original 8x8 tiles and overlays,
+without the toolbar, minimap or status strips), then blanks **only the
+32x21 city viewport** in real B800 video RAM. The old byte-copy and
+optimized word-copy tests each perform **48 passes** of real Tandy
+VRAM reads/writes over that uniformly black viewport. This still
+benchmarks the actual video-memory throughput, but there is no
+smearing from repeated shifts of visible city graphics, and no tool
+redrawing between trials. A small benchmark heading remains at the top
+of the screen during the test.
+
+It restores the original DOS video mode and prints BIOS clock ticks
+(~55 ms per tick), approximate milliseconds and the **byte/word copy
+speed ratio**. Larger ratios mean faster word copying; 100% means equal
+speed. The first output line is now **City tile draw x2**, not the old
+Full redraw x2, and is **not directly comparable** with earlier builds
+because it deliberately excludes all toolbar/menu work. Copy timings
+still use the same 48-pass viewport test. The benchmark does not save
+the city, change the simulation or modify the tile files. It does not
+require a mouse driver.
+
+Switches now work case-insensitively like normal DOS usage:
+`/bench`, `/BENCH`, `/Bench`, `/nomouse`, and `/NOMOUSE`.
+The hosted video-ops test verifies that the benchmark's viewport clear
+leaves every other byte of the four-bank Tandy framebuffer intact.
 
 The benchmark isolates VRAM copy throughput, not end-to-end game
 frame rate. A build passing GitHub Actions proves 16-bit compilation
