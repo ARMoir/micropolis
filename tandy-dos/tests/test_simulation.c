@@ -17,7 +17,7 @@ static void run_months(unsigned int months)
     assert(city_get_time() == target);
 }
 
-int main(void)
+int main(int argc, char **argv)
 {
     unsigned int x, y, level;
     long balance;
@@ -139,6 +139,21 @@ int main(void)
     assert(zoning_development_at(50U,31U) > 0U ||
            zoning_development_at(51U,31U) > 0U ||
            zoning_development_at(52U,31U) > 0U);
+    if (argc > 1) {
+        assert(city_load(argv[1]));
+        zoning_seed_from_city();
+        simulation_init();
+        run_months(12U);
+        st = simulation_stats();
+        printf("Original city regression: P=%lu Jobs=%lu "
+               "growth=%u serviced=%u no-road=%u no-power=%u "
+               "net-power=%u\\n",
+               st->residents,
+               st->commercial_jobs + st->industrial_jobs,
+               st->growth_total, st->lots_ready,
+               st->lots_no_road, st->lots_no_power,
+               st->powered_tiles);
+    }
     puts("Phased RCI growth (1x1 / 3x3), demo, clock, taxes and persistence passed");
     return 0;
 }
