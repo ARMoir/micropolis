@@ -19,6 +19,7 @@
 #include "placement.h"
 #include "simulation.h"
 #include "video_ops.h"
+#include "menu_font.h"
 
 #define SCREEN_W 320U
 #define SCREEN_H 200U
@@ -903,15 +904,48 @@ static void scroll_one_tile(unsigned int previous_x, unsigned int previous_y)
     }
 }
 
+/* Top navigation must be rendered transparently over cyan VRAM.
+ * BIOS INT 10h/AH=09h writes an OPAQUE black background for each
+ * character in Tandy graphics mode 9, which hid SYSTEM/TOOLS/VIEW/HELP
+ * and left only the last 88 pixels of the cyan strip visible.
+ * Use a tiny 5x7 bitmap font (84 bytes) for these fixed captions,
+ * preserving the 40-column alignment and existing mouse hitboxes.
+ */
+static void draw_menu_caption(unsigned int column, const char *caption)
+{
+    unsigned int x, y;
+    while (*caption != '\0' && column < 40U) {
+        unsigned char ch = (unsigned char)*caption++;
+        for (y = 0U; y < 7U; ++y) {
+            unsigned int bits = menu_font_row(ch,y);
+            for (x = 0U; x < 5U; ++x)
+                if ((bits & (1U << (4U-x))) != 0U)
+                    pixel(column*8U + 1U + x,y,0U);
+        }
+        ++column;
+    }
+}
+
+static void draw_top_menu_bar(void)
+{
+    unsigned int x;
+    for (x = 0U; x < SCREEN_W; x += 8U)
+        solid_tile(x,0U,3U);
+    draw_menu_caption(1U,"SYSTEM");
+    draw_menu_caption(10U,"TOOLS");
+    draw_menu_caption(18U,"VIEW");
+    draw_menu_caption(25U,"HELP");
+}
+
 static void render_full(void)
 {
     unsigned int x, y;
     mouse_pointer_hide();
 
-    /* Cyan DOS-style top menu bar spanning all 40 columns. */
-    for (x = 0U; x < SCREEN_W; x += 8U)
-        solid_tile(x, 0U, 3U);
-    bios_text(0U, 0U, " SYSTEM   TOOLS   VIEW   HELP", 0U);
+    /* The graphics-mode BIOS text API previously erased the cyan bar
+     * underneath all 29 menu characters. Transparent drawing fixes it.
+     */
+    draw_top_menu_bar();
 
     /* City is a fixed rectangular window to the right of the toolbox. */
     for (y = 0U; y < VIEW_H; ++y)
