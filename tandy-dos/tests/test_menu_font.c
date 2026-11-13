@@ -62,7 +62,7 @@ int main(void)
      */
     assert(bar[0][0] == 3U);
     assert(bar[7][10U] == 3U);
-    assert(bar[0][90U] == 3U);
+    assert(bar[0][89U] == 3U);
     assert(bar[0][231U] == 3U);
     assert(bar[0][232U] == 3U);
     assert(bar[0][319U] == 3U);
