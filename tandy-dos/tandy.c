@@ -292,6 +292,56 @@ static void draw_pending_tile(unsigned int px, unsigned int py,
     }
 }
 
+/* A classic original building is composed of 3x3 or 4x4 individual
+ * Micropolis graphic tiles. Simply rotating those positions scrambles
+ * the picture. Keep each bitmap upright and select the corresponding
+ * ORIGINAL tile art at its new screen-relative position instead.
+ * This touches the renderer only when the player rotates the camera;
+ * simulation data, roads, zones and .CTY tile IDs are never changed.
+ */
+static unsigned int upright_building_graphic(unsigned int wx,
+                                              unsigned int wy,
+                                              unsigned int graphic)
+{
+    unsigned int first=0U,span=0U,part,center_id;
+    unsigned int center_offset;
+    int center_x,center_y;
+    unsigned short center;
+    if (map_turns == 0U)
+        return graphic;
+    if (graphic >= 240U && graphic <= 248U) {
+        first=240U; span=3U;
+    } else if (graphic >= 261U && graphic <= 404U) {
+        first=261U + ((graphic-261U)/9U)*9U; span=3U;
+    } else if (graphic >= 423U && graphic <= 431U) {
+        first=423U; span=3U;
+    } else if (graphic >= 432U && graphic <= 611U) {
+        first=432U + ((graphic-432U)/9U)*9U; span=3U;
+    } else if (graphic >= 612U && graphic <= 620U) {
+        first=612U; span=3U;
+    } else if (graphic >= 621U && graphic <= 692U) {
+        first=621U + ((graphic-621U)/9U)*9U; span=3U;
+    } else if (graphic >= 745U && graphic <= 760U) {
+        first=745U; span=4U; /* coal plant */
+    } else if (graphic >= 811U && graphic <= 826U) {
+        first=811U; span=4U; /* nuclear plant */
+    } else {
+        return graphic; /* normal one-tile sprites remain upright */
+    }
+    part=graphic-first;
+    center_offset=span == 3U ? 1U : 1U; /* original zone flag center */
+    center_x=(int)wx + (int)center_offset - (int)(part%span);
+    center_y=(int)wy + (int)center_offset - (int)(part/span);
+    if (center_x<0 || center_y<0 || center_x>=CITY_WIDTH ||
+        center_y>=CITY_HEIGHT)
+        return graphic;
+    center=city_at((unsigned int)center_x,(unsigned int)center_y);
+    center_id=first+center_offset*span+center_offset;
+    if (!(center & 1024U) || (center & TILE_MASK) != center_id)
+        return graphic;
+    return first+view_rotation_upright_part(map_turns,span,part);
+}
+
 static void draw_city_tile(unsigned int px, unsigned int py,
                            unsigned int mx, unsigned int my)
 {
@@ -334,7 +384,8 @@ static void draw_city_tile(unsigned int px, unsigned int py,
                 graphic = ind[stage];
             }
         }
-        draw_original_tile(px, py, graphic);
+        draw_original_tile(px,py,
+                           upright_building_graphic(mx,my,graphic));
         draw_zone_border(px, py, mx, my);
         draw_pending_tile(px, py, mx, my);
         return;
