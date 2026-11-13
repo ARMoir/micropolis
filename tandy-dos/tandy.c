@@ -557,8 +557,8 @@ static void draw_toolbox(void)
  * whose contents change. Particularly important with the 7 MHz V20
  * and an actively moving serial mouse.
  */
-static char footer_shadow[41], status_shadow[41];
-static int footer_valid = 0, status_valid = 0;
+static char city_shadow[41], debug_shadow[41], status_shadow[41];
+static int city_valid = 0, debug_valid = 0, status_valid = 0;
 
 static void draw_status_text(unsigned int row, const char *message,
                              char *shadow, int *valid,
@@ -584,25 +584,22 @@ static void draw_status_text(unsigned int row, const char *message,
     *valid = 1;
 }
 
-static void draw_footer(void)
+/* City statistics belong immediately beneath the top menu. Keeping
+ * this row independent of the map and sidebar means the monthly update
+ * only touches glyphs that actually changed.
+ */
+static void draw_city_stats(void)
 {
-    char summary[41];
+    char summary[80];
     const struct sim_statistics *st = simulation_stats();
     static const char *const months[12] = {
         "JAN","FEB","MAR","APR","MAY","JUN",
         "JUL","AUG","SEP","OCT","NOV","DEC"
     };
-    /* G = cumulative growth events this session, R = serviced growable lots.
-     * A zero R makes missing roads/power immediately visible.
-     */
-    sprintf(summary, "%s %u P:%lu J:%lu G:%u R:%u X%u",
-            months[st->month-1U], st->year,
-            st->residents,
-            st->commercial_jobs + st->industrial_jobs,
-            st->growth_total,
-            st->lots_ready,
-            simulation_is_paused() ? 0U : simulation_speed());
-    draw_status_text(23U,summary,footer_shadow,&footer_valid,15U);
+    sprintf(summary,"%s %u POP:%lu JOB:%lu $%ld",
+            months[st->month-1U],st->year,st->residents,
+            st->commercial_jobs+st->industrial_jobs,city_get_funds());
+    draw_status_text(1U,summary,city_shadow,&city_valid,15U);
 }
 
 /* Redraw only the moving edge.  For a one-tile scroll, use a direct
@@ -700,17 +697,35 @@ static void apply_zone_stroke(unsigned int x0, unsigned int y0,
     draw_status();
 }
 
+/* Bottom row 23 is input/debug state, row 24 is the latest action,
+ * simulation diagnostic or the live construction preview. Statistics
+ * (date, population, employment and funds) never appear here.
+ */
 static void draw_status(void)
 {
-    char status[41];
-    if (placement_active()) {
-        sprintf(status, "C:%ld R:%ld +%u -%u",
-                placement_cost(), placement_remaining(),
-                placement_count(), placement_rejected());
+    char debug[80], status[80];
+    unsigned int wx = scroll_x + cursor_x;
+    unsigned int wy = scroll_y + cursor_y;
+    const struct sim_statistics *st = simulation_stats();
+    if (mouse_on) {
+        sprintf(debug,"TOOL:%s MAP:%03u,%03u M:%03u,%03u",
+                tool_labels[tool_button_index(selected_tool)],
+                wx,wy,mouse_x,mouse_y);
     } else {
-        sprintf(status, "%-8s X:%03u Y:%03u  %-10s",
-                edit_tool_name(selected_tool),
-                scroll_x + cursor_x, scroll_y + cursor_y, last_action);
+        sprintf(debug,"TOOL:%s MAP:%03u,%03u M:OFF",
+                tool_labels[tool_button_index(selected_tool)],wx,wy);
+    }
+    draw_status_text(23U,debug,debug_shadow,&debug_valid,11U);
+    if (placement_active()) {
+        sprintf(status,"C:$%ld LEFT:$%ld +%u -%u",
+                placement_cost(),placement_remaining(),
+                placement_count(),placement_rejected());
+    } else {
+        sprintf(status,"G:%u R:%u X%u %s %s",
+                st->growth_total,st->lots_ready,
+                simulation_is_paused() ? 0U : simulation_speed(),
+                simulation_is_paused() ? "PAUSE" : "RUN",
+                last_action);
     }
     draw_status_text(24U,status,status_shadow,&status_valid,11U);
 }
@@ -887,8 +902,8 @@ static void render_full(void)
                            scroll_x + x, scroll_y + y);
 
     draw_toolbox();
-    footer_valid = status_valid = 0;
-    draw_footer();
+    city_valid = debug_valid = status_valid = 0;
+    draw_city_stats();
     draw_status();
 
     if (info_page != 0)
@@ -1013,7 +1028,7 @@ static void build_preview_finish(void)
          * per completed drag, not on each V20 mouse polling event.
          */
         draw_overview();
-        draw_funds();
+        draw_city_stats();
     }
     draw_status();
 }
@@ -1311,9 +1326,8 @@ static void simulation_idle(void)
         }
     }
     if (event & SIM_EVENT_MONTH) {
-        draw_footer();
-        if (city_get_time() % 48L == 0L)
-            draw_funds();
+        draw_city_stats();
+        draw_status();
     }
     mouse_pointer_show();
 }
@@ -1397,21 +1411,21 @@ static void keyboard_loop(void)
         }
         if (ascii == 'g' || ascii == 'G') {
             simulation_set_paused(!simulation_is_paused());
-            draw_footer();
+            draw_status();
             mouse_pointer_show();
             continue;
         }
         if (ascii == '+' || ascii == '=') {
             simulation_set_speed(simulation_speed() < 4U ?
                                  simulation_speed() + 1U : 4U);
-            draw_footer();
+            draw_status();
             mouse_pointer_show();
             continue;
         }
         if (ascii == '-' || ascii == '_') {
             simulation_set_speed(simulation_speed() > 1U ?
                                  simulation_speed() - 1U : 1U);
-            draw_footer();
+            draw_status();
             mouse_pointer_show();
             continue;
         }
