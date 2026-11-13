@@ -35,6 +35,8 @@ static unsigned int rng = 0x31a5U;
 static unsigned long pop_res, pop_com, pop_ind;
 static unsigned int lots_res, lots_com, lots_ind;
 static unsigned int roads, wires, plants;
+static unsigned int growth_this_month = 0U, ready_month = 0U;
+static unsigned int no_road_month = 0U, no_power_month = 0U;
 
 /* Avoid signed integer overflow on both 8086 and native test hosts. */
 static unsigned int random16(void)
@@ -108,11 +110,18 @@ static int process_zone(unsigned int x, unsigned int y,
     else if (kind == ZONE_IND) ++lots_ind;
 
     if (id != 0U && !(id >= 21U && id <= 43U))
-        return 0; /* authentic buildings are managed by original logic later */
+        return 0; /* original 3x3 buildings are processed separately */
 
     stage = zoning_development_at(x,y);
     next = stage;
     roll = random16();
+    if (!road_access(x,y)) {
+        ++no_road_month;
+    } else if (!has_power(x,y)) {
+        ++no_power_month;
+    } else {
+        ++ready_month;
+    }
     if (!road_access(x,y) || !has_power(x,y)) {
         /* Vacancy increases gradually with lost service, not instantly. */
         if (stage != 0U && (roll & 7U) == 0U)
@@ -127,7 +136,8 @@ static int process_zone(unsigned int x, unsigned int y,
         else if (kind == ZONE_COM && growth_com < 8U &&
                  pop_res > (pop_com * 2UL + 2UL))
             demand = 1;
-        if (demand && (roll & (stage == 0U ? 7U : 31U)) == 0U) {
+        if (demand && ((roll >> 8U) &
+                       (stage == 0U ? 7U : 15U)) == 0U) {
             next = stage + 1U;
             if (kind == ZONE_RES) ++growth_res;
             else if (kind == ZONE_COM) ++growth_com;
@@ -136,6 +146,7 @@ static int process_zone(unsigned int x, unsigned int y,
     }
     if (next != stage) {
         (void)zoning_set_development(x,y,next);
+        if (next > stage) ++growth_this_month;
         changed = 1U;
         last_x = x;
         last_y = y;
@@ -151,11 +162,12 @@ static int process_zone(unsigned int x, unsigned int y,
 }
 
 
-/* Original Micropolis 3x3 vacant zones use center tile IDs 244 / 427 /
- * 616 and are composed of nine consecutive graphic tiles.
- * Grow these as actual authentic 3x3 structures only when all nine
- * underlying tiles still match the original vacant plot, preserving
- * nearby edited city lots. This complements independent 1x1 growth.
+/* The original sprite ranges contain complete 3x3 buildings at
+ * 9-tile increments, with the zone center 4 tiles after the base.
+ * Continue growing *existing* residential, commercial and industrial
+ * buildings in-place, not just initially empty plots. Validate all
+ * nine original sprite IDs before changing anything so edited cities,
+ * roads and utilities are never overwritten.
  */
 static int original_zone_road(unsigned int x, unsigned int y)
 {
@@ -181,50 +193,78 @@ static int process_original_zone(unsigned int x, unsigned int y,
                                  unsigned short center)
 {
     unsigned int id = center & TILE_MASK;
-    unsigned int kind, first, developed, i, j, tile_id;
+    unsigned int kind, base, delta, tiers, first, next_first, i, j;
     unsigned int *count;
+    int road, power;
     if (!(center & ZONE_BIT) || x < 2U || y < 2U ||
         x + 2U >= CITY_WIDTH || y + 2U >= CITY_HEIGHT)
         return 0;
-    if (id == 244U) {
-        kind = ZONE_RES; first = 240U; developed = 261U;
+
+    if (id == 244U || (id >= 265U && id <= 400U &&
+                        (id-265U) % 9U == 0U)) {
+        kind = ZONE_RES;
+        base = 265U;
+        tiers = 4U;
         count = &growth_res;
-    } else if (id == 427U) {
-        kind = ZONE_COM; first = 423U; developed = 432U;
+        first = (id == 244U) ? 240U : id - 4U;
+    } else if (id == 427U || (id >= 436U && id <= 607U &&
+                               (id-436U) % 9U == 0U)) {
+        kind = ZONE_COM;
+        base = 436U;
+        tiers = 5U;
         count = &growth_com;
-    } else if (id == 616U) {
-        kind = ZONE_IND; first = 612U; developed = 621U;
+        first = (id == 427U) ? 423U : id - 4U;
+    } else if (id == 616U || (id >= 625U && id <= 688U &&
+                               (id-625U) % 9U == 0U)) {
+        kind = ZONE_IND;
+        base = 625U;
+        tiers = 4U;
         count = &growth_ind;
+        first = (id == 616U) ? 612U : id - 4U;
     } else {
         return 0;
     }
-    if (*count >= (kind == ZONE_RES ? 12U : 8U) ||
-        !original_zone_road(x,y) || !engine_is_powered(x,y))
+    if (id == 244U || id == 427U || id == 616U)
+        delta = 0U; /* empty original plot */
+    else
+        delta = ((id - base) / 9U) % tiers;
+    if (delta + 1U == tiers)
+        return 0; /* full-density original building */
+    road = original_zone_road(x,y);
+    power = has_power(x,y);
+    if (!road) ++no_road_month;
+    else if (!power) ++no_power_month;
+    else ++ready_month;
+    if (!road || !power || *count >= (kind == ZONE_RES ? 12U : 8U))
         return 0;
     if (kind == ZONE_COM && pop_res <= pop_com * 2UL + 2UL)
         return 0;
     if (kind == ZONE_IND && pop_res <= pop_ind / 2UL)
         return 0;
-    if ((random16() & 15U) != 0U)
+    if ((random16() >> 8U & 15U) != 0U)
         return 0;
+    next_first = (id == 244U || id == 427U || id == 616U) ?
+                 base - 4U : first + 9U;
 
     for (j = 0U; j < 3U; ++j)
         for (i = 0U; i < 3U; ++i) {
-            tile_id = city_at(x + i - 1U, y + j - 1U) & TILE_MASK;
-            if (tile_id != first + j * 3U + i)
+            if ((city_at(x+i-1U,y+j-1U) & TILE_MASK) !=
+                first + j*3U + i)
                 return 0;
         }
     for (j = 0U; j < 3U; ++j)
         for (i = 0U; i < 3U; ++i) {
-            unsigned short flags = 8192U | 16384U; /* BURN/COND */
-            if (i == 1U && j == 1U)
-                flags |= 1024U | 4096U; /* authentic zone center */
-            city_set(x + i - 1U, y + j - 1U,
-                     (unsigned short)(developed + j * 3U + i + flags));
+            unsigned short old_tile = city_at(x+i-1U,y+j-1U);
+            unsigned short flags = old_tile & (unsigned short)~TILE_MASK;
+            if (i == 1U && j == 1U) flags |= ZONE_BIT;
+            city_set(x+i-1U,y+j-1U,
+                     (unsigned short)((next_first+j*3U+i) | flags));
         }
     ++(*count);
+    ++growth_this_month;
     changed = 1U;
-    last_x = x; last_y = y;
+    last_x = x;
+    last_y = y;
     last_radius = 1U;
     power_dirty = 1U;
     return 1;
@@ -341,6 +381,9 @@ void simulation_init(void)
     stats.commercial_jobs = stats.industrial_jobs = 0UL;
     stats.last_income = stats.last_maintenance = 0L;
     stats.powered_tiles = 0U;
+    stats.growth_last_month = stats.growth_total = 0U;
+    stats.lots_ready = stats.lots_no_road = stats.lots_no_power = 0U;
+    growth_this_month = ready_month = no_road_month = no_power_month = 0U;
     stats.residential_lots = stats.commercial_lots = 0U;
     stats.industrial_lots = stats.road_tiles = 0U;
     stats.wire_tiles = stats.plants = 0U;
@@ -396,6 +439,11 @@ unsigned int simulation_advance(unsigned int max_tiles)
         stats.road_tiles = roads;
         stats.wire_tiles = wires;
         stats.plants = plants;
+        stats.growth_last_month = growth_this_month;
+        stats.growth_total += growth_this_month;
+        stats.lots_ready = ready_month;
+        stats.lots_no_road = no_road_month;
+        stats.lots_no_power = no_power_month;
         next_time = city_get_time();
         if (next_time <= 2147483599L)
             city_set_time(next_time + 4L);
@@ -407,6 +455,8 @@ unsigned int simulation_advance(unsigned int max_tiles)
         lots_res = lots_com = lots_ind = 0U;
         roads = wires = plants = 0U;
         growth_res = growth_com = growth_ind = 0U;
+        growth_this_month = ready_month = 0U;
+        no_road_month = no_power_month = 0U;
         event |= SIM_EVENT_MONTH;
     }
     return event;
