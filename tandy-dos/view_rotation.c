@@ -116,3 +116,24 @@ unsigned int view_rotation_upright_part(unsigned int turns,
     }
     return sy * span + sx;
 }
+
+/* Adjacent street and power-line connections must remain visually joined
+ * after turning the map. Their original tile sets already provide
+ * horizontal/vertical/corner/T-junction graphics, so just substitute
+ * the corresponding ORIGINAL tile ID; never rotate sprite pixels.
+ * Also works for traffic road variants which encode base in low nibble.
+ */
+unsigned int view_rotation_utility_tile(unsigned int turns,
+                                         unsigned int graphic_id)
+{
+    static const unsigned char cw[16] = {
+        1U,0U,3U,2U,5U,6U,7U,4U,
+        9U,10U,11U,8U,12U,14U,13U,15U
+    };
+    unsigned int i;
+    if (graphic_id < 64U || graphic_id > 223U)
+        return graphic_id;
+    for (i=0U;i<(turns&3U);++i)
+        graphic_id=(graphic_id&~15U)+cw[graphic_id&15U];
+    return graphic_id;
+}
