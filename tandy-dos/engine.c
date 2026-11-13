@@ -11,6 +11,13 @@
  */
 #include "city.h"
 #include "engine.h"
+#include <stdlib.h>
+
+#ifdef __WATCOMC__
+#define ENGINE_FAR far
+#else
+#define ENGINE_FAR
+#endif
 
 #define TILE_ID     1023U
 #define PWRBIT     32768U
@@ -19,11 +26,29 @@
 #define NUKE_PLANT   816U
 #define POWER_BYTES ((CITY_TILES + 7U) / 8U)
 
-/* Original Micropolis has a stack-based scan. Use bounded BFS to make the
- * traversal deterministic for DOS, without recursion or Unix allocation.
- * The queue is 24KB, below DOS's 64KB per-object limit.
+/* A 24KB BFS queue would push Watcom's 64KB DGROUP over its hard limit
+ * once small-lot development state is enabled. Allocate it from DOS's
+ * far heap instead (large-model far data pointers). It is reused for
+ * the lifetime of the application, so scans never malloc in the hot path.
  */
-static unsigned short work_queue[CITY_TILES];
+static unsigned short ENGINE_FAR *work_queue = NULL;
+
+static int ensure_queue(void)
+{
+    if (work_queue != NULL)
+        return 1;
+    work_queue = (unsigned short ENGINE_FAR *)
+        malloc((size_t)CITY_TILES * sizeof(unsigned short));
+    return work_queue != NULL;
+}
+
+void engine_shutdown(void)
+{
+    if (work_queue != NULL) {
+        free(work_queue);
+        work_queue = NULL;
+    }
+}
 static unsigned char discovered[POWER_BYTES];
 
 static int seen(unsigned int index)
@@ -58,6 +83,9 @@ unsigned int engine_power_scan(void)
     unsigned long capacity = 0UL;
     static const int dx[4] = {0, 1, 0, -1};
     static const int dy[4] = {-1, 0, 1, 0};
+
+    if (!ensure_queue())
+        return 0U; /* Allocation failure: leave existing network intact. */
 
     /* Clear stale power flags without destroying tile ID or other flags.
      * Seeds are the real POWERPLANT and NUCLEAR zone-center IDs.
