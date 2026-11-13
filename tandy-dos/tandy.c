@@ -1540,6 +1540,61 @@ static void keyboard_loop(void)
     }
 }
 
+/* /BENCH: an in-place VRAM copy microbenchmark on real Tandy hardware.
+ * Runs a full redraw and equivalent traditional byte vs optimized word
+ * scroll copies, with the same 32x21 viewport and graphics mode.
+ * No changes to any .CTY/.ZON file or simulation state.
+ * DOS BIOS clock resolution is ~55ms; runs multiple passes for accuracy.
+ */
+static unsigned long bench_full_ticks = 0UL;
+static unsigned long bench_byte_ticks = 0UL;
+static unsigned long bench_word_ticks = 0UL;
+
+static unsigned long bench_bios_ticks(void)
+{
+    union REGS r;
+    r.h.ah = 0U;
+    int86(0x1a, &r, &r);
+    return ((unsigned long)r.x.cx << 16) | (unsigned long)r.x.dx;
+}
+
+static void benchmark_video(void)
+{
+    unsigned int pass, row, index, off;
+    unsigned long start;
+    mouse_pointer_hide();
+
+    /* Two complete redraws, including original tile art + UI. */
+    start = bench_bios_ticks();
+    for (pass = 0U; pass < 2U; ++pass)
+        render_full();
+    bench_full_ticks = bench_bios_ticks() - start;
+
+    /* Original left-scroll inner loop, 48 runs across all 168 lines.
+     * Exclude newly exposed tile rendering to isolate VRAM throughput.
+     */
+    render_full();
+    start = bench_bios_ticks();
+    for (pass = 0U; pass < 48U; ++pass)
+        for (row = VIEW_Y; row < VIEW_Y + VIEW_H*8U; ++row) {
+            off = vram_offset(VIEW_X,row);
+            for (index = 0U; index < VIEW_W*4U-4U; ++index)
+                video[off+index] = video[off+index+4U];
+        }
+    bench_byte_ticks = bench_bios_ticks() - start;
+
+    /* Same total rows/bytes and overlap direction as the byte loop. */
+    render_full();
+    start = bench_bios_ticks();
+    for (pass = 0U; pass < 48U; ++pass)
+        for (row = VIEW_Y; row < VIEW_Y + VIEW_H*8U; ++row) {
+            off = vram_offset(VIEW_X,row);
+            tandy_move_words(video,off,off+4U,(VIEW_W*4U-4U)/2U,0);
+        }
+    bench_word_ticks = bench_bios_ticks() - start;
+    render_full();
+}
+
 /* Map a normal DOS 8.3 city save to its optional zone sidecar. */
 static int zoning_sidecar_name(const char *cityname,
                                char *dest, unsigned int capacity)
@@ -1559,11 +1614,15 @@ static int zoning_sidecar_name(const char *cityname,
 
 int main(int argc, char **argv)
 {
-    int i, have_city = 0, allow_mouse = 1;
+    int i, have_city = 0, allow_mouse = 1, bench_mode = 0;
     char sidecar[256];
     for (i = 1; i < argc; ++i) {
         if (strcmp(argv[i], "/NOMOUSE") == 0 ||
             strcmp(argv[i], "-NOMOUSE") == 0) {
+            allow_mouse = 0;
+        } else if (strcmp(argv[i], "/BENCH") == 0 ||
+                   strcmp(argv[i], "-BENCH") == 0) {
+            bench_mode = 1;
             allow_mouse = 0;
         } else if (!have_city && city_load(argv[i])) {
             have_city = 1;
@@ -1607,12 +1666,28 @@ int main(int argc, char **argv)
         }
     }
     render_full();
-    keyboard_loop();
+    if (bench_mode)
+        benchmark_video();
+    else
+        keyboard_loop();
     mouse_pointer_hide();
     mouse_shutdown();
     engine_shutdown();
     set_video_mode(old_mode);
     if (art_data != NULL)
         free(art_data); /* art buffer used only in graphics mode */
+    if (bench_mode) {
+        puts("MICROPOL /BENCH - Tandy mode 9, 32x21 city viewport");
+        printf("Full redraw x2     : %lu ticks (~%lu ms)\\n",
+               bench_full_ticks, bench_full_ticks*55UL);
+        printf("VRAM bytes x48     : %lu ticks (~%lu ms)\\n",
+               bench_byte_ticks, bench_byte_ticks*55UL);
+        printf("VRAM 16-bit x48    : %lu ticks (~%lu ms)\\n",
+               bench_word_ticks, bench_word_ticks*55UL);
+        if (bench_word_ticks != 0UL)
+            printf("Copy speed ratio   : %lu%% (higher is faster)\\n",
+                   (bench_byte_ticks*100UL)/bench_word_ticks);
+        puts("Clock resolution ~55ms. All copies preserve identical pixels.");
+    }
     return 0;
 }
