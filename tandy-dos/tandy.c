@@ -804,9 +804,16 @@ static int save_city_new_file(void)
     return 0;
 }
 
+/* If another tool/menu is chosen while the mouse is held, the unfinished
+ * preview must be cancelled rather than charged by its later release.
+ */
+static void build_preview_cancel(void);
+
 /* Map number-row shortcuts, toolbar, and Tools menu onto one function. */
 static void select_tool(unsigned int number)
 {
+    if (build_drag_active)
+        build_preview_cancel();
     switch (number) {
     case 0U: selected_tool = EDIT_INSPECT; break;
     case 1U: selected_tool = EDIT_ROAD; break;
@@ -961,6 +968,8 @@ static void run_menu_action(enum ui_action action)
 
 static void show_menu(enum ui_menu menu)
 {
+    if (build_drag_active)
+        build_preview_cancel();
     open_menu = menu;
     menu_highlight = 0U;
     render_full();
