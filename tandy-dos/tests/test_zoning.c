@@ -44,9 +44,15 @@ int main(void)
     assert(zoning_set(7U, 7U, ZONE_RES));
     assert(!zoning_set(7U, 7U, ZONE_COM));
 
+    /* Development density survives the new v3 format without touching
+     * classic CTY city data or existing zoning boundaries.
+     */
+    assert(zoning_set_development(4U, 6U, 2U));
+    assert(zoning_development_at(4U, 6U) == 2U);
     assert(zoning_save("testzone.zon"));
     zoning_clear();
     assert(zoning_load("testzone.zon"));
+    assert(zoning_development_at(4U, 6U) == 2U);
     assert(zoning_at(4U, 6U) == ZONE_RES);
     assert(zoning_at(7U, 7U) == ZONE_RES);
     assert(zoning_at(5U, 7U) == ZONE_COM);
