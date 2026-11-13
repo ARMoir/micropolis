@@ -22,6 +22,7 @@ struct sim_statistics {
     unsigned int powered_tiles;
     unsigned int growth_last_month;
     unsigned int growth_total;
+    unsigned int residential_growth_total;
     unsigned int lots_ready;
     unsigned int lots_no_road;
     unsigned int lots_no_power;
@@ -47,6 +48,10 @@ unsigned int simulation_power_scan_count(void);
  * until the next city is loaded and simulation_init() is called.
  */
 int simulation_has_last_change(void);
+/* Prefer following the most recently BUILT HOUSE, not an unrelated
+ * commercial or industrial upgrade. Returns 0 until one has grown.
+ */
+int simulation_last_home_change(unsigned int *x, unsigned int *y);
 int simulation_is_paused(void);
 void simulation_set_paused(int paused);
 unsigned int simulation_speed(void);
