@@ -28,6 +28,7 @@ static unsigned int cursor = 0U;
 static unsigned int scan_x = 0U, scan_y = 0U;
 static unsigned int power_scan_count = 0U;
 static unsigned int last_change_valid = 0U;
+static unsigned int last_home_valid = 0U, last_home_x = 0U, last_home_y = 0U;
 static unsigned int last_x, last_y;
 static unsigned int last_radius = 0U;
 static unsigned int changed = 0U;
@@ -155,7 +156,14 @@ static int process_zone(unsigned int x, unsigned int y,
     }
     if (next != stage) {
         (void)zoning_set_development(x,y,next);
-        if (next > stage) ++growth_this_month;
+        if (next > stage) {
+            ++growth_this_month;
+            if (kind == ZONE_RES) {
+                last_home_x = x;
+                last_home_y = y;
+                last_home_valid = 1U;
+            }
+        }
         changed = 1U;
         last_x = x;
         last_y = y;
@@ -272,6 +280,11 @@ static int process_original_zone(unsigned int x, unsigned int y,
         }
     ++(*count);
     ++growth_this_month;
+    if (kind == ZONE_RES) {
+        last_home_x = x;
+        last_home_y = y;
+        last_home_valid = 1U;
+    }
     changed = 1U;
     last_x = x;
     last_y = y;
@@ -387,6 +400,7 @@ void simulation_init(void)
     power_dirty = 1U;
     power_scan_count = 0U;
     last_change_valid = 0U;
+    last_home_valid = 0U;
     paused = 0U;
     speed = 1U;
     rng = (unsigned int)(0x31a5U ^ (unsigned int)city_get_time());
@@ -399,6 +413,7 @@ void simulation_init(void)
     stats.last_income = stats.last_maintenance = 0L;
     stats.powered_tiles = 0U;
     stats.growth_last_month = stats.growth_total = 0U;
+    stats.residential_growth_total = 0U;
     stats.lots_ready = stats.lots_no_road = stats.lots_no_power = 0U;
     growth_this_month = ready_month = no_road_month = no_power_month = 0U;
     stats.residential_lots = stats.commercial_lots = 0U;
@@ -416,6 +431,14 @@ unsigned int simulation_last_change_radius(void) { return last_radius; }
 unsigned int simulation_progress(void) { return cursor; }
 unsigned int simulation_power_scan_count(void) { return power_scan_count; }
 int simulation_has_last_change(void) { return last_change_valid != 0U; }
+int simulation_last_home_change(unsigned int *x, unsigned int *y)
+{
+    if (!last_home_valid || x == NULL || y == NULL)
+        return 0;
+    *x = last_home_x;
+    *y = last_home_y;
+    return 1;
+}
 int simulation_is_paused(void) { return paused != 0U; }
 void simulation_set_paused(int pause) { paused = pause ? 1U : 0U; }
 unsigned int simulation_speed(void) { return speed; }
@@ -465,6 +488,7 @@ unsigned int simulation_advance(unsigned int max_tiles)
         stats.plants = plants;
         stats.growth_last_month = growth_this_month;
         stats.growth_total += growth_this_month;
+        stats.residential_growth_total += growth_res;
         stats.lots_ready = ready_month;
         stats.lots_no_road = no_road_month;
         stats.lots_no_power = no_power_month;
