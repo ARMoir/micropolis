@@ -854,21 +854,23 @@ static int drag_enabled(void)
 static void handle_mouse(void)
 {
     struct mouse_state state;
-    unsigned int next_x, next_y;
+    unsigned int next_x, next_y, world_x, world_y;
     int menu, item, toolbar;
-    int left_press, right_press, moved;
+    int left_press, right_press, left_release, right_release, moved, inside;
 
     if (!mouse_poll(&state))
         return;
     left_press = (state.buttons & 1U) && !(mouse_buttons & 1U);
     right_press = (state.buttons & 2U) && !(mouse_buttons & 2U);
+    left_release = !(state.buttons & 1U) && (mouse_buttons & 1U);
+    right_release = !(state.buttons & 2U) && (mouse_buttons & 2U);
     moved = state.x != mouse_x || state.y != mouse_y;
+    inside = state.x >= VIEW_X && state.y >= VIEW_Y &&
+             state.y < VIEW_Y + VIEW_H * 8U;
 
     if (moved) {
         mouse_pointer_hide();
-        if (info_page == 0 && open_menu == MENU_NONE &&
-            state.x >= VIEW_X && state.y >= VIEW_Y &&
-            state.y < VIEW_Y + VIEW_H * 8U) {
+        if (info_page == 0 && open_menu == MENU_NONE && inside) {
             next_x = (state.x - VIEW_X) / 8U;
             next_y = (state.y - VIEW_Y) / 8U;
             if (next_x != cursor_x || next_y != cursor_y) {
@@ -876,11 +878,29 @@ static void handle_mouse(void)
                 cursor_x = next_x;
                 cursor_y = next_y;
                 draw_cursor();
-                if ((state.buttons & 1U) && (mouse_buttons & 1U) &&
-                    drag_enabled())
+                world_x = scroll_x + cursor_x;
+                world_y = scroll_y + cursor_y;
+                if (zone_drag_active && (state.buttons & 1U) &&
+                    (mouse_buttons & 1U) &&
+                    selected_zone_kind() != ZONE_NONE) {
+                    apply_zone_stroke(zone_drag_x, zone_drag_y,
+                                      world_x, world_y,
+                                      selected_zone_kind());
+                    zone_drag_x = world_x;
+                    zone_drag_y = world_y;
+                } else if (zone_erase_active && (state.buttons & 2U) &&
+                           (mouse_buttons & 2U)) {
+                    apply_zone_stroke(zone_drag_x, zone_drag_y,
+                                      world_x, world_y, ZONE_NONE);
+                    zone_drag_x = world_x;
+                    zone_drag_y = world_y;
+                } else if ((state.buttons & 1U) && (mouse_buttons & 1U) &&
+                           drag_enabled() &&
+                           selected_zone_kind() == ZONE_NONE) {
                     apply_selected_tool();
-                else
+                } else {
                     draw_status();
+                }
             }
         } else if (open_menu != MENU_NONE) {
             item = ui_dropdown_hit(open_menu, state.x, state.y);
@@ -888,6 +908,9 @@ static void handle_mouse(void)
                 menu_highlight = (unsigned int)item;
                 draw_menu_popup();
             }
+        } else if (!inside) {
+            zone_drag_active = 0;
+            zone_erase_active = 0;
         }
         mouse_x = state.x;
         mouse_y = state.y;
@@ -905,8 +928,9 @@ static void handle_mouse(void)
                 if (menu == open_menu) {
                     open_menu = MENU_NONE;
                     render_full();
-                } else
+                } else {
                     show_menu((enum ui_menu)menu);
+                }
             } else {
                 item = ui_dropdown_hit(open_menu, state.x, state.y);
                 if (item >= 0) {
@@ -914,22 +938,27 @@ static void handle_mouse(void)
                         ui_menu_command(open_menu, (unsigned int)item);
                     open_menu = MENU_NONE;
                     run_menu_action(command);
-                } else
+                } else {
                     open_menu = MENU_NONE;
+                }
                 if (!exit_requested)
                     render_full();
             }
         } else {
             menu = ui_header_hit(state.x, state.y);
-            if (menu != MENU_NONE)
+            if (menu != MENU_NONE) {
                 show_menu((enum ui_menu)menu);
-            else {
+            } else {
                 toolbar = ui_toolbar_hit(state.x, state.y);
                 if (toolbar >= 0) {
                     select_tool((unsigned int)toolbar);
                     draw_status();
-                } else if (state.x >= VIEW_X && state.y >= VIEW_Y &&
-                           state.y < VIEW_Y + VIEW_H * 8U) {
+                } else if (inside) {
+                    if (selected_zone_kind() != ZONE_NONE) {
+                        zone_drag_active = 1;
+                        zone_drag_x = scroll_x + cursor_x;
+                        zone_drag_y = scroll_y + cursor_y;
+                    }
                     apply_selected_tool();
                 }
             }
@@ -941,14 +970,35 @@ static void handle_mouse(void)
         if (info_page != 0) {
             info_page = 0;
             render_full();
+        } else if (open_menu == MENU_NONE && inside &&
+                   selected_zone_kind() != ZONE_NONE) {
+            /* Right-click over the city erases ZONING ONLY, never roads
+             * or any of the actual original .CTY building sprites.
+             */
+            zone_erase_active = 1;
+            zone_drag_x = scroll_x + cursor_x;
+            zone_drag_y = scroll_y + cursor_y;
+            apply_zone_stroke(zone_drag_x, zone_drag_y,
+                              zone_drag_x, zone_drag_y, ZONE_NONE);
         } else if (open_menu == MENU_TOOLS) {
             open_menu = MENU_NONE;
             render_full();
-        } else
+        } else {
             show_menu(MENU_TOOLS);
+        }
         mouse_pointer_show();
     }
 
+    if (left_release)
+        zone_drag_active = 0;
+    if (right_release)
+        zone_erase_active = 0;
+    if ((left_release || right_release) && zone_minimap_dirty) {
+        mouse_pointer_hide();
+        draw_overview();
+        mouse_pointer_show();
+        zone_minimap_dirty = 0;
+    }
     mouse_buttons = state.buttons;
 }
 
