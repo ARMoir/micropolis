@@ -117,23 +117,59 @@ unsigned int view_rotation_upright_part(unsigned int turns,
     return sy * span + sx;
 }
 
-/* Adjacent street and power-line connections must remain visually joined
- * after turning the map. Their original tile sets already provide
- * horizontal/vertical/corner/T-junction graphics, so just substitute
- * the corresponding ORIGINAL tile ID; never rotate sprite pixels.
- * Also works for traffic road variants which encode base in low nibble.
+/* The original Micropolis tile definitions use distinct families:
+ *   64..207  roads, bridges and traffic variants
+ *   208..222 power conductors and road/rail-power crossings
+ *   224..238 railway, bridges and road/rail crossings
+ *
+ * The first implementation incorrectly stopped at tile 223. Roads
+ * rotated but railway tiles did not, producing mismatched roads/tracks
+ * around intersections. Only map graphics are substituted, never the
+ * saved world IDs or network connection bits.
+ *
+ * Source: original micropolis-activity/src/sim/headers/sim.h and
+ * w_con.c (_RoadTable/_WireTable/_RailTable).
  */
-unsigned int view_rotation_utility_tile(unsigned int turns,
-                                         unsigned int graphic_id)
+static unsigned int rotate_connection_once(unsigned int id)
 {
     static const unsigned char cw[16] = {
         1U,0U,3U,2U,5U,6U,7U,4U,
         9U,10U,11U,8U,12U,14U,13U,15U
     };
+    unsigned int family;
+
+    /* Animated bridge variants use separate graphics across the
+     * traffic range. In particular, BRWH (79) and BRWV (95)
+     * are a horizontal/vertical pair, NOT low-nibble siblings.
+     */
+    if (id == 79U) return 95U;
+    if (id == 95U) return 79U;
+
+    if (id >= 64U && id <= 207U) {
+        /* Preserve other specialized 0x?F bridge animation frames
+         * until their directional art has been individually verified.
+         * Do not accidentally turn an animation into another asset.
+         */
+        if ((id & 15U) == 15U) return id;
+        family = id & ~15U;
+    } else if (id >= 208U && id <= 222U) {
+        family = 208U;
+    } else if (id >= 224U && id <= 238U) {
+        family = 224U;
+    } else {
+        /* 223 unused, 239 legacy crossing, and all ordinary city
+         * sprites do not have validated directional substitutes.
+         */
+        return id;
+    }
+    return family + cw[id & 15U];
+}
+
+unsigned int view_rotation_utility_tile(unsigned int turns,
+                                         unsigned int graphic_id)
+{
     unsigned int i;
-    if (graphic_id < 64U || graphic_id > 223U)
-        return graphic_id;
-    for (i=0U;i<(turns&3U);++i)
-        graphic_id=(graphic_id&~15U)+cw[graphic_id&15U];
+    for (i = 0U; i < (turns & 3U); ++i)
+        graphic_id = rotate_connection_once(graphic_id);
     return graphic_id;
 }
