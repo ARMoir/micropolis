@@ -63,7 +63,8 @@ unsigned int ui_menu_count(enum ui_menu menu)
 int ui_header_hit(unsigned int x, unsigned int y)
 {
     unsigned int column;
-    if (x >= 320U || y >= UI_MAP_Y)
+    /* City-statistics row y=8..15 is NOT a menu click target. */
+    if (x >= 320U || y >= UI_MENU_HEIGHT)
         return MENU_NONE;
     column = x / 8U;
     if (column >= 1U && column <= 8U) return MENU_FILE;
