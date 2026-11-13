@@ -45,10 +45,12 @@ project. It targets the NEC V20-equipped Tandy 1000 EX.
   stores per-tile custom zoning and its 2-bit development density. Existing
   ZON v2 files are still accepted (initial density zero), and an imported
   original city without a sidecar seeds zoning from 3x3 zone centers.
-- **Classic city-builder layout:** cyan top menu bar, beveled left-side
-  two-column construction toolbox with miniature authentic Micropolis
-  tile icons, city window to the right, a compact city overview, and
-  two-line bottom status area. All fit native 320x200x16 Tandy video.
+- **Compact classic city-builder layout:** cyan menu bar (row 0), city
+  statistics just below it (row 1), a clean 64-pixel two-column toolbox
+  with miniature original Micropolis tile icons and a larger minimap
+  directly underneath, 256x168 city window to the right (32x21 tiles),
+  and two separate debug/construction rows at the bottom. All fit
+  native 320x200x16 Tandy video.
 - **On-screen System / Tools / View / Help menus**, keyboard shortcuts,
   and clickable sidebar toolbox.
 - **Optional DOS mouse support** using INT 33h, with its own small software
@@ -92,10 +94,12 @@ overwritten unless you explicitly save to a new file.
 ### New menus and mouse support
 
 The top row is a clickable menu bar: **SYSTEM / TOOLS / VIEW / HELP**.
-The left side contains eight clickable beveled tool buttons (0-7),
-arranged in two columns and four rows. The main city viewport fills
-the rightmost **240x176 pixels (30x22 tiles)**, with a compact world
-overview map below the buttons and a 16-pixel status footer. Menus contain real
+The second row displays city date, population, jobs and treasury funds.
+The 64-pixel left sidebar contains eight compact clickable buttons (0-7),
+arranged in two columns and four rows, with the enlarged minimap below.
+The city uses **256x168 pixels (32x21 tiles)** on the right. The two
+bottom 8-pixel rows are reserved for world/mouse coordinates, selected
+tool, simulation diagnostics, actions and construction-preview costs. Menus contain real
 commands for saving a copy of the city, exit, changing tools, manual
 power scan, center cursor, and help pages. They are available without
 a mouse: press **F** (File), **T** (Tools), **V** (View), **H** (Help),
@@ -275,21 +279,22 @@ replaced with a classic late-1980s/early-1990s city-builder layout, using
 the supplied original SimCity DOS screen as visual inspiration.
 
 - Cyan SYSTEM/TOOLS/VIEW/HELP top-row menu, with working submenus.
-- Gray left sidebar with eight large beveled icon buttons, each using
-  authentic reduced Micropolis graphics and a short tool label.
-- Right-side city at 30 tiles wide by 22 tiles tall, panning within the
-  original 120x100 world. It remains a 16-color native Tandy mode-9
-  framebuffer, not a VGA-only UI.
-- Lower left mini-overview of the actual loaded map and bright viewport
-  outline to show what area you are viewing.
-- Two-line lower status strip with the selected tool and cursor map
-  coordinates. The `FUNDS: --` line is intentionally a placeholder until
-  the real Micropolis economic simulation is ported.
+- Narrow 64-pixel left sidebar with eight compact original Micropolis
+  icon buttons and short text labels.
+- Right-side city at 32 tiles wide by 21 tiles tall, panning within the
+  original 120x100 world, in 16-color native Tandy mode 9.
+- Enlarged 56x44-pixel minimap below the buttons, with a bright camera
+  outline. Panning changes only the outline pixels rather than
+  redrawing the entire minimap on every scroll.
+- Top statistics row displays month/year, population, jobs and the live
+  treasury balance. It is independent of the menu row directly above.
+- Two debug rows at the bottom show the active tool, world-map cursor
+  coordinates, mouse screen coordinates, cumulative growth, serviced lots,
+  simulation speed and action or pending construction cost.
 
-The fast-scroll routine now shifts only the 240-pixel-wide right-side
-city area instead of sliding the controls and map together. This reduces
-VRAM traffic per pan, but the new toolbox and minimap should be
-performance-tested on the real V20.
+The fast-scroll routine now shifts only the 256-pixel-wide right-side
+city area rather than the controls. This is 32 tiles wide, compared
+with the previous 30, while scrolling remains limited to the city.
 
 Tool numbers, keyboard panning, map editing, save-as, power scan,
 optional DOS mouse handling and `/NOMOUSE` are unchanged.
@@ -353,11 +358,13 @@ file for irregular zoning. Neither preview nor cancel rewrites saves.
 ## Live simulation milestone
 
 **Controls:** G pauses and resumes; + / - adjust simulation speed
-between 1x and 4x. The top status line now shows current in-game
-month/year, residents, jobs, cumulative growth (G), serviced growable lots
-(R), and simulation speed. With G still at zero and R at zero, check
-road and electrical access before expecting development. The left toolbox
-continues to show the actual saved funds balance.
+between 1x and 4x. The top city-statistics row shows the month/year,
+population, total jobs and treasury funds. The bottom diagnostic row
+shows cumulative growth (G), serviced buildable lots (R), speed,
+pause state and the most recent action. A second bottom row shows
+the current tool, world-map cursor and mouse screen position (or
+M:OFF if there is no DOS mouse driver). With G=0 and R=0 over time,
+check road and electrical access before expecting development.
 
 Automatic city updates use small timed batches (up to 320 map squares
 per update), keyed to the DOS BIOS time-of-day timer. The simulation
@@ -405,7 +412,7 @@ appeared to have no new construction even while the clock advanced.
 - Replaced BIOS teletype text output (which could scroll the whole
   graphics framebuffer at the bottom row) with explicitly positioned,
   non-scrolling BIOS character writes.
-- The two status rows are updated **only at changed glyph cells**.
+- City stats and both diagnostic rows are updated **only at changed glyph cells**.
   Dragging no longer redraws the entire icon toolbox; selecting a
   tool redraws just the former and new tool buttons. Coal and bulldoze
   button highlighting now matches their actual tool IDs.
@@ -414,7 +421,7 @@ appeared to have no new construction even while the clock advanced.
 - Original **already developed** residential/commercial/industrial
   zones can now grow to higher original nine-tile density levels;
   we no longer restrict development to empty 3x3 plots.
-- City bottom status reports cumulative growth **G** and powered,
+- Bottom diagnostic status reports cumulative growth **G** and powered,
   road-served buildable opportunities **R**. If R=0, there is no
   eligible development to grow; if G=0 over time, inspect road and
   power availability.
@@ -426,3 +433,27 @@ The revised graphics and speed have been compiled and tested in CI,
 but only the real Tandy 1000 EX can validate the screen and input
 feel. As before, keep existing CTY/ZON save pairs together and save
 to new filenames for safety.
+
+## Compact 320x200 interface update
+
+The current screen has two reserved top rows (SYSTEM / TOOLS / VIEW /
+HELP, then date / POP / JOB / cash), and two bottom rows for input and
+simulation diagnostics. The city occupies x=64..319, y=16..183, so it
+now shows **32 columns by 21 rows** of actual Micropolis terrain.
+The left toolbar occupies only x=0..63 and uses a compact 2x4 grid of
+30x24-pixel buttons; the minimap is directly below it at x=4..59,
+y=136..179. All eight original tool IDs, keyboard shortcuts, mouse
+hitboxes and 16-color artwork are retained.
+
+Mouse diagnostics `M:xxx,yyy` refer to screen pixel coordinates, and
+`MAP:xxx,yyy` indicates the selected world tile. The bottom-most row
+shows either `G` (growth), `R` (serviced buildable lots), simulation
+speed and the last action, or live cost / affordable construction
+quantities while dragging. Original date, population, jobs and saved
+funds appear only at the top and are never mixed with input debugging.
+
+For performance, the minimap camera rectangle is now updated by
+restoring only its previous border and drawing the new border on each
+scroll. The whole minimap is only reconstructed when the underlying
+city terrain or zoning changes, keeping the narrow toolbar stable and
+reducing VRAM writes on the NEC V20.
