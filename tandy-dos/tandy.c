@@ -18,6 +18,7 @@
 #include "zoning.h"
 #include "placement.h"
 #include "simulation.h"
+#include "video_ops.h"
 
 #define SCREEN_W 320U
 #define SCREEN_H 200U
@@ -86,9 +87,13 @@ static unsigned char current_video_mode(void)
     return (unsigned char)(r.h.al & 0x7f);
 }
 
+/* Same addresses as before, from a 400-byte startup lookup table.
+ * Zero division/multiplication in pixel, cursor and tile hot paths.
+ * All call sites already validate screen coordinates where needed.
+ */
 static unsigned int vram_offset(unsigned int x, unsigned int y)
 {
-    return ((y & 3U) << 13) + ((y >> 2) * 160U) + (x >> 1);
+    return tandy_scanlines[y] + (x >> 1);
 }
 
 static void pixel(unsigned int x, unsigned int y, unsigned char color)
@@ -107,12 +112,16 @@ static void pixel(unsigned int x, unsigned int y, unsigned char color)
 
 static void solid_tile(unsigned int px, unsigned int py, unsigned char color)
 {
-    unsigned int row, n, off;
+    unsigned int row, off;
     unsigned char packed = (unsigned char)((color << 4) | color);
-    for (row = 0; row < 8U; ++row) {
+    unsigned short pair = (unsigned short)packed |
+                          ((unsigned short)packed << 8);
+    volatile unsigned short far *out;
+    for (row = 0U; row < 8U; ++row) {
         off = vram_offset(px, py + row);
-        for (n = 0; n < 4U; ++n)
-            video[off + n] = packed;
+        out = (volatile unsigned short far *)(video + off);
+        out[0] = pair;
+        out[1] = pair;
     }
 }
 
@@ -174,12 +183,19 @@ static int load_original_art(void)
 static void draw_original_tile(unsigned int px, unsigned int py, unsigned int tile)
 {
     unsigned int src = tile * 32U;
-    unsigned int row, byte_index, dst;
-    for (row = 0; row < 8U; ++row) {
+    unsigned int row, dst;
+    const unsigned short far *art =
+        (const unsigned short far *)(art_data + src);
+    volatile unsigned short far *out;
+    for (row = 0U; row < 8U; ++row) {
         dst = vram_offset(px, py + row);
-        for (byte_index = 0; byte_index < 4U; ++byte_index)
-            video[dst + byte_index] =
-                art_data[src + row * 4U + byte_index];
+        out = (volatile unsigned short far *)(video + dst);
+        /* 2 aligned word copies per scanline, rather than 4 byte copies.
+         * Original TILES.DAT and all overlay graphics remain unchanged.
+         */
+        out[0] = art[0];
+        out[1] = art[1];
+        art += 2;
     }
 }
 
@@ -832,59 +848,61 @@ static void render_full(void);
 
 static void scroll_one_tile(unsigned int previous_x, unsigned int previous_y)
 {
-    unsigned int x, y, i, dst, src;
+    unsigned int x, y, dst, src;
 
     if (scroll_y == previous_y && scroll_x == previous_x + 1U) {
-        /* Camera right, image left: work left-to-right. */
+        /* Camera right, image left. Source and destination overlap,
+         * so always copy forward from left to right.
+         */
         for (y = VIEW_Y; y < VIEW_Y + VIEW_H * 8U; ++y) {
             dst = vram_offset(VIEW_X, y);
-            for (i = 0; i < VIEW_W * 4U - 4U; ++i)
-                video[dst + i] = video[dst + i + 4U];
+            tandy_move_words(video,dst,dst+4U,
+                             (VIEW_W*4U-4U)/2U,0);
         }
-        for (y = 0; y < VIEW_H; ++y)
-            draw_city_tile(VIEW_X + (VIEW_W - 1U) * 8U, VIEW_Y + y * 8U,
-                           scroll_x + VIEW_W - 1U, scroll_y + y);
+        for (y = 0U; y < VIEW_H; ++y)
+            draw_city_tile(VIEW_X+(VIEW_W-1U)*8U,VIEW_Y+y*8U,
+                           scroll_x+VIEW_W-1U,scroll_y+y);
 
     } else if (scroll_y == previous_y && previous_x == scroll_x + 1U) {
-        /* Camera left, image right: work right-to-left. */
+        /* Camera left, image right: copy backward to retain overlapping
+         * source bytes; original bytewise result is preserved exactly.
+         */
         for (y = VIEW_Y; y < VIEW_Y + VIEW_H * 8U; ++y) {
             dst = vram_offset(VIEW_X, y);
-            for (i = VIEW_W * 4U; i > 4U; --i)
-                video[dst + i - 1U] = video[dst + i - 5U];
+            tandy_move_words(video,dst+4U,dst,
+                             (VIEW_W*4U-4U)/2U,1);
         }
-        for (y = 0; y < VIEW_H; ++y)
-            draw_city_tile(VIEW_X, VIEW_Y + y * 8U, scroll_x, scroll_y + y);
+        for (y = 0U; y < VIEW_H; ++y)
+            draw_city_tile(VIEW_X,VIEW_Y+y*8U,scroll_x,scroll_y+y);
 
     } else if (scroll_x == previous_x && scroll_y == previous_y + 1U) {
-        /* Camera down, image up: copy scanlines top-to-bottom. */
-        for (y = VIEW_Y; y < VIEW_Y + (VIEW_H - 1U) * 8U; ++y) {
-            dst = vram_offset(VIEW_X, y);
-            src = vram_offset(VIEW_X, y + 8U);
-            for (i = 0; i < VIEW_W * 4U; ++i)
-                video[dst + i] = video[src + i];
+        /* Camera down, image up: each four-bank scanline is 128 bytes
+         * wide. Copy full rows in existing top-to-bottom order.
+         */
+        for (y = VIEW_Y; y < VIEW_Y + (VIEW_H-1U)*8U; ++y) {
+            dst = vram_offset(VIEW_X,y);
+            src = vram_offset(VIEW_X,y+8U);
+            tandy_move_words(video,dst,src,VIEW_W*2U,0);
         }
-        for (x = 0; x < VIEW_W; ++x)
-            draw_city_tile(VIEW_X + x * 8U, VIEW_Y + (VIEW_H - 1U) * 8U,
-                           scroll_x + x, scroll_y + VIEW_H - 1U);
+        for (x = 0U; x < VIEW_W; ++x)
+            draw_city_tile(VIEW_X+x*8U,VIEW_Y+(VIEW_H-1U)*8U,
+                           scroll_x+x,scroll_y+VIEW_H-1U);
 
     } else if (scroll_x == previous_x && previous_y == scroll_y + 1U) {
-        /* Camera up, image down: copy scanlines bottom-to-top. */
-        for (y = VIEW_Y + VIEW_H * 8U - 1U; y >= VIEW_Y + 8U; --y) {
-            dst = vram_offset(VIEW_X, y);
-            src = vram_offset(VIEW_X, y - 8U);
-            for (i = 0; i < VIEW_W * 4U; ++i)
-                video[dst + i] = video[src + i];
+        /* Camera up, image down: work bottom-to-top. */
+        for (y = VIEW_Y+VIEW_H*8U-1U; y >= VIEW_Y+8U; --y) {
+            dst = vram_offset(VIEW_X,y);
+            src = vram_offset(VIEW_X,y-8U);
+            tandy_move_words(video,dst,src,VIEW_W*2U,0);
         }
-        for (x = 0; x < VIEW_W; ++x)
-            draw_city_tile(VIEW_X + x * 8U, VIEW_Y,
-                           scroll_x + x, scroll_y);
+        for (x = 0U; x < VIEW_W; ++x)
+            draw_city_tile(VIEW_X+x*8U,VIEW_Y,scroll_x+x,scroll_y);
     } else {
-        /* Reserved for future jumps/teleports; only 1-tile steps today. */
         render_full();
         return;
     }
 }
- 
+
 static void render_full(void)
 {
     unsigned int x, y;
@@ -1577,6 +1595,7 @@ int main(int argc, char **argv)
         return 1;
     }
     video = (volatile unsigned char far *)MK_FP(0xb800, 0);
+    tandy_init_scanlines();
     (void)load_original_art();
     mouse_on = allow_mouse ? mouse_init() : 0;
     if (mouse_on) {
