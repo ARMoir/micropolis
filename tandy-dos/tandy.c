@@ -360,21 +360,31 @@ static void draw_city_tile(unsigned int px, unsigned int py,
     draw_pending_tile(px, py, mx, my);
 }
 
+/* AH=0Eh teletype can SCROLL the ENTIRE graphics screen when its
+ * cursor wraps at column 40 / row 24. That was corrupting the Tandy
+ * toolbar, top bar and city graphics as status text changed.
+ * AH=09h writes ONE glyph at a fixed cursor without auto-advancing.
+ * Explicit positioning also guarantees no accidental screen scroll.
+ */
 static void bios_text(unsigned int row, unsigned int column,
                       const char *s, unsigned char color)
 {
     union REGS r;
-    r.h.ah = 2;
-    r.h.bh = 0;
-    r.h.dh = (unsigned char)row;
-    r.h.dl = (unsigned char)column;
-    int86(0x10, &r, &r);
-    while (*s && column++ < 40U) {
-        r.h.ah = 0x0e;
-        r.h.al = (unsigned char)*s++;
-        r.h.bh = 0;
-        r.h.bl = color;
+    if (row >= 25U || column >= 40U)
+        return;
+    while (*s && column < 40U) {
+        r.h.ah = 2U;
+        r.h.bh = 0U;
+        r.h.dh = (unsigned char)row;
+        r.h.dl = (unsigned char)column;
         int86(0x10, &r, &r);
+        r.h.ah = 9U;
+        r.h.al = (unsigned char)*s++;
+        r.h.bh = 0U;
+        r.h.bl = color;
+        r.x.cx = 1U;
+        int86(0x10, &r, &r);
+        ++column;
     }
 }
 
@@ -444,53 +454,57 @@ static void draw_funds(void)
     bios_text(2U, 0U, money, 0U);
 }
 
+/* Only the selected tool's TWO affected buttons need repainting.
+ * Previously every tool selection and drag commit redrew the entire
+ * 80x176 panel, all eight icons and labels, causing visible flicker.
+ */
+static void draw_tool_button(unsigned int n)
+{
+    unsigned int bx, by, ix, iy, src;
+    unsigned char color, packed;
+    int chosen;
+    chosen = (n == 6U && selected_tool == EDIT_BULLDOZE) ||
+             (n == 7U && selected_tool == EDIT_COAL) ||
+             (n < 6U && (unsigned int)selected_tool == n);
+    bx = 4U + (n & 1U) * 40U;
+    by = UI_BUTTON_TOP + (n >> 1) * UI_BUTTON_SIZE;
+    /* Thin bright border indicates selection; each icon has its own
+     * recessed gray area and legible dark, separate text band.
+     */
+    box_pixels(bx, by, 34U, 32U,
+               (unsigned char)(chosen ? 14U : 8U));
+    box_pixels(bx + 2U, by + 2U, 30U, 28U, 7U);
+    box_pixels(bx + 5U, by + 3U, 24U, 20U, 8U);
+    if (art_data != NULL) {
+        src = tool_icons[n] * 32U;
+        for (iy = 0U; iy < 8U; ++iy)
+            for (ix = 0U; ix < 8U; ++ix) {
+                packed = art_data[src + iy * 4U + (ix >> 1)];
+                color = (unsigned char)((ix & 1U) ?
+                        (packed & 15U) : (packed >> 4));
+                box_pixels(bx + 9U + ix * 2U, by + 4U + iy * 2U,
+                           2U, 2U, color);
+            }
+    }
+    box_pixels(bx + 3U, by + 24U, 28U, 8U, 7U);
+    bios_text((by + 24U) / 8U, (bx / 8U) + 1U,
+              tool_labels[n], (unsigned char)(chosen ? 4U : 1U));
+}
+
 static void draw_toolbox(void)
 {
-    unsigned int x, y, n, bx, by, ix, iy, src;
-    unsigned char color, packed;
-    /* Cool gray left bezel. No draw calls touch city pixels (x >= 80). */
+    unsigned int x, y, n;
     for (y = 8U; y < UI_FOOTER_Y; y += 8U)
         for (x = 0U; x < UI_TOOLBOX_W; x += 8U)
             solid_tile(x, y, 7U);
-
     for (y = 8U; y < UI_FOOTER_Y; ++y) {
         pixel(78U, y, 8U);
         pixel(79U, y, 0U);
     }
     draw_funds();
     bios_text(3U, 2U, "TOOLS", 1U);
-
-    for (n = 0U; n < 8U; ++n) {
-        bx = 4U + (n & 1U) * 40U;
-        by = UI_BUTTON_TOP + (n >> 1) * UI_BUTTON_SIZE;
-        color = (unsigned char)(((n == 6U && selected_tool == EDIT_BULLDOZE) ||
-                                (n == 7U && selected_tool == EDIT_COAL) ||
-                                (n < 6U && (unsigned int)selected_tool == n)) ?
-                                14U : 8U);
-        box_pixels(bx, by, 34U, 32U, color);
-        box_pixels(bx + 2U, by + 2U, 30U, 27U, 15U);
-        box_pixels(bx + 5U, by + 3U, 24U, 19U, 7U);
-        /* Draw authentic 8x8 Micropolis artwork enlarged to 16x16.
-         * Source stays in TILES.DAT, we do not need another sprites file.
-         */
-        if (art_data != NULL) {
-            src = tool_icons[n] * 32U;
-            for (iy = 0U; iy < 8U; ++iy)
-                for (ix = 0U; ix < 8U; ++ix) {
-                    packed = art_data[src + iy * 4U + (ix >> 1)];
-                    color = (unsigned char)((ix & 1U) ?
-                            (packed & 15U) : (packed >> 4));
-                    box_pixels(bx + 9U + ix * 2U, by + 4U + iy * 2U,
-                               2U, 2U, color);
-                }
-        }
-        bios_text((by + 24U) / 8U,
-                  (bx / 8U) + 1U, tool_labels[n],
-                  (unsigned char)(((n == 6U && selected_tool == EDIT_BULLDOZE) ||
-                                  (n == 7U && selected_tool == EDIT_COAL) ||
-                                  (n < 6U && (unsigned int)selected_tool == n)) ?
-                                  4U : 1U));
-    }
+    for (n = 0U; n < 8U; ++n)
+        draw_tool_button(n);
     bios_text(20U, 2U, "MAP", 1U);
     draw_overview();
 }
@@ -855,6 +869,7 @@ static void build_preview_cancel(void);
 /* Map number-row shortcuts, toolbar, and Tools menu onto one function. */
 static void select_tool(unsigned int number)
 {
+    unsigned int previous = (unsigned int)selected_tool;
     if (build_drag_active)
         build_preview_cancel();
     switch (number) {
@@ -868,7 +883,10 @@ static void select_tool(unsigned int number)
     case 7U: selected_tool = EDIT_COAL; break;
     }
     last_action = "SELECT";
-    draw_toolbox();
+    if (previous != (unsigned int)selected_tool) {
+        draw_tool_button(previous);
+        draw_tool_button((unsigned int)selected_tool);
+    }
 }
 
 static void preview_refresh(unsigned int x0, unsigned int y0,
@@ -922,7 +940,7 @@ static void build_preview_finish(void)
          * per completed drag, not on each V20 mouse polling event.
          */
         draw_overview();
-        draw_toolbox();
+        draw_funds();
     }
     draw_status();
 }
