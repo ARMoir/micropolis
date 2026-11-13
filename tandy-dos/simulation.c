@@ -16,6 +16,7 @@
 #include "engine.h"
 #include "simulation.h"
 #include "zoning.h"
+#include <stddef.h>
 
 #define TILE_MASK 1023U
 #define ZONE_BIT 1024U
