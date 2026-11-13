@@ -1472,6 +1472,7 @@ int main(int argc, char **argv)
     keyboard_loop();
     mouse_pointer_hide();
     mouse_shutdown();
+    engine_shutdown();
     set_video_mode(old_mode);
     if (art_data != NULL)
         free(art_data); /* art buffer used only in graphics mode */
