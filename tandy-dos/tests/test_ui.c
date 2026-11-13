@@ -56,6 +56,9 @@ int main(void)
     assert(ui_menu_command(MENU_TOOLS, 7U) == UI_TOOL_COAL);
     assert(ui_menu_command(MENU_FILE, 1U) == UI_EXIT);
     assert(ui_menu_command(MENU_VIEW, 0U) == UI_SCAN_POWER);
+    assert(ui_menu_count(MENU_VIEW) == 5U);
+    assert(ui_menu_command(MENU_VIEW, 2U) == UI_ROTATE_CW);
+    assert(ui_menu_command(MENU_VIEW, 3U) == UI_ROTATE_CCW);
     assert(ui_menu_command(MENU_HELP, 1U) == UI_HELP_MOUSE);
     assert(ui_menu_command(MENU_FILE, 20U) == UI_NOTHING);
     puts("Tandy menu hit-testing and dispatch tests passed");
