@@ -49,7 +49,8 @@ project. It targets the NEC V20-equipped Tandy 1000 EX.
   original city without a sidecar seeds zoning from 3x3 zone centers.
 - **Compact classic city-builder layout:** cyan menu bar (row 0), city
   statistics just below it (row 1), a clean 64-pixel two-column toolbox
-  with miniature original Micropolis tile icons and a larger minimap
+  with enlarged original Micropolis tile icons plus two custom pixel-tool
+  pictograms, and a larger minimap
   directly underneath, 256x168 city window to the right (32x21 tiles),
   and two separate debug/construction rows at the bottom. All fit
   native 320x200x16 Tandy video.
@@ -99,8 +100,12 @@ overwritten unless you explicitly save a new copy.
 
 The top row is a clickable menu bar: **SYSTEM / TOOLS / VIEW / HELP**.
 The second row displays city date, population, jobs and treasury funds.
-The 64-pixel left sidebar contains eight compact clickable buttons (0-7),
+The 64-pixel left sidebar contains eight compact clickable icon buttons
 arranged in two columns and four rows, with the enlarged minimap below.
+The visual grouping is DOZ/ROAD, POWER/RES, COM/IND, INSPECT/COAL;
+number keys **0..7** still select their original tools. The selected
+icon is outlined in yellow, and the bottom status names the selected
+function rather than squeezing labels into the icon buttons.
 The city uses **256x168 pixels (32x21 tiles)** on the right. The two
 bottom 8-pixel rows are reserved for world/mouse coordinates, selected
 tool, simulation diagnostics, actions and construction-preview costs. Menus contain real
@@ -290,8 +295,9 @@ replaced with a classic late-1980s/early-1990s city-builder layout, using
 the supplied original SimCity DOS screen as visual inspiration.
 
 - Cyan SYSTEM/TOOLS/VIEW/HELP top-row menu, with working submenus.
-- Narrow 64-pixel left sidebar with eight compact original Micropolis
-  icon buttons and short text labels.
+- Narrow 64-pixel left sidebar with eight compact beveled icons, six
+  using original Micropolis tile art and two custom DOS pixel pictograms
+  (bulldozer and magnifying glass). No tiny overlapping icon labels.
 - Right-side city at 32 tiles wide by 21 tiles tall, panning within the
   original 120x100 world, in 16-color native Tandy mode 9.
 - Enlarged 56x44-pixel minimap below the buttons, with a bright camera
@@ -573,3 +579,40 @@ actual development, a test verifying an infrastructure change forces
 one appropriate rescan, and a saved-city test confirming the initial
 camera shows actual homes. These are software checks; report any
 remaining periodic stalls or visual glitches from the actual Tandy.
+
+## Classic SimCity-inspired icon palette (not an exact reproduction)
+
+The two historical SimCity toolbar examples inform the **raised, beveled
+buttons**, strong pressed/selected state, and grouping by function.
+The Tandy 1000 EX still uses a **64-pixel sidebar** and a four-row,
+two-column grid of 30x24-pixel controls; a larger toolbar would steal
+visible city tiles and slow mouse/UI handling on the 7 MHz V20.
+
+Button positions, from left to right and top to bottom:
+
+| Row | Left | Right |
+| --- | --- | --- |
+| 1 | Bulldoze | Road |
+| 2 | Power line | Residential |
+| 3 | Commercial | Industrial |
+| 4 | Inspect | Coal plant |
+
+Residential, commercial and industrial buttons have **green, blue and
+yellow** lower accent bars, respectively. The selected tool has a
+bright yellow pressed border. Most icons reuse the existing original
+Micropolis artwork in TILES.DAT; Inspect and Bulldoze get new tiny
+native pixel-art icons so they are no longer represented by generic
+terrain/rubble. There are no extra disk assets or renderer changes.
+
+The original numeric shortcuts and menus remain stable: 0=Inspect,
+1=Road, 2=Power, 3=Residential, 4=Commercial, 5=Industrial,
+6=Bulldoze, 7=Coal. Mouse clicks are translated from the visual order
+to those stable tool keys, with host regression tests for all eight
+buttons. The bottom diagnostic line identifies the selected tool.
+
+The TOOLS and MAP sidebar captions now use the same tiny transparent
+bitmap font as the fixed top menu, avoiding the black rectangles caused
+by DOS graphics-mode BIOS text rendering. Tool changes still repaint
+**only the previously selected and newly selected buttons**. The
+minimap remains below all tools, and the main city window remains
+32x21 original 8x8 tiles.
