@@ -110,7 +110,8 @@ The city uses **256x168 pixels (32x21 tiles)** on the right. The two
 bottom 8-pixel rows are reserved for world/mouse coordinates, selected
 tool, simulation diagnostics, actions and construction-preview costs. Menus contain real
 commands for saving a copy of the city, exit, changing tools, manual
-power scan, center cursor, and help pages. They are available without
+power scan, clockwise/counterclockwise map rotation, center cursor,
+and help pages. They are available without
 a mouse: press **F** (File), **T** (Tools), **V** (View), **H** (Help),
 or **F10** (File). In an open menu use arrow keys, Enter and Esc.
 Esc closes a menu or help window before it exits the program.
@@ -616,3 +617,41 @@ by DOS graphics-mode BIOS text rendering. Tool changes still repaint
 **only the previously selected and newly selected buttons**. The
 minimap remains below all tools, and the main city window remains
 32x21 original 8x8 tiles.
+
+## Four-way SimCity 2000-style map view rotation (no sprite rotation)
+
+Use **R** for a clockwise 90-degree turn and **Shift+R** for a
+counterclockwise 90-degree turn, or open the **VIEW** menu and select
+"Rotate CW" / "Rotate CCW". Repeating a direction gives 0°, 90°, 180°
+and 270° orientations and returns to normal after four turns.
+
+This is a **view-only camera change**. The actual original 120x100
+Micropolis world, zoning, budgets, simulation, road/power networks and
+CTY/ZON saves never rotate or change just because the view is turned.
+At 90° or 270°, the virtual display coordinate space becomes 100x120
+tiles; the visible Tandy city viewport stays **32x21** tiles. The
+selection cursor remains on the same world square when rotating,
+with the camera refocused on it. WASD/arrows pan in screen directions,
+while mouse clicks, drag-to-build previews, zoning removal, keyboard
+construction, and Tab-to-last-house still target the correct world
+coordinates. The minimap turns with the city and shows the correct
+rotated viewport rectangle.
+
+No individual graphics pixels are rotated. Original 3x3 residential,
+commercial and industrial buildings, plus 4x4 coal/nuclear plants, have
+their component tiles reselected from the existing TILES.DAT artwork
+to keep their *whole building appearance upright* when their positions
+turn. Roads and power lines switch among the original directional
+connection graphics so bends and straight segments still join visually.
+Other specialized multi-tile landmarks may require additional sprite
+layout rules if they look incorrect at 90°/270°.
+
+Rotation intentionally costs one full screen redraw; all later one-tile
+panning continues to use the same accelerated 16-bit VRAM shifts.
+The saved files retain normal north-up coordinates, and restarting the
+program resets view rotation to 0°.
+
+CI exhaustively checks world/display round trips for all **12,000**
+tiles at all four orientations; bounds and cursor focus; connected zone
+border directions; 3x3/4x4 upright tile arrangements; and correct
+original road and power sprite selection through four turns.
