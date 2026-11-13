@@ -4,17 +4,22 @@
 #ifndef TANDY_UI_H
 #define TANDY_UI_H
 
-/* One 8-pixel top menu row, classic left toolbox, city window to the
- * right, and two bottom status rows. 30x22 visible tiles.
+/* Native Tandy 320x200: menus 0..7; city stats 8..15; a narrow
+ * 64-pixel toolbox alongside a 32x21-tile city window (y=16..183);
+ * diagnostics at y=184..199. Minimap lives under compact tool grid.
  */
-#define UI_MAP_X       80U
-#define UI_MAP_Y        8U
-#define UI_MAP_COLS    30U
-#define UI_MAP_ROWS    22U
+#define UI_MAP_X       64U
+#define UI_MAP_Y       16U
+#define UI_MAP_COLS    32U
+#define UI_MAP_ROWS    21U
 #define UI_FOOTER_Y   184U
-#define UI_TOOLBOX_W   80U
-#define UI_BUTTON_TOP  32U
-#define UI_BUTTON_SIZE 32U
+#define UI_TOOLBOX_W   64U
+#define UI_BUTTON_TOP  24U
+#define UI_BUTTON_SIZE 24U
+#define UI_MINIMAP_X    4U
+#define UI_MINIMAP_Y  136U
+#define UI_MINIMAP_W   56U
+#define UI_MINIMAP_H   44U
 
 enum ui_menu {
     MENU_NONE = -1,
