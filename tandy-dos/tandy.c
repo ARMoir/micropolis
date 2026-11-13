@@ -822,17 +822,10 @@ static void redraw_zoning_brush(unsigned int x0, unsigned int y0,
     if (top > 0U) --top;
     if (right + 1U < CITY_WIDTH) ++right;
     if (bottom + 1U < CITY_HEIGHT) ++bottom;
-    for (mx = left; mx <= right; ++mx) {
-        if (mx < scroll_x || mx >= scroll_x + VIEW_W)
-            continue;
-        x = mx - scroll_x;
-        for (my = top; my <= bottom; ++my) {
-            if (my < scroll_y || my >= scroll_y + VIEW_H)
-                continue;
-            y = my - scroll_y;
-            draw_city_tile(VIEW_X + x * 8U, VIEW_Y + y * 8U, mx, my);
-        }
-    }
+    for (mx = left; mx <= right; ++mx)
+        for (my = top; my <= bottom; ++my)
+            if (world_to_visible(mx,my,&x,&y))
+                draw_city_tile(VIEW_X+x*8U,VIEW_Y+y*8U,mx,my);
     draw_cursor();
 }
 
@@ -866,9 +859,9 @@ static void apply_zone_stroke(unsigned int x0, unsigned int y0,
 static void draw_status(void)
 {
     char debug[80], status[80];
-    unsigned int wx = scroll_x + cursor_x;
-    unsigned int wy = scroll_y + cursor_y;
+    unsigned int wx,wy;
     const struct sim_statistics *st = simulation_stats();
+    display_to_world(cursor_x,cursor_y,&wx,&wy);
     if (mouse_on) {
         sprintf(debug,"TOOL:%s MAP:%03u,%03u M:%03u,%03u",
                 tool_labels[tool_key_from_enum(selected_tool)],
@@ -1006,8 +999,7 @@ static void scroll_one_tile(unsigned int previous_x, unsigned int previous_y)
                              (VIEW_W*4U-4U)/2U,0);
         }
         for (y = 0U; y < VIEW_H; ++y)
-            draw_city_tile(VIEW_X+(VIEW_W-1U)*8U,VIEW_Y+y*8U,
-                           scroll_x+VIEW_W-1U,scroll_y+y);
+            draw_display_tile(VIEW_W-1U,y);
 
     } else if (scroll_y == previous_y && previous_x == scroll_x + 1U) {
         /* Camera left, image right: copy backward to retain overlapping
@@ -1019,7 +1011,7 @@ static void scroll_one_tile(unsigned int previous_x, unsigned int previous_y)
                              (VIEW_W*4U-4U)/2U,1);
         }
         for (y = 0U; y < VIEW_H; ++y)
-            draw_city_tile(VIEW_X,VIEW_Y+y*8U,scroll_x,scroll_y+y);
+            draw_display_tile(0U,y);
 
     } else if (scroll_x == previous_x && scroll_y == previous_y + 1U) {
         /* Camera down, image up: each four-bank scanline is 128 bytes
@@ -1031,8 +1023,7 @@ static void scroll_one_tile(unsigned int previous_x, unsigned int previous_y)
             tandy_move_words(video,dst,src,VIEW_W*2U,0);
         }
         for (x = 0U; x < VIEW_W; ++x)
-            draw_city_tile(VIEW_X+x*8U,VIEW_Y+(VIEW_H-1U)*8U,
-                           scroll_x+x,scroll_y+VIEW_H-1U);
+            draw_display_tile(x,VIEW_H-1U);
 
     } else if (scroll_x == previous_x && previous_y == scroll_y + 1U) {
         /* Camera up, image down: work bottom-to-top. */
@@ -1042,7 +1033,7 @@ static void scroll_one_tile(unsigned int previous_x, unsigned int previous_y)
             tandy_move_words(video,dst,src,VIEW_W*2U,0);
         }
         for (x = 0U; x < VIEW_W; ++x)
-            draw_city_tile(VIEW_X+x*8U,VIEW_Y,scroll_x+x,scroll_y);
+            draw_display_tile(x,0U);
     } else {
         render_full();
         return;
@@ -1095,8 +1086,7 @@ static void render_full(void)
     /* City is a fixed rectangular window to the right of the toolbox. */
     for (y = 0U; y < VIEW_H; ++y)
         for (x = 0U; x < VIEW_W; ++x)
-            draw_city_tile(VIEW_X + x * 8U, VIEW_Y + y * 8U,
-                           scroll_x + x, scroll_y + y);
+            draw_display_tile(x,y);
 
     draw_toolbox();
     city_valid = debug_valid = status_valid = 0;
@@ -1251,9 +1241,9 @@ static void build_preview_cancel(void)
 static void apply_selected_tool(void)
 {
     unsigned int kind = selected_zone_kind();
-    unsigned int mx = scroll_x + cursor_x;
-    unsigned int my = scroll_y + cursor_y;
+    unsigned int mx,my;
     int erased = 0;
+    display_to_world(cursor_x,cursor_y,&mx,&my);
     if (kind != ZONE_NONE || selected_tool == EDIT_ROAD ||
         selected_tool == EDIT_POWER) {
         build_preview_start(mx, my);
@@ -1789,8 +1779,7 @@ static void benchmark_video(void)
     for (pass = 0U; pass < 2U; ++pass)
         for (y = 0U; y < VIEW_H; ++y)
             for (x = 0U; x < VIEW_W; ++x)
-                draw_city_tile(VIEW_X + x*8U, VIEW_Y + y*8U,
-                               scroll_x + x, scroll_y + y);
+                draw_display_tile(x,y);
     bench_full_ticks = bench_bios_ticks() - start;
 
     /* The test copies the LIVE video RAM, not a normal RAM buffer.
