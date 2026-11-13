@@ -42,6 +42,9 @@ jobs:
             -o test-ui tandy-dos/ui.c tandy-dos/tests/test_ui.c
           ./test-ui
           cc -std=c89 -Wall -Wextra -pedantic \
+            -o test-menu-font tandy-dos/menu_font.c tandy-dos/ui.c tandy-dos/tests/test_menu_font.c
+          ./test-menu-font
+          cc -std=c89 -Wall -Wextra -pedantic \
             -o test-video-ops tandy-dos/video_ops.c tandy-dos/tests/test_video_ops.c
           ./test-video-ops
           cc -std=c89 -Wall -Wextra -pedantic \
@@ -98,7 +101,7 @@ jobs:
           wcl -bcl=dos -0 -ml -q -fe=MICROPOL.EXE \
             tandy-dos/tandy.c tandy-dos/city.c tandy-dos/editor.c tandy-dos/connections.c tandy-dos/engine.c \
             tandy-dos/ui.c tandy-dos/mouse.c tandy-dos/zoning.c \
-            tandy-dos/placement.c tandy-dos/simulation.c tandy-dos/video_ops.c
+            tandy-dos/placement.c tandy-dos/simulation.c tandy-dos/video_ops.c tandy-dos/menu_font.c
           test -s MICROPOL.EXE
           file MICROPOL.EXE
 
