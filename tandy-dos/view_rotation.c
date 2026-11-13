@@ -96,3 +96,23 @@ unsigned int view_rotation_edges(unsigned int turns, unsigned int edges)
         edges = ((edges << 1U) | (edges >> 3U)) & 15U;
     return edges;
 }
+
+/* A multi-tile building's pieces occupy a square 3x3/4x4 grid.
+ * Rotate only their POSITIONS; choose the original source piece at
+ * the new screen-relative grid position so the composite stays upright.
+ */
+unsigned int view_rotation_upright_part(unsigned int turns,
+                                         unsigned int span,
+                                         unsigned int part)
+{
+    unsigned int x = part % span;
+    unsigned int y = part / span;
+    unsigned int sx,sy;
+    switch (turns & 3U) {
+    case 1U: sx = span - 1U - y; sy = x; break;
+    case 2U: sx = span - 1U - x; sy = span - 1U - y; break;
+    case 3U: sx = y; sy = span - 1U - x; break;
+    default: sx = x; sy = y; break;
+    }
+    return sy * span + sx;
+}
