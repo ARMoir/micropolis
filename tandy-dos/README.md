@@ -49,8 +49,7 @@ project. It targets the NEC V20-equipped Tandy 1000 EX.
   original city without a sidecar seeds zoning from 3x3 zone centers.
 - **Compact classic city-builder layout:** cyan menu bar (row 0), city
   statistics just below it (row 1), a clean 64-pixel two-column toolbox
-  with enlarged original Micropolis tile icons plus two custom pixel-tool
-  pictograms, and a larger minimap
+  with recognizable 16x16 pixel icons and a larger minimap
   directly underneath, 256x168 city window to the right (32x21 tiles),
   and two separate debug/construction rows at the bottom. All fit
   native 320x200x16 Tandy video.
@@ -296,9 +295,10 @@ replaced with a classic late-1980s/early-1990s city-builder layout, using
 the supplied original SimCity DOS screen as visual inspiration.
 
 - Cyan SYSTEM/TOOLS/VIEW/HELP top-row menu, with working submenus.
-- Narrow 64-pixel left sidebar with eight compact beveled icons, six
-  using original Micropolis tile art and two custom DOS pixel pictograms
-  (bulldozer and magnifying glass). No tiny overlapping icon labels.
+- Narrow 64-pixel left sidebar with eight compact beveled icons: the
+  original recognizable road tile, retained custom bulldozer and magnifier,
+  and five new full 16x16 native-color pictograms for power, residential,
+  commercial, industrial and coal. No tiny overlapping labels.
 - Right-side city at 32 tiles wide by 21 tiles tall, panning within the
   original 120x100 world, in 16-color native Tandy mode 9.
 - Enlarged 56x44-pixel minimap below the buttons, with a bright camera
@@ -600,10 +600,13 @@ Button positions, from left to right and top to bottom:
 
 Residential, commercial and industrial buttons have **green, blue and
 yellow** lower accent bars, respectively. The selected tool has a
-bright yellow pressed border. Most icons reuse the existing original
-Micropolis artwork in TILES.DAT; Inspect and Bulldoze get new tiny
-native pixel-art icons so they are no longer represented by generic
-terrain/rubble. There are no extra disk assets or renderer changes.
+bright yellow pressed border. The road icon retains the original
+Micropolis TILES.DAT artwork, and the bulldozer and inspector retain
+their working custom pixel art. Power, residential, commercial,
+industrial and coal now use **dedicated full 16x16 pictograms** rather
+than enlarged 8x8 fragments of one building/utility map tile. This
+fixes the five icons that looked nonsensical on the real Tandy.
+No extra disk assets, graphics-mode changes, or renderer rewrites.
 
 The original numeric shortcuts and menus remain stable: 0=Inspect,
 1=Road, 2=Power, 3=Residential, 4=Commercial, 5=Industrial,
@@ -665,3 +668,31 @@ original road, rail and power sprite selection through four turns.
 The transport-sprite regression additionally checks **all 960 tile
 IDs** at 0/90/180/270 degrees: roads stay road graphics, railways stay
 rail graphics, power stays power, and four turns restore every ID.
+
+## Tandy hardware toolbar icon correction
+
+The first compact toolbar looked correct for Road, Bulldozer and Inspect,
+but the other five tools were simply using one arbitrary **8x8 map tile**
+(each enlarged to 16x16). A map tile is only a piece of a larger factory,
+house or utility, so those images did not read as functional tool icons.
+
+The five new 16x16 toolbar-only designs are stored as compact C data in
+`tandy-dos/tool_art.c` and use the same native Tandy palette as the game:
+
+- **Power:** large yellow lightning bolt with blue-white sparks
+- **Residential:** white house, red roof and green lawn
+- **Commercial:** blue glass office/shop with windows and a door
+- **Industrial:** gray factory with two smokestacks
+- **Coal plant:** red-brown power station, tall stacks and yellow power motif
+
+Road keeps its original artwork; the existing good Bulldozer and
+magnifying-glass graphics are untouched. All eight buttons retain their
+existing positions, selection highlights, numeric shortcuts, drag
+behavior, and mouse hitboxes. Tool icons never alter original city
+terrain, simulated buildings, or CTY/ZON data.
+
+The `test-tool-art` host regression verifies each of the five new
+icons contains real, distinguishable 16-color pixels, stays within
+16x16 bounds, and that every displayed icon still maps to its intended
+mouse and keyboard tool ID. Native 8086 DOS compilation is verified
+separately by the Open Watcom build.
