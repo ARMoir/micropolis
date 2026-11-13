@@ -103,6 +103,24 @@ int main(void)
         check_span(off+4U,off,156U,1);
     }
     compare();
+    /* Benchmark can clear its live city viewport without overwriting
+     * any of the menu, toolbox, minimap or status rows. Verify every
+     * byte, across all four graphics banks, against a reference fill.
+     */
+    reset_buffers();
+    tandy_fill_region(actual.bytes,VIEW_X/2U,VIEW_Y,
+                      VIEW_W*4U,VIEW_H*8U,0U);
+    for(y=VIEW_Y; y<VIEW_Y+VIEW_H*8U; ++y) {
+        off=tandy_scanlines[y]+VIEW_X/2U;
+        memset(expected+off,0,VIEW_W*4U);
+    }
+    compare();
+    /* Out-of-range regions must not overwrite adjacent graphics. */
+    tandy_fill_region(actual.bytes,159U,0U,2U,1U,255U);
+    tandy_fill_region(actual.bytes,0U,199U,160U,2U,255U);
+    tandy_fill_region(actual.bytes,160U,0U,0U,1U,255U);
+    compare();
+
     /* Zero words is a valid no-op. */
     tandy_move_words(actual.bytes,0U,4U,0U,0);
     compare();
