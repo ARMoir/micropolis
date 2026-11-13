@@ -24,6 +24,10 @@ int main(void)
     assert(!zoning_set(4U, 6U, ZONE_RES));
     assert(zoning_paint_line(5U, 7U, 12U, 7U, ZONE_COM) == 8U);
     assert(zoning_count(ZONE_COM) == 8U);
+    assert((zoning_edge_mask(5U, 7U) & 2U) == 0U);
+    assert((zoning_edge_mask(5U, 7U) & 8U) != 0U);
+    assert(zoning_edge_mask(6U, 7U) == 5U);
+    assert(zoning_edge_mask(3U, 7U) == 0U);
     assert(zoning_paint_line(13U, 8U, 13U, 15U, ZONE_IND) == 8U);
     assert(zoning_count(ZONE_IND) == 8U);
     assert(zoning_paint_line(20U, 20U, 23U, 23U, ZONE_RES) == 4U);
