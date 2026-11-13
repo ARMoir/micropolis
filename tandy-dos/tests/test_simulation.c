@@ -57,12 +57,18 @@ int main(int argc, char **argv)
      */
     assert(simulation_power_scan_count() == 1U);
     assert(simulation_has_last_change());
+    {
+        unsigned int hx,hy;
+        assert(simulation_last_home_change(&hx,&hy));
+        assert(hx==15U && hy==11U);
+    }
     level = zoning_development_at(15U,11U);
     assert(level > 0U && level <= 3U);
     assert((city_at(15U,11U) & 1023U) == 0U);
     assert((city_at(80U,80U) & 1023U) == 265U);
     st = simulation_stats();
     assert(st->residents > 0UL);
+    assert(st->residential_growth_total > 0U);
     assert(st->road_tiles == 1U);
     assert(st->wire_tiles == 5U);
     assert(st->plants == 1U);
@@ -117,6 +123,7 @@ int main(int argc, char **argv)
     run_months(24U);
     assert(simulation_has_last_change());
     assert(simulation_power_scan_count() == 1U);
+    assert(simulation_stats()->residential_growth_total > 0U);
     /* More than one density stage may develop within 24 months.
      * Confirm the entire nine-sprite group remains coherent.
      */
@@ -160,6 +167,7 @@ int main(int argc, char **argv)
         assert(st->powered_tiles > 0U);
         assert(st->lots_ready > 0U);
         assert(st->growth_total > 0U);
+        assert(st->residential_growth_total > 0U);
         assert(simulation_power_scan_count() == 1U);
         assert(simulation_has_last_change());
         printf("Original city regression: P=%lu Jobs=%lu "
