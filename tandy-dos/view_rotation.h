@@ -23,4 +23,10 @@ void view_rotation_focus(unsigned int turns, unsigned int wx,
                          unsigned int *cursor_y);
 /* World top/right/bottom/left border bits 1/2/4/8 to screen edges. */
 unsigned int view_rotation_edges(unsigned int turns, unsigned int edges);
+/* Keep an assembled 3x3 or 4x4 building graphic upright on screen,
+ * without rotating any pixel sprites. 'part' is 0..span*span-1.
+ */
+unsigned int view_rotation_upright_part(unsigned int turns,
+                                         unsigned int span,
+                                         unsigned int part);
 #endif
