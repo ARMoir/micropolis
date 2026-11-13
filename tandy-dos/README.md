@@ -30,7 +30,7 @@ project. It targets the NEC V20-equipped Tandy 1000 EX.
   available for original-format regression tests but is no longer used
   by the user-facing RCI construction tools.
 - **Running phased simulation**, including time, automatic road/power checks,
-  1x1 RCI lot growth in three densities, original 3x3 vacant-zone development
+  1x1 RCI lot growth in three densities, original vacant and occupied 3x3-zone density growth
   using all nine authentic original building sprites, a population/jobs census,
   and yearly taxes and power/road maintenance. DOS BIOS clock scheduling
   processes only 80..320 map cells per interval so the mouse, keyboard and
@@ -86,7 +86,7 @@ The first command opens the built-in **powered starter neighborhood**
 with an original 4x4 coal plant, connected power lines, roads, and empty
 residential/commercial/industrial lots ready to grow. The second loads
 the included **original Micropolis city map**. Its buildings can
-develop from vacant original 3x3 plots, but the input file is never
+develop from vacant and already occupied original 3x3 plots, but the input file is never
 overwritten unless you explicitly save to a new file.
 
 ### New menus and mouse support
@@ -186,8 +186,9 @@ disallowed.
 are a deliberately simplified adaptation of the original Micropolis
 engine, not a complete port. One-square empty zones grow through three
 stages using the existing original 8x8 tiles, while authentic vacant
-3x3 plots develop complete 3x3 building graphics. Original developed
-buildings are preserved, and imported cities are not overwritten.
+3x3 plots and previously developed classic buildings can advance to
+higher authentic density stages using complete original 3x3 artwork.
+Imported input files are not overwritten.
 Commercial and industrial 1x1 buildings reuse center tiles from the
 original artwork; we may refine those sprites after a hardware test.
 The original traffic, pollution, land-value, policing, disasters,
@@ -228,7 +229,7 @@ contains detailed population, growth, traffic, pollution, police/fire,
 disasters and budget rules that have **not been fully ported**. The
 first DOS-friendly adaptation covers phased scans, a running city
 clock, three-level custom small-lot growth, basic demand, an annual
-tax/maintenance cycle, original vacant 3x3 development and the real
+tax/maintenance cycle, original 3x3 development and the real
 network power scan. Complex effects and the full original economy
 are still future work. Native V20 hardware timings remain unmeasured;
 the phased scheduler may need tuning after testing.
@@ -314,12 +315,10 @@ the exact size, magic/version, map dimensions, and the 16-bit checksum
 before applying a sidecar. On original cities without a sidecar,
 3x3 zone centers are used to reconstruct their existing colored zones.
 
-The original Micropolis simulation engine does **not** yet grow
-buildings within arbitrary per-square zoning. A future growth port
-must choose appropriate original sprites by parcel size, including
-one-square commercial and industrial artwork, while respecting
-roads and power. This build proves editing, color borders, and
-persistence without claiming automatic development.
+The current phased simulator **does grow individual 1x1 lots**, through
+three occupancy stages, using the existing original tile artwork.
+A complete implementation of the original city evaluation and services
+is still to come.
 
 ## Transactional drag-to-build preview
 
@@ -343,7 +342,8 @@ new CTY save files. The demo city starts with a test balance of $20,000.
 Current editor costs: Road $10/tile, Power line $5/tile, RCI zoning
 $12/tile. This rounds the classic $100 per nine-tile 3x3 zone to an
 individual-tile price. The budget is currently construction-only;
-tax income, city economy and full simulation growth are not ported.
+basic tax income and RCI growth are now running, but the complete
+original city-economy model has not been ported.
 Bulldozing and coal plant placement retain their earlier simplified
 editor behavior and have no transactional preview yet.
 
@@ -354,7 +354,9 @@ file for irregular zoning. Neither preview nor cancel rewrites saves.
 
 **Controls:** G pauses and resumes; + / - adjust simulation speed
 between 1x and 4x. The top status line now shows current in-game
-month/year, residents, jobs, and simulation speed. The left toolbox
+month/year, residents, jobs, cumulative growth (G), serviced growable lots
+(R), and simulation speed. With G still at zero and R at zero, check
+road and electrical access before expecting development. The left toolbox
 continues to show the actual saved funds balance.
 
 Automatic city updates use small timed batches (up to 320 map squares
@@ -367,9 +369,9 @@ construction preview is on screen.
 Newly zoned 1x1 lots develop only when they have road access and
 adjacent **powered** infrastructure. Residential builds first; jobs
 depend on housing demand. Loss of road access or electricity gradually
-reduces development. Vacant original 3x3 plots can develop complete
-nine-tile original buildings when power, road and demand permit;
-existing 3x3 buildings are not reworked. The underlying map tiles of
+reduces development. Vacant and existing original 3x3 plots can progress through native
+nine-tile building density stages when power, road and demand permit;
+original sprite layouts remain coherent. The underlying map tiles of
 custom 1x1 zones do not change, and their growth levels are saved in
 the new backward-compatible ZON v3 sidecar.
 
@@ -393,3 +395,34 @@ To meet the 16-bit linker’s **64KB DGROUP** limit, the power scanner's
 far heap instead of permanent near/static memory. The simulation
 itself uses no large extra map arrays other than the 3KB
 per-tile development bitmap.
+
+## November 2026 real-Tandy UI and growth corrections
+
+Real-hardware feedback showed that the toolbar was being repainted
+too often, its text could slide across the city, and imported cities
+appeared to have no new construction even while the clock advanced.
+
+- Replaced BIOS teletype text output (which could scroll the whole
+  graphics framebuffer at the bottom row) with explicitly positioned,
+  non-scrolling BIOS character writes.
+- The two status rows are updated **only at changed glyph cells**.
+  Dragging no longer redraws the entire icon toolbox; selecting a
+  tool redraws just the former and new tool buttons. Coal and bulldoze
+  button highlighting now matches their actual tool IDs.
+- Sidebar icons use more distinct recesses, selection borders, and
+  text backgrounds.
+- Original **already developed** residential/commercial/industrial
+  zones can now grow to higher original nine-tile density levels;
+  we no longer restrict development to empty 3x3 plots.
+- City bottom status reports cumulative growth **G** and powered,
+  road-served buildable opportunities **R**. If R=0, there is no
+  eligible development to grow; if G=0 over time, inspect road and
+  power availability.
+- A new CI regression runs the actual HAPPISLE.CTY file for one
+  simulated year and asserts that existing buildings develop. It
+  prints growth, ready lots, and road/power bottlenecks.
+
+The revised graphics and speed have been compiled and tested in CI,
+but only the real Tandy 1000 EX can validate the screen and input
+feel. As before, keep existing CTY/ZON save pairs together and save
+to new filenames for safety.
