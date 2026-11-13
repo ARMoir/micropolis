@@ -398,60 +398,98 @@ static const char *const tool_labels[8] = {
     "INS", "RD", "PWR", "RES", "COM", "IND", "DOZ", "PLT"
 };
 
-/* Small overview map uses the real city tiles. Unlike the city window,
- * it is a static, coarse preview and can be repainted after edits/pans.
+/* Small authentic 16-color world overview below the compact tools.
+ * Cache the previous camera outline so panning only restores/draws its
+ * border, instead of repainting thousands of pixels each keypress.
  */
-static void draw_overview(void)
+static unsigned int overview_old_x, overview_old_y;
+static unsigned int overview_old_w, overview_old_h;
+static int overview_valid = 0;
+
+static unsigned char overview_color(unsigned int px, unsigned int py)
 {
-    unsigned int px, py, mx, my, id, ox, oy, w, h;
-    unsigned char color;
-    for (py = 0U; py < 13U; ++py) {
-        my = py * CITY_HEIGHT / 13U;
-        for (px = 0U; px < 72U; ++px) {
-            mx = px * CITY_WIDTH / 72U;
-            id = city_at(mx, my) & TILE_MASK;
-            color = 2U;
-            if (id >= 1U && id <= 20U) color = 1U;
-            else if (id >= 21U && id <= 43U) color = 10U;
-            else if (id >= 64U && id <= 207U) color = 8U;
-            else if (id >= 208U && id <= 239U) color = 7U;
-            else if (id >= 240U && id <= 422U) color = 10U;
-            else if (id >= 423U && id <= 611U) color = 9U;
-            else if (id >= 612U && id <= 692U) color = 6U;
-            else if (id >= 693U) color = 15U;
-            if (zoning_at(mx, my) == ZONE_RES) color = 10U;
-            if (zoning_at(mx, my) == ZONE_COM) color = 9U;
-            if (zoning_at(mx, my) == ZONE_IND) color = 14U;
-            pixel(4U + px, 169U + py, color);
-        }
+    unsigned int mx = px * CITY_WIDTH / UI_MINIMAP_W;
+    unsigned int my = py * CITY_HEIGHT / UI_MINIMAP_H;
+    unsigned int id = city_at(mx, my) & TILE_MASK;
+    unsigned int kind = zoning_at(mx, my);
+    unsigned char color = 2U;
+    if (id >= 1U && id <= 20U) color = 1U;
+    else if (id >= 21U && id <= 43U) color = 10U;
+    else if (id >= 64U && id <= 207U) color = 8U;
+    else if (id >= 208U && id <= 239U) color = 7U;
+    else if (id >= 240U && id <= 422U) color = 10U;
+    else if (id >= 423U && id <= 611U) color = 9U;
+    else if (id >= 612U && id <= 692U) color = 6U;
+    else if (id >= 693U) color = 15U;
+    if (kind == ZONE_RES) color = 10U;
+    if (kind == ZONE_COM) color = 9U;
+    if (kind == ZONE_IND) color = 14U;
+    return color;
+}
+
+static void overview_restore_outline(unsigned int x, unsigned int y,
+                                      unsigned int width, unsigned int height)
+{
+    unsigned int p;
+    for (p = 0U; p < width; ++p) {
+        pixel(UI_MINIMAP_X + x + p, UI_MINIMAP_Y + y,
+              overview_color(x+p,y));
+        pixel(UI_MINIMAP_X + x + p, UI_MINIMAP_Y + y + height-1U,
+              overview_color(x+p,y+height-1U));
     }
-    ox = 4U + scroll_x * 72U / CITY_WIDTH;
-    oy = 169U + scroll_y * 13U / CITY_HEIGHT;
-    w = VIEW_W * 72U / CITY_WIDTH;
-    h = VIEW_H * 13U / CITY_HEIGHT;
-    if (h < 2U) h = 2U;
-    for (px = 0U; px < w; ++px) {
-        pixel(ox + px, oy, 14U);
-        pixel(ox + px, oy + h - 1U, 14U);
-    }
-    for (py = 0U; py < h; ++py) {
-        pixel(ox, oy + py, 14U);
-        pixel(ox + w - 1U, oy + py, 14U);
+    for (p = 0U; p < height; ++p) {
+        pixel(UI_MINIMAP_X + x, UI_MINIMAP_Y + y+p,
+              overview_color(x,y+p));
+        pixel(UI_MINIMAP_X + x + width-1U, UI_MINIMAP_Y + y+p,
+              overview_color(x+width-1U,y+p));
     }
 }
 
-static void draw_funds(void)
+static void overview_draw_outline(unsigned int x, unsigned int y,
+                                   unsigned int width, unsigned int height)
 {
-    char money[16];
-    unsigned int x;
-    long funds = city_get_funds();
-    if (funds > 99999999L) funds = 99999999L;
-    /* Narrow status area, only redraw the changing number. */
-    for (x = 0U; x < UI_TOOLBOX_W; x += 8U)
-        solid_tile(x, 16U, 7U);
-    bios_text(1U, 0U, "FUNDS", 0U);
-    sprintf(money, "$%8ld", funds);
-    bios_text(2U, 0U, money, 0U);
+    unsigned int p;
+    for (p = 0U; p < width; ++p) {
+        pixel(UI_MINIMAP_X + x + p,UI_MINIMAP_Y + y,14U);
+        pixel(UI_MINIMAP_X + x + p,UI_MINIMAP_Y + y + height-1U,14U);
+    }
+    for (p = 0U; p < height; ++p) {
+        pixel(UI_MINIMAP_X + x,UI_MINIMAP_Y + y + p,14U);
+        pixel(UI_MINIMAP_X + x + width-1U,UI_MINIMAP_Y + y + p,14U);
+    }
+}
+
+static void draw_overview_camera(void)
+{
+    unsigned int x = scroll_x * UI_MINIMAP_W / CITY_WIDTH;
+    unsigned int y = scroll_y * UI_MINIMAP_H / CITY_HEIGHT;
+    unsigned int w = VIEW_W * UI_MINIMAP_W / CITY_WIDTH;
+    unsigned int h = VIEW_H * UI_MINIMAP_H / CITY_HEIGHT;
+    if (w < 2U) w = 2U;
+    if (h < 2U) h = 2U;
+    if (overview_valid && overview_old_x == x && overview_old_y == y &&
+        overview_old_w == w && overview_old_h == h)
+        return;
+    if (overview_valid)
+        overview_restore_outline(overview_old_x,overview_old_y,
+                                 overview_old_w,overview_old_h);
+    overview_draw_outline(x,y,w,h);
+    overview_old_x = x;
+    overview_old_y = y;
+    overview_old_w = w;
+    overview_old_h = h;
+    overview_valid = 1;
+}
+
+static void draw_overview(void)
+{
+    unsigned int px, py;
+    for (py = 0U; py < UI_MINIMAP_H; ++py)
+        for (px = 0U; px < UI_MINIMAP_W; ++px)
+            pixel(UI_MINIMAP_X + px,UI_MINIMAP_Y + py,
+                  overview_color(px,py));
+    overview_valid = 0;
+    draw_overview_camera();
 }
 
 /* Only the selected tool's TWO affected buttons need repainting.
@@ -466,29 +504,28 @@ static void draw_tool_button(unsigned int n)
     chosen = (n == 6U && selected_tool == EDIT_BULLDOZE) ||
              (n == 7U && selected_tool == EDIT_COAL) ||
              (n < 6U && (unsigned int)selected_tool == n);
-    bx = 4U + (n & 1U) * 40U;
+    bx = 1U + (n & 1U) * (UI_TOOLBOX_W / 2U);
     by = UI_BUTTON_TOP + (n >> 1) * UI_BUTTON_SIZE;
-    /* Thin bright border indicates selection; each icon has its own
-     * recessed gray area and legible dark, separate text band.
+    /* Each 30x24 button retains its real Micropolis sprite and short
+     * label; no text overlaps an adjacent button or the minimap.
      */
-    box_pixels(bx, by, 34U, 32U,
+    box_pixels(bx,by,30U,24U,
                (unsigned char)(chosen ? 14U : 8U));
-    box_pixels(bx + 2U, by + 2U, 30U, 28U, 7U);
-    box_pixels(bx + 5U, by + 3U, 24U, 20U, 8U);
+    box_pixels(bx+1U,by+1U,28U,22U,7U);
+    box_pixels(bx+5U,by+1U,20U,15U,8U);
     if (art_data != NULL) {
         src = tool_icons[n] * 32U;
         for (iy = 0U; iy < 8U; ++iy)
             for (ix = 0U; ix < 8U; ++ix) {
-                packed = art_data[src + iy * 4U + (ix >> 1)];
+                packed = art_data[src + iy*4U + (ix>>1)];
                 color = (unsigned char)((ix & 1U) ?
                         (packed & 15U) : (packed >> 4));
-                box_pixels(bx + 9U + ix * 2U, by + 4U + iy * 2U,
-                           2U, 2U, color);
+                box_pixels(bx+7U+ix*2U,by+iy*2U,2U,2U,color);
             }
     }
-    box_pixels(bx + 3U, by + 24U, 28U, 8U, 7U);
-    bios_text((by + 24U) / 8U, (bx / 8U) + 1U,
-              tool_labels[n], (unsigned char)(chosen ? 4U : 1U));
+    box_pixels(bx+1U,by+16U,28U,8U,7U);
+    bios_text((by+16U)/8U,(bx/8U)+1U,
+              tool_labels[n],(unsigned char)(chosen ? 4U : 1U));
 }
 
 static unsigned int tool_button_index(enum edit_tool tool)
@@ -501,18 +538,17 @@ static unsigned int tool_button_index(enum edit_tool tool)
 static void draw_toolbox(void)
 {
     unsigned int x, y, n;
-    for (y = 8U; y < UI_FOOTER_Y; y += 8U)
+    for (y = UI_MAP_Y; y < UI_FOOTER_Y; y += 8U)
         for (x = 0U; x < UI_TOOLBOX_W; x += 8U)
-            solid_tile(x, y, 7U);
-    for (y = 8U; y < UI_FOOTER_Y; ++y) {
-        pixel(78U, y, 8U);
-        pixel(79U, y, 0U);
+            solid_tile(x,y,7U);
+    for (y = UI_MAP_Y; y < UI_FOOTER_Y; ++y) {
+        pixel(UI_TOOLBOX_W-2U,y,8U);
+        pixel(UI_TOOLBOX_W-1U,y,0U);
     }
-    draw_funds();
-    bios_text(3U, 2U, "TOOLS", 1U);
+    bios_text(2U,1U,"TOOLS",1U);
     for (n = 0U; n < 8U; ++n)
         draw_tool_button(n);
-    bios_text(20U, 2U, "MAP", 1U);
+    bios_text(16U,2U,"MAP",1U);
     draw_overview();
 }
 
