@@ -1444,7 +1444,9 @@ static void keyboard_loop(void)
              */
             if (simulation_has_last_change()) {
                 unsigned int gx, gy;
-                simulation_last_change(&gx, &gy);
+                int house = simulation_last_home_change(&gx, &gy);
+                if (!house)
+                    simulation_last_change(&gx, &gy);
                 scroll_x = gx > VIEW_W/2U ? gx-VIEW_W/2U : 0U;
                 scroll_y = gy > VIEW_H/2U ? gy-VIEW_H/2U : 0U;
                 if (scroll_x > CITY_WIDTH-VIEW_W)
@@ -1453,7 +1455,7 @@ static void keyboard_loop(void)
                     scroll_y = CITY_HEIGHT-VIEW_H;
                 cursor_x = gx-scroll_x;
                 cursor_y = gy-scroll_y;
-                last_action = "LAST GROWTH";
+                last_action = house ? "LAST HOUSE" : "LAST GROWTH";
                 render_full();
             } else {
                 last_action = "NO GROWTH";
