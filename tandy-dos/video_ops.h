@@ -25,6 +25,15 @@ void tandy_init_scanlines(void);
  * All callers use even offsets, and the copy is overlap-safe.
  * Preserve 8086 compatibility and avoid touching video page registers.
  */
+/* Fill only a specified horizontal VRAM window and scanline range.
+ * Used to make live-VRAM benchmarks visually quiet and keep HUD,
+ * toolbar and minimap bytes untouched. Bounds are checked.
+ */
+void tandy_fill_region(volatile unsigned char TANDY_FAR *screen,
+                       unsigned int start_byte, unsigned int top_line,
+                       unsigned int width_bytes, unsigned int line_count,
+                       unsigned char packed_color);
+
 void tandy_move_words(volatile unsigned char TANDY_FAR *screen,
                       unsigned int dst_offset, unsigned int src_offset,
                       unsigned int words, int backwards);
