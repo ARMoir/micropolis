@@ -26,6 +26,8 @@ struct sim_statistics {
     long last_maintenance;
 };
 
+/* Add a ready-to-grow example neighborhood to the built-in demo only. */
+void simulation_seed_demo(void);
 void simulation_init(void);
 void simulation_mark_power_dirty(void);
 unsigned int simulation_advance(unsigned int max_tiles);
