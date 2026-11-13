@@ -15,6 +15,40 @@ static unsigned char city_header[3120];
 #define CITY_FILE_LENGTH 27120L
 #define CITY_MAP_OFFSET   3120L
 #define TILE_ID_MASK      1023U
+/* Six 480-byte history arrays, then MiscHis[50] at 2 bytes/word. */
+#define FUNDS_OFFSET (6U * 480U + 50U * 2U)
+
+long city_get_funds(void)
+{
+    unsigned long n = ((unsigned long)city_header[FUNDS_OFFSET] << 24) |
+                      ((unsigned long)city_header[FUNDS_OFFSET + 1U] << 16) |
+                      ((unsigned long)city_header[FUNDS_OFFSET + 2U] << 8) |
+                      ((unsigned long)city_header[FUNDS_OFFSET + 3U]);
+    /* Original saves hold a signed 32-bit value, but never permit negative
+     * construction cash. Treat malformed negative balances as zero.
+     */
+    if (n & 0x80000000UL)
+        return 0L;
+    return (long)n;
+}
+
+void city_set_funds(long funds)
+{
+    unsigned long n = funds > 0L ? (unsigned long)funds : 0UL;
+    city_header[FUNDS_OFFSET] = (unsigned char)(n >> 24);
+    city_header[FUNDS_OFFSET + 1U] = (unsigned char)(n >> 16);
+    city_header[FUNDS_OFFSET + 2U] = (unsigned char)(n >> 8);
+    city_header[FUNDS_OFFSET + 3U] = (unsigned char)n;
+}
+
+int city_spend_funds(long cost)
+{
+    long funds = city_get_funds();
+    if (cost < 0L || cost > funds)
+        return 0;
+    city_set_funds(funds - cost);
+    return 1;
+}
 
 unsigned short city_at(unsigned int x, unsigned int y)
 {
@@ -134,4 +168,5 @@ void city_make_demo(void)
             city_tiles[x * CITY_HEIGHT + y] = tile & TILE_ID_MASK;
         }
     }
+    city_set_funds(20000L); /* editor-only demo starting balance */
 }
