@@ -196,7 +196,6 @@ static void update_date(void)
 
 void simulation_init(void)
 {
-    unsigned int i;
     cursor = 0U;
     changed = 0U;
     power_dirty = 1U;
@@ -211,8 +210,10 @@ void simulation_init(void)
     stats.commercial_jobs = stats.industrial_jobs = 0UL;
     stats.last_income = stats.last_maintenance = 0L;
     stats.powered_tiles = 0U;
-    for (i = 0U; i < 1U; ++i) /* explicit, no additional large buffers */
-        update_date();
+    stats.residential_lots = stats.commercial_lots = 0U;
+    stats.industrial_lots = stats.road_tiles = 0U;
+    stats.wire_tiles = stats.plants = 0U;
+    update_date();
 }
 void simulation_mark_power_dirty(void) { power_dirty = 1U; }
 const struct sim_statistics *simulation_stats(void) { return &stats; }
