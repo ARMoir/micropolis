@@ -408,8 +408,12 @@ static void bios_text(unsigned int row, unsigned int column,
 /* SimCity-style compact toolbox, custom-drawn in Tandy mode 9.
  * All of these pixels are OUTSIDE the map's VRAM scrolling rectangle.
  */
+/* Indices are stable DOS numeric tool shortcuts, NOT visual buttons.
+ * Prefer recognizable occupied RCI sprites over empty-zone centers.
+ * Inspect and Bulldoze use native 16x16 tool pictograms below.
+ */
 static const unsigned short tool_icons[8] = {
-    0U, 66U, 210U, 244U, 427U, 616U, 44U, 750U
+    0U, 66U, 210U, 249U, 449U, 638U, 44U, 750U
 };
 static const char *const tool_labels[8] = {
     "INS", "RD", "PWR", "RES", "COM", "IND", "DOZ", "PLT"
@@ -513,43 +517,126 @@ static void draw_overview(void)
  * A drag commit never repaints the 64-pixel-wide sidebar controls;
  * it updates the minimap and top treasury figures only.
  */
-static void draw_tool_button(unsigned int n)
-{
-    unsigned int bx, by, ix, iy, src;
-    unsigned char color, packed;
-    int chosen;
-    chosen = (n == 6U && selected_tool == EDIT_BULLDOZE) ||
-             (n == 7U && selected_tool == EDIT_COAL) ||
-             (n < 6U && (unsigned int)selected_tool == n);
-    bx = 1U + (n & 1U) * (UI_TOOLBOX_W / 2U);
-    by = UI_BUTTON_TOP + (n >> 1) * UI_BUTTON_SIZE;
-    /* Each 30x24 button retains its real Micropolis sprite and short
-     * label; no text overlaps an adjacent button or the minimap.
-     */
-    box_pixels(bx,by,30U,24U,
-               (unsigned char)(chosen ? 14U : 8U));
-    box_pixels(bx+1U,by+1U,28U,22U,7U);
-    box_pixels(bx+5U,by+1U,20U,15U,8U);
-    if (art_data != NULL) {
-        src = tool_icons[n] * 32U;
-        for (iy = 0U; iy < 8U; ++iy)
-            for (ix = 0U; ix < 8U; ++ix) {
-                packed = art_data[src + iy*4U + (ix>>1)];
-                color = (unsigned char)((ix & 1U) ?
-                        (packed & 15U) : (packed >> 4));
-                box_pixels(bx+7U+ix*2U,by+iy*2U,2U,2U,color);
-            }
-    }
-    box_pixels(bx+1U,by+16U,28U,8U,7U);
-    bios_text((by+16U)/8U,(bx/8U)+1U,
-              tool_labels[n],(unsigned char)(chosen ? 4U : 1U));
-}
-
-static unsigned int tool_button_index(enum edit_tool tool)
+/* The keyboard numbers are intentionally stable even though the
+ * arrangement follows the original SimCity's bulldozer-first palette:
+ * DOZ / Road, Power / Res, Com / Ind, Inspect / Plant.
+ */
+static unsigned int tool_key_from_enum(enum edit_tool tool)
 {
     if (tool == EDIT_BULLDOZE) return 6U;
     if (tool == EDIT_COAL) return 7U;
     return (unsigned int)tool;
+}
+
+static unsigned int tool_button_index(enum edit_tool tool)
+{
+    return ui_toolbar_button(tool_key_from_enum(tool));
+}
+
+static unsigned char toolbar_accent(unsigned int tool)
+{
+    switch (tool) {
+    case 3U: return 10U; /* green residential */
+    case 4U: return 9U;  /* blue commercial */
+    case 5U: return 14U; /* yellow industrial */
+    case 6U: return 12U; /* red/orange demolition */
+    case 2U: return 11U; /* pale cyan electric utility */
+    case 1U: return 8U;  /* asphalt */
+    case 7U: return 6U;  /* brown coal */
+    default: return 15U;
+    }
+}
+
+/* These two actions have no recognisable city MAP sprites, so draw
+ * genuine 16x16 pixel pictograms rather than a grass/rubble tile.
+ * Everything is calculated only when a tool button is repainted.
+ */
+static void draw_tool_pictogram(unsigned int tool,
+                                unsigned int px, unsigned int py)
+{
+    unsigned int x, y;
+    if (tool == 6U) { /* yellow bulldozer, black tracks, steel blade */
+        box_pixels(px+3U,py+11U,11U,3U,0U);
+        box_pixels(px+4U,py+12U,9U,1U,8U);
+        box_pixels(px+4U,py+6U,10U,5U,14U);
+        box_pixels(px+8U,py+2U,5U,5U,14U);
+        box_pixels(px+9U,py+3U,3U,3U,9U);
+        box_pixels(px+1U,py+7U,2U,7U,8U);
+        box_pixels(px+1U,py+11U,3U,3U,15U);
+        pixel(px+6U,py+10U,6U);
+        pixel(px+11U,py+10U,6U);
+    } else if (tool == 0U) { /* inspector magnifying glass */
+        for (y=2U;y<11U;++y)
+            for (x=2U;x<11U;++x) {
+                int dx = (int)x-6;
+                int dy = (int)y-6;
+                int d = dx*dx+dy*dy;
+                if (d <= 20 && d >= 12)
+                    pixel(px+x,py+y,0U);
+                else if (d < 12)
+                    pixel(px+x,py+y,11U);
+            }
+        box_pixels(px+10U,py+10U,2U,2U,0U);
+        box_pixels(px+11U,py+12U,3U,2U,6U);
+        pixel(px+12U,py+14U,0U);
+    }
+}
+
+/* Keep original tile artwork for road, power, housing, commerce,
+ * industry and plant. The active icon stays crisply identifiable in
+ * the narrow panel, and no extra graphic assets need shipping.
+ */
+static void draw_tool_art(unsigned int tool, unsigned int px,
+                          unsigned int py)
+{
+    unsigned int ix,iy,src;
+    unsigned char packed,color;
+    if (tool == 0U || tool == 6U) {
+        draw_tool_pictogram(tool,px,py);
+        return;
+    }
+    if (art_data == NULL)
+        return;
+    src = tool_icons[tool]*32U;
+    for (iy=0U;iy<8U;++iy)
+        for (ix=0U;ix<8U;++ix) {
+            packed=art_data[src+iy*4U+(ix>>1)];
+            color=(unsigned char)((ix&1U) ?
+                                  (packed&15U) : (packed>>4));
+            box_pixels(px+ix*2U,py+iy*2U,2U,2U,color);
+        }
+}
+
+static void draw_tool_button(unsigned int n)
+{
+    unsigned int bx,by,x,y,tool;
+    unsigned char accent;
+    int selected;
+    if (n >= 8U)
+        return;
+    tool = ui_toolbar_tool(n);
+    selected = tool_button_index(selected_tool) == n;
+    accent = toolbar_accent(tool);
+    bx = 1U+(n&1U)*(UI_TOOLBOX_W/2U);
+    by = UI_BUTTON_TOP+(n>>1)*UI_BUTTON_SIZE;
+    /* 30x24 beveled icon buttons, styled after both SimCity examples.
+     * No opaque BIOS label erases a lower portion of an icon.
+     * Selected button is 'pressed', outlined in yellow.
+     */
+    box_pixels(bx,by,30U,24U,0U);          /* dark outside edge */
+    box_pixels(bx+1U,by+1U,28U,22U,
+               (unsigned char)(selected?8U:7U));
+    for (x=1U;x<29U;++x) {
+        pixel(bx+x,by+1U,(unsigned char)(selected?14U:15U));
+        pixel(bx+x,by+22U,(unsigned char)(selected?14U:8U));
+    }
+    for (y=1U;y<23U;++y) {
+        pixel(bx+1U,by+y,(unsigned char)(selected?14U:15U));
+        pixel(bx+28U,by+y,(unsigned char)(selected?14U:8U));
+    }
+    draw_tool_art(tool,bx+(selected?8U:7U),by+(selected?4U:3U));
+    /* Classic R/C/I colors; other tools get restrained accents. */
+    box_pixels(bx+3U,by+20U,24U,2U,accent);
 }
 
 static void draw_toolbox(void)
@@ -726,7 +813,7 @@ static void draw_status(void)
     const struct sim_statistics *st = simulation_stats();
     if (mouse_on) {
         sprintf(debug,"TOOL:%s MAP:%03u,%03u M:%03u,%03u",
-                tool_labels[tool_button_index(selected_tool)],
+                tool_labels[tool_key_from_enum(selected_tool)],
                 wx,wy,mouse_x,mouse_y);
     } else {
         sprintf(debug,"TOOL:%s MAP:%03u,%03u M:OFF",
@@ -1288,7 +1375,7 @@ static void handle_mouse(void)
             } else {
                 toolbar = ui_toolbar_hit(state.x, state.y);
                 if (toolbar >= 0) {
-                    select_tool((unsigned int)toolbar);
+                    select_tool(ui_toolbar_tool((unsigned int)toolbar));
                     draw_status();
                 } else if (inside) {
                     if (selected_zone_kind() != ZONE_NONE ||
