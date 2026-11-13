@@ -1,0 +1,91 @@
+/* SPDX-License-Identifier: GPL-3.0-or-later
+ * Deterministic 16-bit simulation regression: real services, RCI growth,
+ * city time, taxes, sidecar persistence, pause, and brownouts.
+ */
+#include "../city.h"
+#include "../zoning.h"
+#include "../simulation.h"
+#include <assert.h>
+#include <stdio.h>
+
+static void run_months(unsigned int months)
+{
+    unsigned int i;
+    long target = city_get_time() + (long)months * 4L;
+    for (i = 0U; i < 9000U && city_get_time() < target; ++i)
+        (void)simulation_advance(320U);
+    assert(city_get_time() == target);
+}
+
+int main(void)
+{
+    unsigned int x, y, level;
+    long balance;
+    const struct sim_statistics *st;
+    city_make_demo();
+    for (x=0U; x<CITY_WIDTH; ++x)
+        for (y=0U; y<CITY_HEIGHT; ++y)
+            city_set(x,y,0U);
+    zoning_clear();
+    city_set_time(0L);
+    city_set_funds(5000L);
+    city_set_tax_rate(7U);
+    /* Coal source -> connected conductor -> powered 1x1 lot.
+     * Road on a separate neighbor provides road access.
+     */
+    city_set(10U,10U,750U | 1024U | 16384U);
+    for (x=11U; x<=15U; ++x)
+        city_set(x,10U,208U | 16384U);
+    city_set(16U,11U,66U | 4096U | 8192U);
+    assert(zoning_set(15U,11U,ZONE_RES));
+    assert(zoning_development_at(15U,11U)==0U);
+    /* An authentic, original 3x3 building must stay untouched. */
+    city_set(80U,80U,265U | 1024U | 16384U);
+    simulation_init();
+    assert(simulation_stats()->year == 1900U);
+    assert(simulation_stats()->month == 1U);
+    assert(simulation_speed() == 1U);
+    simulation_set_speed(4U);
+    assert(simulation_speed() == 4U);
+    simulation_set_paused(1);
+    assert(!simulation_advance(320U));
+    assert(city_get_time()==0L);
+    simulation_set_paused(0);
+    run_months(32U);
+    level = zoning_development_at(15U,11U);
+    assert(level > 0U && level <= 3U);
+    assert((city_at(15U,11U) & 1023U) == 0U);
+    assert((city_at(80U,80U) & 1023U) == 265U);
+    st = simulation_stats();
+    assert(st->residents > 0UL);
+    assert(st->road_tiles == 1U);
+    assert(st->wire_tiles == 5U);
+    assert(st->plants == 1U);
+    assert(st->powered_tiles >= 6U);
+    assert(st->month == 9U);
+    assert(st->year == 1902U);
+    assert(city_get_tax_rate() == 7U);
+    /* Taxes and upkeep must now be applied automatically each year. */
+    assert(st->last_maintenance > 0L);
+    assert(st->last_income > 0L);
+    balance = city_get_funds();
+    assert(balance != 5000L);
+    assert(city_save_as("sim_test.cty"));
+    assert(zoning_save("sim_test.zon"));
+    assert(zoning_set_development(15U,11U,0U));
+    assert(city_load("sim_test.cty"));
+    assert(zoning_load("sim_test.zon"));
+    assert(zoning_development_at(15U,11U) == level);
+    assert(city_get_funds() == balance);
+    assert(city_get_time() == 128L);
+    assert(remove("sim_test.cty") == 0);
+    assert(remove("sim_test.zon") == 0);
+
+    /* Stop feeding electricity; developed lot should eventually shrink. */
+    city_set(10U,10U,0U);
+    simulation_mark_power_dirty();
+    run_months(100U);
+    assert(zoning_development_at(15U,11U) == 0U);
+    puts("Phased growth, power/road access, date, taxes and save tests passed");
+    return 0;
+}
