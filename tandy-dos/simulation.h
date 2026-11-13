@@ -31,6 +31,7 @@ void simulation_mark_power_dirty(void);
 unsigned int simulation_advance(unsigned int max_tiles);
 const struct sim_statistics *simulation_stats(void);
 void simulation_last_change(unsigned int *x, unsigned int *y);
+unsigned int simulation_last_change_radius(void);
 unsigned int simulation_progress(void);
 int simulation_is_paused(void);
 void simulation_set_paused(int paused);
