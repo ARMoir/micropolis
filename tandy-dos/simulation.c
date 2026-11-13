@@ -24,6 +24,10 @@
 
 static struct sim_statistics stats;
 static unsigned int cursor = 0U;
+/* Avoid 16-bit division/modulo on every scanned map cell. */
+static unsigned int scan_x = 0U, scan_y = 0U;
+static unsigned int power_scan_count = 0U;
+static unsigned int last_change_valid = 0U;
 static unsigned int last_x, last_y;
 static unsigned int last_radius = 0U;
 static unsigned int changed = 0U;
@@ -156,6 +160,7 @@ static int process_zone(unsigned int x, unsigned int y,
         last_x = x;
         last_y = y;
         last_radius = 0U;
+        last_change_valid = 1U;
     }
     if (kind == ZONE_RES)
         pop_res += zone_developed_population(kind,next);
@@ -271,7 +276,11 @@ static int process_original_zone(unsigned int x, unsigned int y,
     last_x = x;
     last_y = y;
     last_radius = 1U;
-    power_dirty = 1U;
+    last_change_valid = 1U;
+    /* Upgrading a 3x3 building only changes its tile IDs. We preserve
+     * the original conductive / power flags exactly, so the expensive
+     * 120x100 BFS is NOT required after each growth event.
+     */
     return 1;
 }
 
@@ -373,8 +382,11 @@ void simulation_seed_demo(void)
 void simulation_init(void)
 {
     cursor = 0U;
+    scan_x = scan_y = 0U;
     changed = 0U;
     power_dirty = 1U;
+    power_scan_count = 0U;
+    last_change_valid = 0U;
     paused = 0U;
     speed = 1U;
     rng = (unsigned int)(0x31a5U ^ (unsigned int)city_get_time());
@@ -402,6 +414,8 @@ void simulation_last_change(unsigned int *x, unsigned int *y)
 }
 unsigned int simulation_last_change_radius(void) { return last_radius; }
 unsigned int simulation_progress(void) { return cursor; }
+unsigned int simulation_power_scan_count(void) { return power_scan_count; }
+int simulation_has_last_change(void) { return last_change_valid != 0U; }
 int simulation_is_paused(void) { return paused != 0U; }
 void simulation_set_paused(int pause) { paused = pause ? 1U : 0U; }
 unsigned int simulation_speed(void) { return speed; }
@@ -420,15 +434,20 @@ unsigned int simulation_advance(unsigned int max_tiles)
         max_tiles = SIM_CHUNK_LIMIT;
     if (power_dirty) {
         stats.powered_tiles = engine_power_scan();
+        ++power_scan_count;
         power_dirty = 0U;
     }
     changed = 0U;
     while (steps < max_tiles && cursor < CITY_TILES) {
-        x = cursor / CITY_HEIGHT;
-        y = cursor % CITY_HEIGHT;
+        x = scan_x;
+        y = scan_y;
         scan_tile(x,y);
         ++cursor;
         ++steps;
+        if (++scan_y == CITY_HEIGHT) {
+            scan_y = 0U;
+            ++scan_x;
+        }
         if (changed) {
             event |= SIM_EVENT_TILE;
             break; /* caller can redraw one changed square cheaply */
@@ -456,6 +475,7 @@ unsigned int simulation_advance(unsigned int max_tiles)
         if (city_get_time() % 48L == 0L)
             year_budget();
         cursor = 0U;
+        scan_x = scan_y = 0U;
         pop_res = pop_com = pop_ind = 0UL;
         lots_res = lots_com = lots_ind = 0U;
         roads = wires = plants = 0U;
