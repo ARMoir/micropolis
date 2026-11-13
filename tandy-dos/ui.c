@@ -22,10 +22,12 @@ static const enum ui_action tools_cmds[] = {
 };
 
 static const char *const view_items[] = {
-    "Power scan  P", "Center cursor", "Close menu"
+    "Power scan  P", "Center cursor", "Rotate CW   r",
+    "Rotate CCW  R", "Close menu"
 };
 static const enum ui_action view_cmds[] = {
-    UI_SCAN_POWER, UI_CENTER_CURSOR, UI_CLOSE
+    UI_SCAN_POWER, UI_CENTER_CURSOR, UI_ROTATE_CW,
+    UI_ROTATE_CCW, UI_CLOSE
 };
 
 static const char *const help_items[] = {
@@ -51,7 +53,7 @@ unsigned int ui_menu_count(enum ui_menu menu)
     switch (menu) {
     case MENU_FILE: return 3U;
     case MENU_TOOLS: return 9U;
-    case MENU_VIEW: return 3U;
+    case MENU_VIEW: return 5U;
     case MENU_HELP: return 4U;
     default: return 0U;
     }
