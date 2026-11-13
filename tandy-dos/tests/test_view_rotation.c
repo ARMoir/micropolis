@@ -75,6 +75,20 @@ int main(void)
     assert(view_rotation_upright_part(1U,3U,0U)==2U);
     assert(view_rotation_upright_part(1U,3U,4U)==4U);
     assert(view_rotation_upright_part(1U,4U,0U)==3U);
+    /* Roads, traffic variants and power wires use existing graphics
+     * rotated by connection ID, without modifying source map data.
+     */
+    assert(view_rotation_utility_tile(1U,66U)==67U);
+    assert(view_rotation_utility_tile(1U,68U)==69U);
+    assert(view_rotation_utility_tile(1U,210U)==211U);
+    assert(view_rotation_utility_tile(1U,212U)==213U);
+    for(x=64U;x<=223U;++x) {
+        unsigned int id=x;
+        for(turn=0U;turn<4U;++turn)
+            id=view_rotation_utility_tile(1U,id);
+        assert(id==x);
+    }
+    assert(view_rotation_utility_tile(2U,245U)==245U);
     puts("120x100 rotation, zone edges, viewport bounds and map integrity passed");
     return 0;
 }
