@@ -6,8 +6,8 @@
  * Original Micropolis © 1989-2007 Electronic Arts Inc.; GPLv3-or-later
  * and additional terms in the repository COPYING file.
  *
- * This is an isolated foundation for porting the real simulation engine.
- * The full scheduled budget/growth/disaster simulator is NOT connected.
+ * The phased simulation uses this power scanner on initial load and
+ * when infrastructure changes; full disaster/traffic logic is not ported.
  */
 #include "city.h"
 #include "engine.h"
