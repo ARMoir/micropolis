@@ -641,8 +641,15 @@ No individual graphics pixels are rotated. Original 3x3 residential,
 commercial and industrial buildings, plus 4x4 coal/nuclear plants, have
 their component tiles reselected from the existing TILES.DAT artwork
 to keep their *whole building appearance upright* when their positions
-turn. Roads and power lines switch among the original directional
-connection graphics so bends and straight segments still join visually.
+turn. Roads, power lines **and railways** switch among their
+respective original directional graphics so bends and straight segments
+still join visually. Crossing tiles for road/power, rail/power and
+road/rail switch orientations together. Road IDs 64..207 and railway
+IDs 224..238 must never be interchanged; the initial rotation
+implementation omitted rail tiles entirely (it stopped at tile 223),
+making roads rotate while train tracks stayed pointing the old way.
+Road-bridge variants 79/95 also have their own horizontal/vertical
+pair rather than being treated as ordinary street segments.
 Other specialized multi-tile landmarks may require additional sprite
 layout rules if they look incorrect at 90°/270°.
 
@@ -654,4 +661,7 @@ program resets view rotation to 0°.
 CI exhaustively checks world/display round trips for all **12,000**
 tiles at all four orientations; bounds and cursor focus; connected zone
 border directions; 3x3/4x4 upright tile arrangements; and correct
-original road and power sprite selection through four turns.
+original road, rail and power sprite selection through four turns.
+The transport-sprite regression additionally checks **all 960 tile
+IDs** at 0/90/180/270 degrees: roads stay road graphics, railways stay
+rail graphics, power stays power, and four turns restore every ID.
