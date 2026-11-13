@@ -57,8 +57,8 @@ unsigned int ui_menu_count(enum ui_menu menu)
     }
 }
 
-/* Row 0: " SYSTEM   TOOLS   VIEW   HELP" (cyan bar).
- * Toolbox occupies x=0..79; the city begins at x=80, y=8.
+/* Row 0 is the menu; row 1 is reserved for city statistics.
+ * Toolbox occupies x=0..63; city begins at x=64, y=16.
  */
 int ui_header_hit(unsigned int x, unsigned int y)
 {
@@ -73,14 +73,14 @@ int ui_header_hit(unsigned int x, unsigned int y)
     return MENU_NONE;
 }
 
-/* Two columns of 32x32 icon buttons down the left-side panel. */
+/* Two columns of 32x24 compact icon buttons. */
 int ui_toolbar_hit(unsigned int x, unsigned int y)
 {
     unsigned int col, row;
     if (x >= UI_TOOLBOX_W || y < UI_BUTTON_TOP ||
         y >= UI_BUTTON_TOP + UI_BUTTON_SIZE * 4U)
         return -1;
-    col = x / 40U;
+    col = x / (UI_TOOLBOX_W / 2U);
     row = (y - UI_BUTTON_TOP) / UI_BUTTON_SIZE;
     return (int)(row * 2U + col);
 }
@@ -92,12 +92,12 @@ int ui_dropdown_hit(enum ui_menu menu, unsigned int x, unsigned int y)
         return -1;
     col = x / 8U;
     row = y / 8U;
-    if (row < 1U || row >= 1U + ui_menu_count(menu))
+    if (row < 2U || row >= 2U + ui_menu_count(menu))
         return -1;
     if (col < ui_menu_origin(menu) ||
         col >= ui_menu_origin(menu) + 16U)
         return -1;
-    return (int)(row - 1U);
+    return (int)(row - 2U);
 }
 
 const char *ui_menu_item(enum ui_menu menu, unsigned int index)
