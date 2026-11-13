@@ -1,6 +1,6 @@
 # Micropolis: Tandy 1000 EX native DOS port
 
-**Status: original-art city editor / first engine-port milestone. Not yet a running city simulation.**
+**Status: experimental playable city simulation with phased RCI development and annual taxation. Incomplete compared with original Micropolis.**
 
 This is an experimental native 8086-compatible, **16-bit real-mode DOS**
 adaptation of the GPL [Micropolis](https://github.com/SimHacker/micropolis)
@@ -29,14 +29,22 @@ project. It targets the NEC V20-equipped Tandy 1000 EX.
   placement, and a basic bulldozer. The old 3x3 RCI builder code remains
   available for original-format regression tests but is no longer used
   by the user-facing RCI construction tools.
-- First isolated simulation subsystem: power-network reachability from coal/nuclear
-  plant centers, using the original conductor flags and 700/2000 tile capacities.
-  Triggered manually using P; no automatic simulation ticking yet.
+- **Running phased simulation**, including time, automatic road/power checks,
+  1x1 RCI lot growth in three densities, original 3x3 vacant-zone development
+  using all nine authentic original building sprites, a population/jobs census,
+  and yearly taxes and power/road maintenance. DOS BIOS clock scheduling
+  processes only 80..320 map cells per interval so the mouse, keyboard and
+  fast-scrolling renderer remain responsive on a V20.
+- Power-network reachability from coal/nuclear plant centers, using the
+  original conductor flags and 700/2000 tile capacities. The network is
+  recomputed after infrastructure edits or initial load, rather than
+  walking the entire map on every graphics frame.
 - **Save as a matching .CTY / .ZON pair**, never overwrite any existing
-  city or sidecar. The existing .CTY keeps the original map and sprites;
-  the optional 3,010-byte .ZON file contains per-tile custom zoning.
-  When a city file is loaded, its matching .ZON is loaded automatically
-  if valid; otherwise original 3x3 zone centers seed the overlay.
+  city or sidecar. The original .CTY stores real city funds, clock, taxes
+  and native building tiles, and the companion **6,010-byte ZON v3**
+  stores per-tile custom zoning and its 2-bit development density. Existing
+  ZON v2 files are still accepted (initial density zero), and an imported
+  original city without a sidecar seeds zoning from 3x3 zone centers.
 - **Classic city-builder layout:** cyan top menu bar, beveled left-side
   two-column construction toolbox with miniature authentic Micropolis
   tile icons, city window to the right, a compact city overview, and
@@ -74,9 +82,12 @@ MICROPOL
 MICROPOL HAPPISLE.CTY
 ```
 
-The first command displays the built-in generated terrain/buildings.
-The second loads the included **original Micropolis city map**. The map
-file stays unchanged.
+The first command opens the built-in **powered starter neighborhood**
+with an original 4x4 coal plant, connected power lines, roads, and empty
+residential/commercial/industrial lots ready to grow. The second loads
+the included **original Micropolis city map**. Its buildings can
+develop from vacant original 3x3 plots, but the input file is never
+overwritten unless you explicitly save to a new file.
 
 ### New menus and mouse support
 
@@ -145,6 +156,8 @@ to its 320-pixel Tandy screen.
 | 6 | Bulldoze (one tile) |
 | 7 | Construct 4x4 coal power plant (16 empty tiles required) |
 | P | Recalculate powered tiles and show the count in the bottom status bar |
+| G | Pause / resume the live simulation |
+| + / - | Increase / decrease simulation speed (1x to 4x) |
 | Space | Purchase one zone, road or wire tile at cursor, budget permitting |
 | F2 | Save a **new** city file in the current directory |
 | F / T / V / H (or F10 for System) | Open System / Tools / View / Help menu |
@@ -169,16 +182,17 @@ rules, cost calculations and full simulation tick scheduling are
 but rail/bridge crossings and terrain correction need further work. A `BLOCKED` indicator means placement is
 disallowed.
 
-**Important:** New single-square zone art uses existing authentic
-Micropolis sprites: a small house, the commercial empty-zone center,
-and the industrial empty-zone center. These are visual placeholders
-on undeveloped dirt, not actual generated businesses or factories.
-The new per-tile zone overlay is **not consumed by the original 3x3
-simulation yet**. We still need to port the city-growth rules and
-adapt them to support small buildings, including true 1x1 commercial
-and industrial assets when suitable. Original city buildings and
-sprite IDs remain untouched. Treat this build as a zoning-editor
-prototype, not a completed city simulation. Keep your original saves.
+**Important:** The first live growth rules are now functional, but they
+are a deliberately simplified adaptation of the original Micropolis
+engine, not a complete port. One-square empty zones grow through three
+stages using the existing original 8x8 tiles, while authentic vacant
+3x3 plots develop complete 3x3 building graphics. Original developed
+buildings are preserved, and imported cities are not overwritten.
+Commercial and industrial 1x1 buildings reuse center tiles from the
+original artwork; we may refine those sprites after a hardware test.
+The original traffic, pollution, land-value, policing, disasters,
+historical census and detailed city economics remain to be ported.
+Keep your original saves.
 
 ## Cross-compiler / build
 
@@ -209,18 +223,15 @@ cc -std=c89 -Wall -Wextra -pedantic -o test-zoning tandy-dos/city.c tandy-dos/zo
 
 ## Remaining simulation-port work
 
-The original simulation implementation under
-`micropolis-activity/src/sim/s_*.c` still depends on X11/Tcl/Tk,
-Unix interfaces, and allocations that are unsuitable for segmented DOS
-without adaptation. The **first power-network scan** is now isolated in `engine.c`.
-Next steps are to integrate the real city tick/update schedule, zoning
-growth and population/economy loops, then budgets, disasters and save-game verification. Game-state
-updates will need profiling on the V20, independently of the already
-fast map redraw.
-
-Optional serial mouse, original 16x16 zoom view and optimized tile
-lookup are also planned. **Do not mistake this editor build for a
-finished, playable Micropolis simulation.**
+The original implementation under `micropolis-activity/src/sim/s_*.c`
+contains detailed population, growth, traffic, pollution, police/fire,
+disasters and budget rules that have **not been fully ported**. The
+first DOS-friendly adaptation covers phased scans, a running city
+clock, three-level custom small-lot growth, basic demand, an annual
+tax/maintenance cycle, original vacant 3x3 development and the real
+network power scan. Complex effects and the full original economy
+are still future work. Native V20 hardware timings remain unmeasured;
+the phased scheduler may need tuning after testing.
 
 ## License
 
@@ -338,3 +349,47 @@ editor behavior and have no transactional preview yet.
 
 Use F2 to save a new CTY/ZON pair, and always keep the companion ZON
 file for irregular zoning. Neither preview nor cancel rewrites saves.
+
+## Live simulation milestone
+
+**Controls:** G pauses and resumes; + / - adjust simulation speed
+between 1x and 4x. The top status line now shows current in-game
+month/year, residents, jobs, and simulation speed. The left toolbox
+continues to show the actual saved funds balance.
+
+Automatic city updates use small timed batches (up to 320 map squares
+per update), keyed to the DOS BIOS time-of-day timer. The simulation
+advances even when you use keyboard-only /NOMOUSE mode; it does not
+block waiting for keyboard input. To avoid corrupting menu and preview
+graphics, updates temporarily stop while a menu/dialog or an active
+construction preview is on screen.
+
+Newly zoned 1x1 lots develop only when they have road access and
+adjacent **powered** infrastructure. Residential builds first; jobs
+depend on housing demand. Loss of road access or electricity gradually
+reduces development. Vacant original 3x3 plots can develop complete
+nine-tile original buildings when power, road and demand permit;
+existing 3x3 buildings are not reworked. The underlying map tiles of
+custom 1x1 zones do not change, and their growth levels are saved in
+the new backward-compatible ZON v3 sidecar.
+
+Each full map scan advances four classic Micropolis CityTime units,
+equivalent to one game month. At the end of each simulated year,
+a simple RCI-based tax income and road/wire/plant maintenance cost
+are applied to saved funds. The tax rate is read from the original
+Micropolis CTY header. This is an **experimental economy**, not the
+complete original Micropolis budget system.
+
+To test growth immediately without finding a suitable location in an
+existing save, run `MICROPOL` without arguments: a powered sample
+neighborhood appears in view, with roads, a coal plant, and empty RCI
+zones. Use G and +/- to explore simulation behavior. On the real
+Tandy EX, please evaluate smoothness during city development and
+whether the selected original 1x1 commercial/industrial artwork
+looks coherent.
+
+To meet the 16-bit linker’s **64KB DGROUP** limit, the power scanner's
+24KB BFS work queue is now allocated once from the large-model
+far heap instead of permanent near/static memory. The simulation
+itself uses no large extra map arrays other than the 3KB
+per-tile development bitmap.
