@@ -574,7 +574,7 @@ static void draw_status(void)
     for (x = 0; x < SCREEN_W / 8U; ++x)
         solid_tile(x * 8U, 192U, 1);
     if (placement_active()) {
-        sprintf(status, "COST:$%ld LEFT:$%ld %u OK %u X",
+        sprintf(status, "C:%ld R:%ld +%u -%u",
                 placement_cost(), placement_remaining(),
                 placement_count(), placement_rejected());
     } else {
@@ -668,9 +668,9 @@ static void draw_info_page(void)
         bios_text(6U, 3U, "MOUSE SUPPORT: DOS INT 33H", 15U);
         bios_text(8U, 3U, "RUN A SERIAL MOUSE DRIVER", 14U);
         bios_text(9U, 3U, "BEFORE STARTING MICROPOL", 14U);
-        bios_text(11U, 3U, "LEFT: MENU / BUILD / DRAW", 14U);
-        bios_text(12U, 3U, "RIGHT: ERASE ZONE / TOOLS", 14U);
-        bios_text(13U, 3U, "DRAG: RCI ZONES / ROADS", 14U);
+        bios_text(11U, 3U, "LEFT DRAG: PREVIEW BUILD", 14U);
+        bios_text(12U, 3U, "RELEASE: BUY / BUILD", 14U);
+        bios_text(13U, 3U, "RIGHT: ERASE ZONE / TOOLS", 14U);
         bios_text(14U, 3U, "KEYBOARD ALWAYS WORKS", 14U);
         bios_text(16U, 3U, "ESC / CLICK TO RETURN", 15U);
     } else {
@@ -859,11 +859,9 @@ static void build_preview_move(unsigned int x, unsigned int y)
 static void build_preview_finish(void)
 {
     unsigned int x0, y0, x1, y1, applied;
-    long paid;
     if (!build_drag_active)
         return;
     placement_bounds(&x0, &y0, &x1, &y1);
-    paid = placement_cost();
     applied = placement_commit();
     build_drag_active = 0;
     last_action = applied ? "BUILT" : "BLOCKED";
@@ -874,7 +872,6 @@ static void build_preview_finish(void)
          */
         draw_overview();
         draw_toolbox();
-        (void)paid;
     }
     draw_status();
 }
@@ -973,14 +970,9 @@ static void show_menu(enum ui_menu menu)
  * crosses into a new map tile. Dragging only edits single-tile tools,
  * preventing accidental 3x3/4x4 buildings during a mouse stroke.
  */
-static int drag_enabled(void)
-{
-    return selected_zone_kind() != ZONE_NONE ||
-           selected_tool == EDIT_ROAD ||
-           selected_tool == EDIT_POWER ||
-           selected_tool == EDIT_BULLDOZE;
-}
-
+/* Roads, wires and RCI zones now share the mouse preview transaction;
+ * bulldoze continues as immediate single-cell erasing.
+ */
 static void handle_mouse(void)
 {
     struct mouse_state state;
