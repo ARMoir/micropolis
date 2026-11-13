@@ -717,18 +717,32 @@ static void render_full(void)
 static int save_city_new_file(void)
 {
     unsigned int slot;
-    char filename[13];
+    char cityname[13], zonename[13];
     FILE *f;
 
-    /* DOS 8.3 filenames, never overwrite any existing source or save. */
+    /* DOS 8.3 names, skip a slot if EITHER file exists. Don't clobber
+     * an orphan .ZON file left by a failed previous save operation.
+     */
     for (slot = 1U; slot < 10000U; ++slot) {
-        sprintf(filename, "CITY%04u.CTY", slot);
-        f = fopen(filename, "rb");
+        sprintf(cityname, "CITY%04u.CTY", slot);
+        sprintf(zonename, "CITY%04u.ZON", slot);
+        f = fopen(cityname, "rb");
         if (f != NULL) {
             fclose(f);
             continue;
         }
-        return city_save_as(filename);
+        f = fopen(zonename, "rb");
+        if (f != NULL) {
+            fclose(f);
+            continue;
+        }
+        if (!city_save_as(cityname))
+            return 0;
+        if (!zoning_save(zonename)) {
+            last_action = "ZON ERR";
+            return 0;
+        }
+        return 1;
     }
     return 0;
 }
@@ -752,16 +766,33 @@ static void select_tool(unsigned int number)
 
 static void apply_selected_tool(void)
 {
+    unsigned int kind = selected_zone_kind();
+    unsigned int mx = scroll_x + cursor_x;
+    unsigned int my = scroll_y + cursor_y;
+    int erased = 0;
+    if (kind != ZONE_NONE) {
+        apply_zone_stroke(mx, my, mx, my, kind);
+        return;
+    }
     if (selected_tool == EDIT_INSPECT) {
         last_action = "INSPECT";
-    } else if (edit_place(selected_tool, scroll_x + cursor_x,
-                          scroll_y + cursor_y)) {
-        last_action = "PLACED";
-        redraw_edit_area();
-        draw_cursor();
-        draw_overview();
     } else {
-        last_action = "BLOCKED";
+        if (selected_tool == EDIT_BULLDOZE)
+            erased = zoning_set(mx, my, ZONE_NONE);
+        if (edit_place(selected_tool, mx, my)) {
+            last_action = "PLACED";
+            redraw_edit_area();
+            draw_cursor();
+            draw_overview();
+        } else if (erased) {
+            last_action = "UNZONED";
+        } else {
+            last_action = "BLOCKED";
+        }
+        if (erased) {
+            redraw_zoning_brush(mx, my, mx, my);
+            draw_overview();
+        }
     }
     draw_status();
 }
@@ -814,7 +845,8 @@ static void show_menu(enum ui_menu menu)
  */
 static int drag_enabled(void)
 {
-    return selected_tool == EDIT_ROAD ||
+    return selected_zone_kind() != ZONE_NONE ||
+           selected_tool == EDIT_ROAD ||
            selected_tool == EDIT_POWER ||
            selected_tool == EDIT_BULLDOZE;
 }
