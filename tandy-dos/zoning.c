@@ -151,6 +151,18 @@ unsigned int zoning_paint_line(unsigned int x0, unsigned int y0,
     return count;
 }
 
+unsigned int zoning_edge_mask(unsigned int x, unsigned int y)
+{
+    unsigned int kind = zoning_at(x, y), mask = 0U;
+    if (!kind || x >= CITY_WIDTH || y >= CITY_HEIGHT)
+        return 0U;
+    if (y == 0U || zoning_at(x, y - 1U) != kind) mask |= 1U;
+    if (x + 1U >= CITY_WIDTH || zoning_at(x + 1U, y) != kind) mask |= 2U;
+    if (y + 1U >= CITY_HEIGHT || zoning_at(x, y + 1U) != kind) mask |= 4U;
+    if (x == 0U || zoning_at(x - 1U, y) != kind) mask |= 8U;
+    return mask;
+}
+
 unsigned int zoning_count(unsigned int kind)
 {
     unsigned int i, count = 0U;
