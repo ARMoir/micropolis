@@ -28,5 +28,9 @@ unsigned short city_at(unsigned int x, unsigned int y);
 long city_get_funds(void);
 void city_set_funds(long funds);
 int city_spend_funds(long cost);
+long city_get_time(void);
+void city_set_time(long ticks);
+unsigned int city_get_tax_rate(void);
+void city_set_tax_rate(unsigned int rate);
 
 #endif
