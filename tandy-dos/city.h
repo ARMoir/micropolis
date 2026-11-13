@@ -20,6 +20,12 @@ int city_save_as(const char *path);
 void city_set(unsigned int x, unsigned int y, unsigned short tile);
 void city_make_demo(void);
 unsigned short city_at(unsigned int x, unsigned int y);
+/* Choose a useful first camera position in an imported city, using
+ * the densest existing residential/commercial/industrial neighborhood.
+ * Writes a clamped viewport TOP-LEFT. Returns 0 for empty cities.
+ */
+int city_suggest_view(unsigned int view_w, unsigned int view_h,
+                      unsigned int *left, unsigned int *top);
 
 /* Original Micropolis MiscHis[50..51] funds field, big-endian signed 32.
  * Original .CTY funds are loaded and saved intact except when construction
