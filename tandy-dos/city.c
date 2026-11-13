@@ -50,6 +50,48 @@ int city_spend_funds(long cost)
     return 1;
 }
 
+/* Original CityTime and CityTax fields are stored in the same
+ * MiscHis area as funds; keep the classic .CTY layout byte-perfect.
+ */
+#define TIME_OFFSET (6U * 480U + 8U * 2U)
+#define TAX_OFFSET  (6U * 480U + 56U * 2U)
+
+long city_get_time(void)
+{
+    unsigned long n = ((unsigned long)city_header[TIME_OFFSET] << 24) |
+                      ((unsigned long)city_header[TIME_OFFSET + 1U] << 16) |
+                      ((unsigned long)city_header[TIME_OFFSET + 2U] << 8) |
+                      ((unsigned long)city_header[TIME_OFFSET + 3U]);
+    if (n > 2147483647UL)
+        return 0L;
+    return (long)n;
+}
+
+void city_set_time(long ticks)
+{
+    unsigned long n = ticks > 0L ? (unsigned long)ticks : 0UL;
+    if (n > 2147483647UL) n = 2147483647UL;
+    city_header[TIME_OFFSET] = (unsigned char)(n >> 24);
+    city_header[TIME_OFFSET + 1U] = (unsigned char)(n >> 16);
+    city_header[TIME_OFFSET + 2U] = (unsigned char)(n >> 8);
+    city_header[TIME_OFFSET + 3U] = (unsigned char)n;
+}
+
+unsigned int city_get_tax_rate(void)
+{
+    unsigned int rate =
+        ((unsigned int)city_header[TAX_OFFSET] << 8) |
+        (unsigned int)city_header[TAX_OFFSET + 1U];
+    return rate <= 20U ? rate : 7U;
+}
+
+void city_set_tax_rate(unsigned int rate)
+{
+    if (rate > 20U) rate = 20U;
+    city_header[TAX_OFFSET] = (unsigned char)(rate >> 8);
+    city_header[TAX_OFFSET + 1U] = (unsigned char)rate;
+}
+
 unsigned short city_at(unsigned int x, unsigned int y)
 {
     if (x >= CITY_WIDTH || y >= CITY_HEIGHT)
@@ -169,4 +211,5 @@ void city_make_demo(void)
         }
     }
     city_set_funds(20000L); /* editor-only demo starting balance */
+    city_set_tax_rate(7U);
 }
