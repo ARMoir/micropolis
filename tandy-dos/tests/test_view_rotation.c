@@ -59,6 +59,22 @@ int main(void)
     assert(view_rotation_edges(2U,10U)==10U);
     assert(view_rotation_width(4U)==120U);
     assert(view_rotation_width(5U)==100U);
+    /* A multi-tile sprite stays visually upright by selecting its
+     * matching source piece at the new screen-relative position.
+     */
+    for(turn=0U;turn<4U;++turn) {
+        unsigned int span;
+        for(span=3U;span<=4U;++span)
+            for(x=0U;x<span*span;++x) {
+                unsigned int part=view_rotation_upright_part(turn,span,x);
+                unsigned int inverse=(4U-turn)&3U;
+                assert(part<span*span);
+                assert(view_rotation_upright_part(inverse,span,part)==x);
+            }
+    }
+    assert(view_rotation_upright_part(1U,3U,0U)==2U);
+    assert(view_rotation_upright_part(1U,3U,4U)==4U);
+    assert(view_rotation_upright_part(1U,4U,0U)==3U);
     puts("120x100 rotation, zone edges, viewport bounds and map integrity passed");
     return 0;
 }
