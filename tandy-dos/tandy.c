@@ -602,7 +602,7 @@ static void draw_info_page(void)
         bios_text(8U, 3U, "ARROWS / WASD  PAN CITY", 14U);
         bios_text(9U, 3U, "I J K L       MOVE CURSOR", 14U);
         bios_text(10U, 3U, "0..7          SELECT TOOLS", 14U);
-        bios_text(11U, 3U, "SPACE         BUILD / DOZE", 14U);
+        bios_text(11U, 3U, "SPACE         ZONE 1X1 / BUILD", 14U);
         bios_text(12U, 3U, "F2            SAVE AS", 14U);
         bios_text(13U, 3U, "P             POWER SCAN", 14U);
         bios_text(14U, 3U, "F T V H       OPEN MENUS", 14U);
@@ -612,8 +612,8 @@ static void draw_info_page(void)
         bios_text(8U, 3U, "RUN A SERIAL MOUSE DRIVER", 14U);
         bios_text(9U, 3U, "BEFORE STARTING MICROPOL", 14U);
         bios_text(11U, 3U, "LEFT: MENU / BUILD / DRAW", 14U);
-        bios_text(12U, 3U, "RIGHT: TOOLS MENU", 14U);
-        bios_text(13U, 3U, "DRAG: ROADS, WIRES, DOZE", 14U);
+        bios_text(12U, 3U, "RIGHT: ERASE ZONE / TOOLS", 14U);
+        bios_text(13U, 3U, "DRAG: RCI ZONES / ROADS", 14U);
         bios_text(14U, 3U, "KEYBOARD ALWAYS WORKS", 14U);
         bios_text(16U, 3U, "ESC / CLICK TO RETURN", 15U);
     } else {
@@ -1119,8 +1119,13 @@ static void keyboard_loop(void)
             ++cursor_y;
         else if (ascii >= '0' && ascii <= '7')
             select_tool((unsigned int)(ascii - '0'));
-        else if (ascii == ' ')
+        else if (ascii == ' ') {
             apply_selected_tool();
+            if (zone_minimap_dirty) {
+                draw_overview();
+                zone_minimap_dirty = 0;
+            }
+        }
         else if (ascii == 'p' || ascii == 'P')
             run_menu_action(UI_SCAN_POWER);
         else if (scan == 0x3cU)
@@ -1157,15 +1162,37 @@ static void keyboard_loop(void)
     }
 }
 
+/* Map a normal DOS 8.3 city save to its optional zone sidecar. */
+static int zoning_sidecar_name(const char *cityname,
+                               char *dest, unsigned int capacity)
+{
+    char *extension;
+    unsigned int length = (unsigned int)strlen(cityname);
+    if (length + 5U >= capacity)
+        return 0;
+    strcpy(dest, cityname);
+    extension = strrchr(dest, '.');
+    if (extension != NULL)
+        strcpy(extension, ".ZON");
+    else
+        strcat(dest, ".ZON");
+    return 1;
+}
+
 int main(int argc, char **argv)
 {
     int i, have_city = 0, allow_mouse = 1;
+    char sidecar[256];
     for (i = 1; i < argc; ++i) {
         if (strcmp(argv[i], "/NOMOUSE") == 0 ||
             strcmp(argv[i], "-NOMOUSE") == 0) {
             allow_mouse = 0;
         } else if (!have_city && city_load(argv[i])) {
             have_city = 1;
+            zoning_seed_from_city();
+            if (zoning_sidecar_name(argv[i], sidecar,
+                                    (unsigned int)sizeof(sidecar)))
+                (void)zoning_load(sidecar);
         } else {
             fprintf(stderr,
                     "Unrecognized argument or invalid 27120-byte city: %s\n",
@@ -1173,8 +1200,10 @@ int main(int argc, char **argv)
             return 1;
         }
     }
-    if (!have_city)
+    if (!have_city) {
         city_make_demo();
+        zoning_seed_from_city();
+    }
 
     old_mode = current_video_mode();
     set_video_mode(9);
