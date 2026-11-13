@@ -21,12 +21,22 @@ project. It targets the NEC V20-equipped Tandy 1000 EX.
   those cars collapse into visual noise at 8x8. Use the converter's
   `--preserve-traffic` flag to produce the unmodified 8x8 traffic variants.
   Runtime data: **30,720-byte TILES.DAT**.
-- Visible cursor, road/power placement, 3x3 R/C/I zones and original 4x4 coal power plant
-  placement, with original Micropolis tile IDs/flags, and a simple bulldozer.
+- **Per-square freeform zoning** for residential (green), commercial (blue),
+  and industrial (yellow): single 1x1 tiles or irregular painted areas.
+  External borders join adjacent same-type zones instead of showing an
+  artificial grid through every connected zoning area.
+- Visible cursor, road/power placement, original 4x4 coal power plant
+  placement, and a basic bulldozer. The old 3x3 RCI builder code remains
+  available for original-format regression tests but is no longer used
+  by the user-facing RCI construction tools.
 - First isolated simulation subsystem: power-network reachability from coal/nuclear
   plant centers, using the original conductor flags and 700/2000 tile capacities.
   Triggered manually using P; no automatic simulation ticking yet.
-- **Save as a new .CTY file**, never overwrite an existing file.
+- **Save as a matching .CTY / .ZON pair**, never overwrite any existing
+  city or sidecar. The existing .CTY keeps the original map and sprites;
+  the optional 12,008-byte .ZON file contains per-tile custom zoning.
+  When a city file is loaded, its matching .ZON is loaded automatically
+  if valid; otherwise original 3x3 zone centers seed the overlay.
 - **Classic city-builder layout:** cyan top menu bar, beveled left-side
   two-column construction toolbox with miniature authentic Micropolis
   tile icons, city window to the right, a compact city overview, and
@@ -36,8 +46,11 @@ project. It targets the NEC V20-equipped Tandy 1000 EX.
 - **Optional DOS mouse support** using INT 33h, with its own small software
   arrow to work in Tandy graphics mode 9 even if the mouse driver's own
   cursor graphics do not support that video mode.
-- Left-click to select a tool or build, right-click for Tools menu, and
-  click-drag to paint roads, wires or bulldozer tiles. No mouse required.
+- Left-click to select a tool or build. Hold left-click and drag R/C/I
+  tools to **paint custom zoning**; right-click or right-drag within the
+  city while an RCI tool is selected to erase *only the zoning*, never
+  buildings or roads. For other tools, right-click opens the Tools menu.
+  Keyboard zoning still works one square at a time. No mouse required.
 - Original demo-city generator and fallback colored glyph art if TILES.DAT
   isn't present.
 
@@ -103,11 +116,15 @@ MICROPOL HAPPISLE.CTY /NOMOUSE
 
 Mouse controls: left-click a **menu name** to open its dropdown,
 left-click a **tool icon** in the left sidebar to select it, left-click
-the main city window to apply that tool, and right-click for the **Tools** dropdown.
-Click and drag while using **Road**, **Power line**, or **Bulldoze** to
-paint consecutive tiles. The main map's yellow selection outline follows
-the mouse, while a small black-and-white pointer shows the exact
-pointer position. DOS keyboard shortcuts remain functional.
+the main city window to apply that tool, and then **left-drag with a
+Residential / Commercial / Industrial tool** to draw any freeform shape.
+A click paints a *single tile*. Right-click / right-drag the city with
+a zoning tool to erase zoning without bulldozing underlying terrain or
+existing structures. With other tools, right-click opens the Tools
+dropdown. Road, power-line and bulldoze tools still support left-drag.
+The map's yellow selection outline follows the mouse, with a small
+black-and-white pointer showing the actual pointer position. Keyboard
+shortcuts remain functional.
 
 **Mouse movement and the cursor need testing on the real Tandy 1000
 EX**, especially with a serial mouse driver. This hardware has unusual
@@ -124,36 +141,46 @@ to its 320-pixel Tandy screen.
 | 0 | Inspect (no placement) |
 | 1 | Road |
 | 2 | Power line |
-| 3 | Residential zone |
-| 4 | Commercial zone |
-| 5 | Industrial zone |
+| 3 | Residential zoning brush (green, 1x1 or larger) |
+| 4 | Commercial zoning brush (blue, 1x1 or larger) |
+| 5 | Industrial zoning brush (yellow, 1x1 or larger) |
 | 6 | Bulldoze (one tile) |
 | 7 | Construct 4x4 coal power plant (16 empty tiles required) |
 | P | Recalculate powered tiles and show the count in the bottom status bar |
-| Space | Apply the selected tool at the cursor |
+| Space | Apply selected tool at cursor (zones one square) |
 | F2 | Save a **new** city file in the current directory |
 | F / T / V / H (or F10 for System) | Open System / Tools / View / Help menu |
 | Arrow keys + Enter (menu open) | Navigate and choose menu items |
 | Esc | Close menu/help window; otherwise exit and restore DOS video mode |
 
-F2 finds the first available `CITY0001.CTY`, `CITY0002.CTY`,
-and so on. It never overwrites a file that already exists. Copy the
-result from your CF card for inspection, or load it using
-`MICROPOL CITY0001.CTY`.
+F2 finds the first **free pair** of `CITY0001.CTY` /
+`CITY0001.ZON`, `CITY0002.CTY` / `CITY0002.ZON`, etc.
+It never overwrites either file. **Keep both files together**, and load
+as usual with `MICROPOL CITY0001.CTY`. The zoning file is loaded
+automatically if present. A vanilla Micropolis program can still read
+the .CTY, but it will not understand custom zones stored in .ZON.
 
-Construction is intentionally conservative: roads/wires require
-empty or wooded non-water terrain, 3x3 zones require nine empty tiles,
-and the bulldozer only clears one tile. Complex building-demolition
+Construction is intentionally conservative: roads/wires and custom zones
+require empty/wooded non-water terrain, or a custom zone of the same
+type may be drawn over its original occupied building sprites.
+Custom zones can be 1x1 or any freehand shape, but roads, water and
+unrelated structures are not silently overwritten. The bulldozer
+clears one tile; zoning erase removes *only the zoning layer*. Complex building-demolition
 rules, cost calculations and full simulation tick scheduling are
 **not yet integrated**. Road/wire adjacency tile selection is implemented,
 but rail/bridge crossings and terrain correction need further work. A `BLOCKED` indicator means placement is
 disallowed.
 
-**Important:** Although edited maps are written in the original .CTY
-file layout, we have not yet integrated the original simulation rules
-or validated edited maps as playable cities in another Micropolis port.
-Keep your original save files. The generated demo has empty
-budget/history metadata and is for renderer/editor tests only.
+**Important:** New single-square zone art uses existing authentic
+Micropolis sprites: a small house, the commercial empty-zone center,
+and the industrial empty-zone center. These are visual placeholders
+on undeveloped dirt, not actual generated businesses or factories.
+The new per-tile zone overlay is **not consumed by the original 3x3
+simulation yet**. We still need to port the city-growth rules and
+adapt them to support small buildings, including true 1x1 commercial
+and industrial assets when suitable. Original city buildings and
+sprite IDs remain untouched. Treat this build as a zoning-editor
+prototype, not a completed city simulation. Keep your original saves.
 
 ## Cross-compiler / build
 
@@ -164,7 +191,7 @@ To build manually with Open Watcom for DOS:
 
 ```sh
 python3 tandy-dos/tools/convert_tiles.py micropolis-activity/images/tiles.xpm TILES.DAT
-wcl -bcl=dos -0 -ml -q -fe=MICROPOL.EXE tandy-dos/tandy.c tandy-dos/city.c tandy-dos/editor.c tandy-dos/connections.c tandy-dos/engine.c tandy-dos/ui.c tandy-dos/mouse.c
+wcl -bcl=dos -0 -ml -q -fe=MICROPOL.EXE tandy-dos/tandy.c tandy-dos/city.c tandy-dos/editor.c tandy-dos/connections.c tandy-dos/engine.c tandy-dos/ui.c tandy-dos/mouse.c tandy-dos/zoning.c
 ```
 
 Host-side regression tests for loading/saving cities and editing zones:
@@ -178,6 +205,8 @@ cc -std=c89 -Wall -Wextra -pedantic -o test-engine tandy-dos/city.c tandy-dos/en
 ./test-engine
 cc -std=c89 -Wall -Wextra -pedantic -o test-ui tandy-dos/ui.c tandy-dos/tests/test_ui.c
 ./test-ui
+cc -std=c89 -Wall -Wextra -pedantic -o test-zoning tandy-dos/city.c tandy-dos/zoning.c tandy-dos/tests/test_zoning.c
+./test-zoning
 ```
 
 ## Remaining simulation-port work
@@ -254,3 +283,31 @@ performance-tested on the real V20.
 
 Tool numbers, keyboard panning, map editing, save-as, power scan,
 optional DOS mouse handling and `/NOMOUSE` are unchanged.
+
+## Flexible single-tile zoning (new)
+
+The original 3x3 stamp is no longer the primary RCI editor action.
+Select RES, COM or IND, then left-drag to paint custom irregular areas,
+even if the desired area is only one square. The colors are classic
+light-green, light-blue and yellow; borders are drawn around connected
+areas, not between neighboring same-type cells. Sprite rendering,
+underlying city map data, and the faster right-window scroll are
+unchanged. Brush strokes interpolate across gaps when the V20's COM
+mouse sampling misses intermediate cells.
+
+Right-drag while an RCI tool is selected **removes just zoning**.
+It never bulldozes roads or buildings. Keyboard Space paints one tile
+at the yellow cursor.
+
+Edited zones are held in a static 12,000-byte grid and saved to
+`CITYnnnn.ZON` sidecars, preserving the .CTY map. The parser validates
+the exact size, magic/version, map dimensions, and every zoning byte
+before applying a sidecar. On original cities without a sidecar,
+3x3 zone centers are used to reconstruct their existing colored zones.
+
+The original Micropolis simulation engine does **not** yet grow
+buildings within arbitrary per-square zoning. A future growth port
+must choose appropriate original sprites by parcel size, including
+one-square commercial and industrial artwork, while respecting
+roads and power. This build proves editing, color borders, and
+persistence without claiming automatic development.
