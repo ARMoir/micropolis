@@ -86,6 +86,34 @@ int main(void)
     simulation_mark_power_dirty();
     run_months(100U);
     assert(zoning_development_at(15U,11U) == 0U);
-    puts("Phased growth, power/road access, date, taxes and save tests passed");
+    /* An untouched authentic vacant 3x3 RCI plot must be eligible for
+     * complete nine-sprite development when ring-road and power exist.
+     */
+    for (x=0U; x<CITY_WIDTH; ++x)
+        for (y=0U; y<CITY_HEIGHT; ++y)
+            city_set(x,y,0U);
+    zoning_clear();
+    city_set_time(0L);
+    city_set_funds(20000L);
+    city_set(23U,29U,750U | 1024U | 16384U);
+    for (x=24U; x<=28U; ++x)
+        city_set(x,29U,208U | 16384U);
+    for (y=0U; y<3U; ++y)
+        for (x=0U; x<3U; ++x) {
+            unsigned short value = (unsigned short)(240U + y*3U + x +
+                                                     8192U + 16384U);
+            if (x == 1U && y == 1U)
+                value |= 1024U;
+            city_set(29U+x,29U+y,value);
+        }
+    city_set(32U,30U,66U | 8192U | 4096U);
+    simulation_init();
+    run_months(24U);
+    assert((city_at(30U,30U) & 1023U) == 265U);
+    assert((city_at(29U,29U) & 1023U) == 261U);
+    assert((city_at(31U,31U) & 1023U) == 269U);
+    assert((city_at(30U,30U) & 1024U) != 0U);
+    assert((city_at(32U,30U) & 1023U) == 66U);
+    puts("Phased RCI growth (1x1 and original 3x3), clock, taxes and persistence passed");
     return 0;
 }
