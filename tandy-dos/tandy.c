@@ -962,6 +962,7 @@ static void draw_info_page(void)
         bios_text(12U, 3U, "G  PAUSE   +/-  SPEED", 14U);
         bios_text(13U, 3U, "F2 SAVE     P POWER SCAN", 14U);
         bios_text(14U, 3U, "G=GROWTH  R=READY LOTS", 14U);
+        bios_text(15U, 3U, "r CW   SHIFT+R CCW", 14U);
         bios_text(16U, 3U, "ESC / ANY KEY TO RETURN", 15U);
     } else if (info_page == 2) {
         bios_text(6U, 3U, "MOUSE SUPPORT: DOS INT 33H", 15U);
@@ -1274,6 +1275,28 @@ static void apply_selected_tool(void)
     draw_status();
 }
 
+/* Rotate the camera about the selected WORLD square, never the city
+ * map itself. Render original TILES.DAT sprites upright in new positions.
+ * The 120x100 map becomes a 100x120 virtual map at 90/270 degrees.
+ */
+static void rotate_view(int clockwise)
+{
+    unsigned int wx,wy;
+    if (build_drag_active)
+        build_preview_cancel(); /* never change view mid-purchase */
+    zone_erase_active = 0;
+    display_to_world(cursor_x,cursor_y,&wx,&wy);
+    map_turns = (map_turns + (clockwise ? 1U : 3U)) & 3U;
+    view_rotation_focus(map_turns,wx,wy,VIEW_W,VIEW_H,
+                        &scroll_x,&scroll_y,&cursor_x,&cursor_y);
+    zone_minimap_dirty = 0;
+    last_action = clockwise ? "ROT CW" : "ROT CCW";
+    /* An explicit quarter-turn costs one full redraw. Normal panning
+     * still uses the fast one-tile VRAM scrolling branches.
+     */
+    render_full();
+}
+
 static void run_menu_action(enum ui_action action)
 {
     unsigned int powered;
@@ -1302,6 +1325,8 @@ static void run_menu_action(enum ui_action action)
         cursor_y = VIEW_H / 2U;
         last_action = "CENTER";
         break;
+    case UI_ROTATE_CW: rotate_view(1); break;
+    case UI_ROTATE_CCW: rotate_view(0); break;
     case UI_HELP_KEYS: info_page = 1; break;
     case UI_HELP_MOUSE: info_page = 2; break;
     case UI_HELP_ABOUT: info_page = 3; break;
@@ -1625,6 +1650,11 @@ static void keyboard_loop(void)
                 last_action = "NO GROWTH";
                 draw_status();
             }
+            mouse_pointer_show();
+            continue;
+        }
+        if (ascii == 'r' || ascii == 'R') {
+            rotate_view(ascii == 'r');
             mouse_pointer_show();
             continue;
         }
