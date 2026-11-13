@@ -1041,7 +1041,12 @@ static void build_preview_finish(void)
     last_action = applied ? "BUILT" : "BLOCKED";
     redraw_zoning_brush(x0, y0, x1, y1);
     if (applied != 0U) {
-        simulation_mark_power_dirty();
+        /* Zoning-only edits cannot alter conductor flags. Only actual
+         * roads/wires (or the legacy bulldoze/coal path) invalidate the
+         * expensive full-city electricity map.
+         */
+        if (selected_tool == EDIT_ROAD || selected_tool == EDIT_POWER)
+            simulation_mark_power_dirty();
         /* Static minimap and sidebar funds are only repainted once
          * per completed drag, not on each V20 mouse polling event.
          */
@@ -1432,6 +1437,31 @@ static void keyboard_loop(void)
             exit_requested = 1;
             break;
         }
+        if (ascii == 9U) {
+            /* Tab follows the last simulated development without
+             * automatically yanking the camera around during play.
+             * The normal yellow selection cursor highlights its tile.
+             */
+            if (simulation_has_last_change()) {
+                unsigned int gx, gy;
+                simulation_last_change(&gx, &gy);
+                scroll_x = gx > VIEW_W/2U ? gx-VIEW_W/2U : 0U;
+                scroll_y = gy > VIEW_H/2U ? gy-VIEW_H/2U : 0U;
+                if (scroll_x > CITY_WIDTH-VIEW_W)
+                    scroll_x = CITY_WIDTH-VIEW_W;
+                if (scroll_y > CITY_HEIGHT-VIEW_H)
+                    scroll_y = CITY_HEIGHT-VIEW_H;
+                cursor_x = gx-scroll_x;
+                cursor_y = gy-scroll_y;
+                last_action = "LAST GROWTH";
+                render_full();
+            } else {
+                last_action = "NO GROWTH";
+                draw_status();
+            }
+            mouse_pointer_show();
+            continue;
+        }
         if (ascii == 'g' || ascii == 'G') {
             simulation_set_paused(!simulation_is_paused());
             draw_status();
@@ -1626,6 +1656,12 @@ int main(int argc, char **argv)
             allow_mouse = 0;
         } else if (!have_city && city_load(argv[i])) {
             have_city = 1;
+            /* Original HAPPISLE starts with water in the upper left.
+             * Start near actual homes so growth is visible to players.
+             * This is camera-only; it never changes the city file.
+             */
+            (void)city_suggest_view(VIEW_W, VIEW_H,
+                                    &scroll_x, &scroll_y);
             zoning_seed_from_city();
             if (zoning_sidecar_name(argv[i], sidecar,
                                     (unsigned int)sizeof(sidecar)))
