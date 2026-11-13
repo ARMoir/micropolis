@@ -21,6 +21,28 @@ void tandy_init_scanlines(void)
                              ((y >> 2) * TANDY_SCANLINE_BYTES));
 }
 
+/* Restrict blanking to the city window: unlike a mode reset or full
+ * renderer pass, this never writes any toolbar, HUD or minimap pixels.
+ * The fill is outside timed sections; its cost cannot skew the ratio.
+ */
+void tandy_fill_region(volatile unsigned char TANDY_FAR *screen,
+                       unsigned int start_byte, unsigned int top_line,
+                       unsigned int width_bytes, unsigned int line_count,
+                       unsigned char packed_color)
+{
+    unsigned int y, offset, x;
+    if (start_byte >= TANDY_SCANLINE_BYTES ||
+        top_line >= TANDY_SCANLINES ||
+        width_bytes > TANDY_SCANLINE_BYTES - start_byte ||
+        line_count > TANDY_SCANLINES - top_line)
+        return;
+    for (y = 0U; y < line_count; ++y) {
+        offset = tandy_scanlines[top_line + y] + start_byte;
+        for (x = 0U; x < width_bytes; ++x)
+            screen[offset + x] = packed_color;
+    }
+}
+
 void tandy_move_words(volatile unsigned char TANDY_FAR *screen,
                       unsigned int dst_offset, unsigned int src_offset,
                       unsigned int words, int backwards)
