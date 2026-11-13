@@ -34,7 +34,7 @@ project. It targets the NEC V20-equipped Tandy 1000 EX.
   Triggered manually using P; no automatic simulation ticking yet.
 - **Save as a matching .CTY / .ZON pair**, never overwrite any existing
   city or sidecar. The existing .CTY keeps the original map and sprites;
-  the optional 12,008-byte .ZON file contains per-tile custom zoning.
+  the optional 3,010-byte .ZON file contains per-tile custom zoning.
   When a city file is loaded, its matching .ZON is loaded automatically
   if valid; otherwise original 3x3 zone centers seed the overlay.
 - **Classic city-builder layout:** cyan top menu bar, beveled left-side
@@ -299,9 +299,9 @@ Right-drag while an RCI tool is selected **removes just zoning**.
 It never bulldozes roads or buildings. Keyboard Space paints one tile
 at the yellow cursor.
 
-Edited zones are held in a static 12,000-byte grid and saved to
+Edited zones are held in a static 3,000-byte 2-bit-per-tile grid and saved to
 `CITYnnnn.ZON` sidecars, preserving the .CTY map. The parser validates
-the exact size, magic/version, map dimensions, and every zoning byte
+the exact size, magic/version, map dimensions, and the 16-bit checksum
 before applying a sidecar. On original cities without a sidecar,
 3x3 zone centers are used to reconstruct their existing colored zones.
 
