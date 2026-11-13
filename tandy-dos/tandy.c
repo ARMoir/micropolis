@@ -1678,14 +1678,14 @@ int main(int argc, char **argv)
         free(art_data); /* art buffer used only in graphics mode */
     if (bench_mode) {
         puts("MICROPOL /BENCH - Tandy mode 9, 32x21 city viewport");
-        printf("Full redraw x2     : %lu ticks (~%lu ms)\\n",
+        printf("Full redraw x2     : %lu ticks (~%lu ms)\n",
                bench_full_ticks, bench_full_ticks*55UL);
-        printf("VRAM bytes x48     : %lu ticks (~%lu ms)\\n",
+        printf("VRAM bytes x48     : %lu ticks (~%lu ms)\n",
                bench_byte_ticks, bench_byte_ticks*55UL);
-        printf("VRAM 16-bit x48    : %lu ticks (~%lu ms)\\n",
+        printf("VRAM 16-bit x48    : %lu ticks (~%lu ms)\n",
                bench_word_ticks, bench_word_ticks*55UL);
         if (bench_word_ticks != 0UL)
-            printf("Copy speed ratio   : %lu%% (higher is faster)\\n",
+            printf("Copy speed ratio   : %lu%% (higher is faster)\n",
                    (bench_byte_ticks*100UL)/bench_word_ticks);
         puts("Clock resolution ~55ms. All copies preserve identical pixels.");
     }
