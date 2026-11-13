@@ -55,6 +55,11 @@ enum ui_action {
  */
 int ui_header_hit(unsigned int x, unsigned int y);
 int ui_toolbar_hit(unsigned int x, unsigned int y);
+/* Visual button order differs from stable 0..7 keyboard shortcuts.
+ * Keep mouse and keyboard tool selection equivalent.
+ */
+unsigned int ui_toolbar_tool(unsigned int button);
+unsigned int ui_toolbar_button(unsigned int tool_key);
 unsigned int ui_menu_origin(enum ui_menu menu);
 unsigned int ui_menu_count(enum ui_menu menu);
 int ui_dropdown_hit(enum ui_menu menu, unsigned int x, unsigned int y);
