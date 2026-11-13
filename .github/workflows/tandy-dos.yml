@@ -44,6 +44,11 @@ jobs:
           cc -std=c89 -Wall -Wextra -pedantic \
             -o test-zoning tandy-dos/city.c tandy-dos/zoning.c tandy-dos/tests/test_zoning.c
           ./test-zoning
+          cc -std=c89 -Wall -Wextra -pedantic \
+            -o test-placement tandy-dos/city.c tandy-dos/zoning.c \
+            tandy-dos/editor.c tandy-dos/connections.c \
+            tandy-dos/placement.c tandy-dos/tests/test_placement.c
+          ./test-placement
 
       - name: Convert original Micropolis tile art to Tandy format
         run: |
@@ -84,7 +89,7 @@ jobs:
         run: |
           wcl -bcl=dos -0 -ml -q -fe=MICROPOL.EXE \
             tandy-dos/tandy.c tandy-dos/city.c tandy-dos/editor.c tandy-dos/connections.c tandy-dos/engine.c \
-            tandy-dos/ui.c tandy-dos/mouse.c tandy-dos/zoning.c
+            tandy-dos/ui.c tandy-dos/mouse.c tandy-dos/zoning.c tandy-dos/placement.c
           test -s MICROPOL.EXE
           file MICROPOL.EXE
 
