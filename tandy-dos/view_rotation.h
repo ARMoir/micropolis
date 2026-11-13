@@ -29,4 +29,9 @@ unsigned int view_rotation_edges(unsigned int turns, unsigned int edges);
 unsigned int view_rotation_upright_part(unsigned int turns,
                                          unsigned int span,
                                          unsigned int part);
+/* Pick existing pre-rendered road/wire tile art in the new direction.
+ * No bitmap rotation, change to world tiles, or extra memory buffers.
+ */
+unsigned int view_rotation_utility_tile(unsigned int turns,
+                                         unsigned int graphic_id);
 #endif
