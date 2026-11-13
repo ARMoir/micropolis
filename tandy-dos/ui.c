@@ -74,6 +74,30 @@ int ui_header_hit(unsigned int x, unsigned int y)
     return MENU_NONE;
 }
 
+/* SimCity-inspired groups in the tiny 64-pixel sidebar:
+ * top: bulldozer + road; next: power + residential;
+ * next: commercial + industrial; bottom: inspect + coal plant.
+ * Tool numeric shortcuts remain unchanged. This indirection ensures
+ * mouse selection, highlighting, and keyboard keys always agree.
+ */
+static const unsigned char button_to_tool[8] = {
+    6U, 1U, 2U, 3U, 4U, 5U, 0U, 7U
+};
+
+unsigned int ui_toolbar_tool(unsigned int button)
+{
+    return button < 8U ? button_to_tool[button] : 0U;
+}
+
+unsigned int ui_toolbar_button(unsigned int tool_key)
+{
+    unsigned int i;
+    for (i=0U; i<8U; ++i)
+        if (button_to_tool[i] == tool_key)
+            return i;
+    return 6U; /* Inspect on invalid shortcut, no out-of-range index */
+}
+
 /* Two columns of 32x24 compact icon buttons. */
 int ui_toolbar_hit(unsigned int x, unsigned int y)
 {
