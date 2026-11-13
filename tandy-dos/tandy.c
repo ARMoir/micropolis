@@ -21,6 +21,7 @@
 #include "video_ops.h"
 #include "menu_font.h"
 #include "view_rotation.h"
+#include "tool_art.h"
 
 #define SCREEN_W 320U
 #define SCREEN_H 200U
@@ -497,13 +498,10 @@ static void bios_text(unsigned int row, unsigned int column,
 /* SimCity-style compact toolbox, custom-drawn in Tandy mode 9.
  * All of these pixels are OUTSIDE the map's VRAM scrolling rectangle.
  */
-/* Indices are stable DOS numeric tool shortcuts, NOT visual buttons.
- * Prefer recognizable occupied RCI sprites over empty-zone centers.
- * Inspect and Bulldoze use native 16x16 tool pictograms below.
+/* Road art is already easy to recognize, so retain it verbatim.
+ * Others use complete 16x16 pictograms instead of one enlarged map cell.
  */
-static const unsigned short tool_icons[8] = {
-    0U, 66U, 210U, 249U, 449U, 638U, 44U, 750U
-};
+#define ROAD_TOOL_TILE 66U
 static const char *const tool_labels[8] = {
     "INS", "RD", "PWR", "RES", "COM", "IND", "DOZ", "PLT"
 };
@@ -676,28 +674,38 @@ static void draw_tool_pictogram(unsigned int tool,
     }
 }
 
-/* Keep original tile artwork for road, power, housing, commerce,
- * industry and plant. The active icon stays crisply identifiable in
- * the narrow panel, and no extra graphic assets need shipping.
+/* Preserve the three hardware-approved icons: original road tile,
+ * bulldozer and inspector. The other five are genuinely readable
+ * 16x16 artwork, not an 8x8 fragment of an original 3x3 building.
  */
 static void draw_tool_art(unsigned int tool, unsigned int px,
                           unsigned int py)
 {
-    unsigned int ix,iy,src;
-    unsigned char packed,color;
+    unsigned int ix,iy,src,color;
+    unsigned char packed;
     if (tool == 0U || tool == 6U) {
         draw_tool_pictogram(tool,px,py);
         return;
     }
-    if (art_data == NULL)
+    if (tool_art_has_icon(tool)) {
+        for (iy=0U;iy<16U;++iy)
+            for (ix=0U;ix<16U;++ix) {
+                color=tool_art_pixel(tool,ix,iy);
+                if (color != TOOL_ART_TRANSPARENT)
+                    pixel(px+ix,py+iy,(unsigned char)color);
+            }
         return;
-    src = tool_icons[tool]*32U;
+    }
+    if (tool != 1U || art_data == NULL)
+        return;
+    src=ROAD_TOOL_TILE*32U;
     for (iy=0U;iy<8U;++iy)
         for (ix=0U;ix<8U;++ix) {
             packed=art_data[src+iy*4U+(ix>>1)];
-            color=(unsigned char)((ix&1U) ?
-                                  (packed&15U) : (packed>>4));
-            box_pixels(px+ix*2U,py+iy*2U,2U,2U,color);
+            color=(unsigned int)((ix&1U) ?
+                                 (packed&15U) : (packed>>4));
+            box_pixels(px+ix*2U,py+iy*2U,2U,2U,
+                       (unsigned char)color);
         }
 }
 
