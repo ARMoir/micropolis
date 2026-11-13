@@ -329,7 +329,7 @@ static unsigned int upright_building_graphic(unsigned int wx,
         return graphic; /* normal one-tile sprites remain upright */
     }
     part=graphic-first;
-    center_offset=span == 3U ? 1U : 1U; /* original zone flag center */
+    center_offset=1U; /* original zone flag is tile (1,1) */
     center_x=(int)wx + (int)center_offset - (int)(part%span);
     center_y=(int)wy + (int)center_offset - (int)(part/span);
     if (center_x<0 || center_y<0 || center_x>=CITY_WIDTH ||
@@ -384,6 +384,10 @@ static void draw_city_tile(unsigned int px, unsigned int py,
                 graphic = ind[stage];
             }
         }
+        /* Road and wire connections turn using ORIGINAL tiles.
+         * Multi-tile building art stays upright with no pixel rotation.
+         */
+        graphic = view_rotation_utility_tile(map_turns,graphic);
         draw_original_tile(px,py,
                            upright_building_graphic(mx,my,graphic));
         draw_zone_border(px, py, mx, my);
@@ -920,7 +924,7 @@ static void draw_status(void)
                 wx,wy,mouse_x,mouse_y);
     } else {
         sprintf(debug,"TOOL:%s MAP:%03u,%03u M:OFF",
-                tool_labels[tool_button_index(selected_tool)],wx,wy);
+                tool_labels[tool_key_from_enum(selected_tool)],wx,wy);
     }
     draw_status_text(23U,debug,debug_shadow,&debug_valid,11U);
     if (placement_active()) {
