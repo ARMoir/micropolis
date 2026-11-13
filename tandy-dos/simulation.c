@@ -279,6 +279,52 @@ static void update_date(void)
     stats.month = (unsigned int)((time / 4L) % 12L) + 1U;
 }
 
+/* A deliberately tiny powered neighborhood in the built-in demo
+ * lets users see zoned development immediately on the Tandy, rather
+ * than needing to locate a coal plant in an external original city.
+ * Never call this when loading somebody's authentic .CTY file.
+ */
+void simulation_seed_demo(void)
+{
+    unsigned int x, y, i, j;
+    unsigned short flags = 8192U | 16384U;
+    for (x=39U; x<=65U; ++x)
+        for (y=22U; y<=43U; ++y)
+            city_set(x,y,0U);
+
+    /* Original four-by-four coal-plant artwork and center zone flags. */
+    for (j=0U; j<4U; ++j)
+        for (i=0U; i<4U; ++i) {
+            unsigned short tile =
+                (unsigned short)(745U + 4U*j+i+flags);
+            if (i==1U && j==1U) tile |= 1024U;
+            city_set(41U+i,25U+j,tile);
+        }
+    for (x=45U; x<=49U; ++x)
+        city_set(x,26U,210U|flags|4096U);
+    for (y=27U; y<=30U; ++y)
+        city_set(49U,y,211U|flags|4096U);
+    for (x=49U; x<=61U; ++x)
+        city_set(x,30U,210U|flags|4096U);
+    for (y=31U; y<=40U; ++y)
+        city_set(61U,y,211U|flags|4096U);
+    for (x=49U; x<=59U; ++x)
+        city_set(x,32U,66U|8192U|4096U);
+    for (y=32U; y<=40U; ++y)
+        city_set(63U,y,67U|8192U|4096U);
+    /* RCI zones directly between a conductor and a road. */
+    for (x=50U; x<=59U; ++x) {
+        unsigned int kind =
+            x <= 54U ? ZONE_RES : (x <= 57U ? ZONE_IND : ZONE_COM);
+        (void)zoning_set(x,31U,kind);
+    }
+    for (y=33U; y<=40U; ++y) {
+        unsigned int kind = y <= 36U ? ZONE_RES :
+                            (y <= 38U ? ZONE_COM : ZONE_IND);
+        (void)zoning_set(62U,y,kind);
+    }
+}
+
 void simulation_init(void)
 {
     cursor = 0U;
