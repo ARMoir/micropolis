@@ -21,4 +21,12 @@ void city_set(unsigned int x, unsigned int y, unsigned short tile);
 void city_make_demo(void);
 unsigned short city_at(unsigned int x, unsigned int y);
 
+/* Original Micropolis MiscHis[50..51] funds field, big-endian signed 32.
+ * Original .CTY funds are loaded and saved intact except when construction
+ * explicitly spends money. Demo cities start with a test budget.
+ */
+long city_get_funds(void);
+void city_set_funds(long funds);
+int city_spend_funds(long cost);
+
 #endif
