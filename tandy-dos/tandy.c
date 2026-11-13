@@ -1010,14 +1010,13 @@ static void handle_mouse(void)
                 draw_cursor();
                 world_x = scroll_x + cursor_x;
                 world_y = scroll_y + cursor_y;
-                if (zone_drag_active && (state.buttons & 1U) &&
-                    (mouse_buttons & 1U) &&
-                    selected_zone_kind() != ZONE_NONE) {
-                    apply_zone_stroke(zone_drag_x, zone_drag_y,
-                                      world_x, world_y,
-                                      selected_zone_kind());
-                    zone_drag_x = world_x;
-                    zone_drag_y = world_y;
+                if (build_drag_active && (state.buttons & 1U ||
+                                         left_release)) {
+                    /* Mouse polling on a 7 MHz V20 can skip cells.
+                     * The preview model fills each interpolated path.
+                     * Even the final release position counts.
+                     */
+                    build_preview_move(world_x, world_y);
                 } else if (zone_erase_active && (state.buttons & 2U) &&
                            (mouse_buttons & 2U)) {
                     apply_zone_stroke(zone_drag_x, zone_drag_y,
@@ -1025,8 +1024,7 @@ static void handle_mouse(void)
                     zone_drag_x = world_x;
                     zone_drag_y = world_y;
                 } else if ((state.buttons & 1U) && (mouse_buttons & 1U) &&
-                           drag_enabled() &&
-                           selected_zone_kind() == ZONE_NONE) {
+                           selected_tool == EDIT_BULLDOZE) {
                     apply_selected_tool();
                 } else {
                     draw_status();
@@ -1038,9 +1036,6 @@ static void handle_mouse(void)
                 menu_highlight = (unsigned int)item;
                 draw_menu_popup();
             }
-        } else if (!inside) {
-            zone_drag_active = 0;
-            zone_erase_active = 0;
         }
         mouse_x = state.x;
         mouse_y = state.y;
@@ -1058,9 +1053,8 @@ static void handle_mouse(void)
                 if (menu == open_menu) {
                     open_menu = MENU_NONE;
                     render_full();
-                } else {
+                } else
                     show_menu((enum ui_menu)menu);
-                }
             } else {
                 item = ui_dropdown_hit(open_menu, state.x, state.y);
                 if (item >= 0) {
@@ -1068,9 +1062,8 @@ static void handle_mouse(void)
                         ui_menu_command(open_menu, (unsigned int)item);
                     open_menu = MENU_NONE;
                     run_menu_action(command);
-                } else {
+                } else
                     open_menu = MENU_NONE;
-                }
                 if (!exit_requested)
                     render_full();
             }
@@ -1084,27 +1077,28 @@ static void handle_mouse(void)
                     select_tool((unsigned int)toolbar);
                     draw_status();
                 } else if (inside) {
-                    if (selected_zone_kind() != ZONE_NONE) {
-                        zone_drag_active = 1;
-                        zone_drag_x = scroll_x + cursor_x;
-                        zone_drag_y = scroll_y + cursor_y;
+                    if (selected_zone_kind() != ZONE_NONE ||
+                        selected_tool == EDIT_ROAD ||
+                        selected_tool == EDIT_POWER) {
+                        build_preview_start(scroll_x + cursor_x,
+                                            scroll_y + cursor_y);
+                    } else {
+                        apply_selected_tool();
                     }
-                    apply_selected_tool();
                 }
             }
         }
         mouse_pointer_show();
     }
+
     if (right_press) {
         mouse_pointer_hide();
         if (info_page != 0) {
             info_page = 0;
             render_full();
         } else if (open_menu == MENU_NONE && inside &&
-                   selected_zone_kind() != ZONE_NONE) {
-            /* Right-click over the city erases ZONING ONLY, never roads
-             * or any of the actual original .CTY building sprites.
-             */
+                   selected_zone_kind() != ZONE_NONE &&
+                   !build_drag_active) {
             zone_erase_active = 1;
             zone_drag_x = scroll_x + cursor_x;
             zone_drag_y = scroll_y + cursor_y;
@@ -1113,17 +1107,20 @@ static void handle_mouse(void)
         } else if (open_menu == MENU_TOOLS) {
             open_menu = MENU_NONE;
             render_full();
-        } else {
+        } else if (!build_drag_active) {
             show_menu(MENU_TOOLS);
         }
         mouse_pointer_show();
     }
 
-    if (left_release)
-        zone_drag_active = 0;
+    if (left_release && build_drag_active) {
+        mouse_pointer_hide();
+        build_preview_finish();
+        mouse_pointer_show();
+    }
     if (right_release)
         zone_erase_active = 0;
-    if ((left_release || right_release) && zone_minimap_dirty) {
+    if (right_release && zone_minimap_dirty) {
         mouse_pointer_hide();
         draw_overview();
         mouse_pointer_show();
@@ -1201,6 +1198,11 @@ static void keyboard_loop(void)
         }
 
         if (ascii == 27U) {
+            if (build_drag_active) {
+                build_preview_cancel(); /* Esc cancels before paying */
+                mouse_pointer_show();
+                continue;
+            }
             exit_requested = 1;
             break;
         }
