@@ -517,10 +517,11 @@ static unsigned char overview_color(unsigned int px, unsigned int py)
     unsigned int mx,my;
     unsigned int dx = px * view_rotation_width(map_turns) / UI_MINIMAP_W;
     unsigned int dy = py * view_rotation_height(map_turns) / UI_MINIMAP_H;
-    view_rotation_to_world(map_turns,dx,dy,&mx,&my);
-    unsigned int id = city_at(mx, my) & TILE_MASK;
-    unsigned int kind = zoning_at(mx, my);
+    unsigned int id, kind;
     unsigned char color = 2U;
+    view_rotation_to_world(map_turns,dx,dy,&mx,&my);
+    id = city_at(mx,my) & TILE_MASK;
+    kind = zoning_at(mx,my);
     if (id >= 1U && id <= 20U) color = 1U;
     else if (id >= 21U && id <= 43U) color = 10U;
     else if (id >= 64U && id <= 207U) color = 8U;
