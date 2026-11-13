@@ -110,3 +110,86 @@ jobs:
             COPYING
             tandy-dos/README.md
           if-no-files-found: error
+
+  release:
+    name: Publish latest Tandy DOS release and remove old releases
+    needs: build
+    if: ${{ github.event_name != 'pull_request' && github.ref == 'refs/heads/master' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    concurrency:
+      group: micropolis-tandy-release
+      cancel-in-progress: false
+    steps:
+      - name: Download verified DOS build
+        uses: actions/download-artifact@v4
+        with:
+          name: micropolis-tandy-ex-dos
+
+      - name: Package DOS release
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s MICROPOL.EXE
+          test -s TILES.DAT
+          test -s HAPPISLE.CTY
+          test -s COPYING
+          test -s tandy-dos/README.md
+          mkdir -p release/package
+          cp MICROPOL.EXE TILES.DAT HAPPISLE.CTY COPYING release/package/
+          cp tandy-dos/README.md release/package/README.md
+          (
+            cd release/package
+            zip -q -9 ../MICROPOL-TANDY-DOS.zip \
+              MICROPOL.EXE TILES.DAT HAPPISLE.CTY README.md COPYING
+          )
+          unzip -t release/MICROPOL-TANDY-DOS.zip
+
+      - name: Publish new release, then completely delete older releases and tags
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: tandy-dos-build-${{ github.run_number }}-${{ github.run_attempt }}
+        run: |
+          set -euo pipefail
+
+          # Do not touch old releases unless the fresh one is successfully
+          # published with its verified build assets.
+          gh release create "$RELEASE_TAG" \
+            release/MICROPOL-TANDY-DOS.zip \
+            release/package/MICROPOL.EXE \
+            release/package/TILES.DAT \
+            release/package/HAPPISLE.CTY \
+            --repo "$GITHUB_REPOSITORY" \
+            --target "$GITHUB_SHA" \
+            --title "Micropolis Tandy DOS Build #$GITHUB_RUN_NUMBER" \
+            --notes "Successful Open Watcom 16-bit DOS build from master. Run #$GITHUB_RUN_NUMBER (attempt $GITHUB_RUN_ATTEMPT), commit $GITHUB_SHA. Includes MICROPOL.EXE, TILES.DAT, HAPPISLE.CTY, README and license." \
+            --latest
+
+          # Use paginated REST results so this cleans up ALL older
+          # releases, not merely the first 30 or 100. --cleanup-tag
+          # also deletes the release's Git tag; deleting a release
+          # removes its associated assets as well.
+          gh api --paginate \
+            "repos/$GITHUB_REPOSITORY/releases?per_page=100" \
+            --jq '.[].tag_name' > "$RUNNER_TEMP/micropolis-release-tags.txt"
+
+          while IFS= read -r old_tag; do
+            if [[ -n "$old_tag" && "$old_tag" != "$RELEASE_TAG" ]]; then
+              echo "Removing older release and tag: $old_tag"
+              gh release delete "$old_tag" \
+                --repo "$GITHUB_REPOSITORY" --yes --cleanup-tag
+            fi
+          done < "$RUNNER_TEMP/micropolis-release-tags.txt"
+
+          # Make cleanup failure visible instead of claiming that old
+          # releases were removed when the API denied the action.
+          gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY"
+          remaining="$(gh api --paginate \
+            "repos/$GITHUB_REPOSITORY/releases?per_page=100" \
+            --jq '.[].tag_name')"
+          if [[ "$remaining" != "$RELEASE_TAG" ]]; then
+            echo "::error::Old releases remain after cleanup: $remaining"
+            exit 1
+          fi
