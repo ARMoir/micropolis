@@ -7,7 +7,8 @@
  * roads, original sprite layouts and 3x3 buildings. This separate layer
  * permits irregular 1x1 zones without inventing a new Micropolis format.
  *
- * Simulated growth inside these new zones is NOT YET IMPLEMENTED.
+ * The first DOS-friendly phased simulator develops these 1x1 zones
+ * using density levels; imported original city tiles remain intact.
  */
 #include "city.h"
 #include "zoning.h"
