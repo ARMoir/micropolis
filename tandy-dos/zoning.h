@@ -21,6 +21,11 @@ unsigned int zoning_paint_line(unsigned int x0, unsigned int y0,
 int zoning_save(const char *path);
 int zoning_load(const char *path);
 unsigned int zoning_count(unsigned int kind);
+/* 1x1 development stage 0=vacant, 1..3 occupied; independent of original
+ * .CTY tile IDs and saved in ZON v3. */
+unsigned int zoning_development_at(unsigned int x, unsigned int y);
+int zoning_set_development(unsigned int x, unsigned int y,
+                           unsigned int level);
 /* N=1 E=2 S=4 W=8; omit internal borders of same-type zones. */
 unsigned int zoning_edge_mask(unsigned int x, unsigned int y);
 
