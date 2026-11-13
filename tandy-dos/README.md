@@ -9,7 +9,9 @@ project. It targets the NEC V20-equipped Tandy 1000 EX.
 ## What is now implemented
 
 - Tandy video BIOS mode **9: 320x200, 16 colors**, direct 4-bank B800 framebuffer.
-- Fast one-tile scrolling that shifts the existing VRAM and redraws only the exposed edge.
+- Fast one-tile scrolling that shifts existing VRAM and redraws only the exposed edge.
+  Now uses a precomputed four-bank scanline table and overlapping 16-bit word
+  copies, without changing pixels, the original renderer, or the game screen.
 - Original Micropolis road/wire connection masks, with automatic corner, T-junction,
   four-way and straight-road orientation when placing or bulldozing nearby tiles.
 - Read-only import of original 27,120-byte .CTY city files, preserving the
@@ -208,7 +210,11 @@ To build manually with Open Watcom for DOS:
 
 ```sh
 python3 tandy-dos/tools/convert_tiles.py micropolis-activity/images/tiles.xpm TILES.DAT
-wcl -bcl=dos -0 -ml -q -fe=MICROPOL.EXE tandy-dos/tandy.c tandy-dos/city.c tandy-dos/editor.c tandy-dos/connections.c tandy-dos/engine.c tandy-dos/ui.c tandy-dos/mouse.c tandy-dos/zoning.c
+wcl -bcl=dos -0 -ml -q -fe=MICROPOL.EXE \
+  tandy-dos/tandy.c tandy-dos/city.c tandy-dos/editor.c \
+  tandy-dos/connections.c tandy-dos/engine.c tandy-dos/ui.c \
+  tandy-dos/mouse.c tandy-dos/zoning.c tandy-dos/placement.c \
+  tandy-dos/simulation.c tandy-dos/video_ops.c
 ```
 
 Host-side regression tests for loading/saving cities and editing zones:
@@ -222,6 +228,8 @@ cc -std=c89 -Wall -Wextra -pedantic -o test-engine tandy-dos/city.c tandy-dos/en
 ./test-engine
 cc -std=c89 -Wall -Wextra -pedantic -o test-ui tandy-dos/ui.c tandy-dos/tests/test_ui.c
 ./test-ui
+cc -std=c89 -Wall -Wextra -pedantic -o test-video-ops tandy-dos/video_ops.c tandy-dos/tests/test_video_ops.c
+./test-video-ops
 cc -std=c89 -Wall -Wextra -pedantic -o test-zoning tandy-dos/city.c tandy-dos/zoning.c tandy-dos/tests/test_zoning.c
 ./test-zoning
 ```
@@ -457,3 +465,61 @@ restoring only its previous border and drawing the new border on each
 scroll. The whole minimap is only reconstructed when the underlying
 city terrain or zoning changes, keeping the narrow toolbar stable and
 reducing VRAM writes on the NEC V20.
+
+## Low-level Tandy/V20 renderer optimizations (no graphics rewrite)
+
+The original 320x200, 16-color mode-9 renderer, converted TILES.DAT,
+menu layout, 8x8 tile graphics, mouse and zoning overlays are **unchanged**.
+The following hot paths were optimized based on techniques seen in
+jhhoward/WolfensteinCGA's Tandy video implementation:
+
+- **400-byte lookup table:** each y=0..199 maps directly to its four-bank
+  VRAM offset. This replaces shifts, multiplication and additions
+  when addressing every pixel and tile row. Table initialized once
+  on startup.
+- **Word-sized blits:** the original packed 8x8 tile data is now copied
+  as two 16-bit writes per line instead of four 8-bit writes; solid
+  background tiles also use two aligned 16-bit writes per row.
+- **Overlap-aware word scrolling:** the four existing one-tile scrolling
+  branches are unchanged visually, but internal VRAM span copies use
+  16-bit words instead of individual bytes. Horizontal left/right
+  copies still use opposite overlap-safe directions, and vertical
+  copies still keep the exact original scanline ordering.
+- **No page flipping:** Tandy 0x3DF page switching was deliberately
+  avoided, since it risks graphics tearing/mouse-cursor compatibility
+  on actual EX hardware and is unnecessary for the current incremental
+  tile renderer.
+
+These changes are built with Open Watcom's **8086 target (-0)**.
+The host regression test `test-video-ops` compares the entire
+32KB four-bank VRAM image against byte-reference copies for all four
+scroll directions, including scanline-bank transitions.
+
+### Actual Tandy timing test
+
+For a repeatable hardware measurement, run:
+
+```dos
+MICROPOL /BENCH
+```
+
+You can also test an existing city without modifying it:
+
+```dos
+MICROPOL HAPPISLE.CTY /BENCH
+```
+
+The benchmark temporarily enters Tandy video mode 9, measures two
+complete city redraws, then performs the same **48 passes** of
+left-shifted VRAM spans using the original byte loop and the optimized
+word copy, respectively. It restores the original DOS video mode,
+then prints BIOS clock ticks (~55 ms per tick), approximate milliseconds
+and the **byte/word copy speed ratio**. Larger ratios mean faster
+word copying; 100% means equal speed. The test does not save the city,
+change the simulation, modify the tile files or require a mouse driver.
+
+The benchmark isolates VRAM copy throughput, not end-to-end game
+frame rate. A build passing GitHub Actions proves 16-bit compilation
+and pixel-equivalence in tests, **not** speed on real V20 hardware.
+Please report the three times from your Tandy so the next iteration can
+decide if a tuned 8086 `REP MOVSW` copy is justified.
