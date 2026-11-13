@@ -2,7 +2,7 @@ name: Micropolis Tandy EX (16-bit DOS)
 
 on:
   push:
-    branches: [tandy-dos-port]
+    branches: [master]
     paths:
       - 'tandy-dos/**'
       - '.github/workflows/tandy-dos.yml'
