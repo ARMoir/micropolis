@@ -42,7 +42,8 @@ jobs:
             tandy-dos/tests/test_crossings.c
           ./test-crossings
           cc -std=c89 -Wall -Wextra -pedantic \
-            -o test-engine tandy-dos/city.c tandy-dos/engine.c tandy-dos/tests/test_engine.c
+            -o test-engine tandy-dos/city.c tandy-dos/zoning.c \
+            tandy-dos/engine.c tandy-dos/tests/test_engine.c
           ./test-engine
           cc -std=c89 -Wall -Wextra -pedantic \
             -o test-ui tandy-dos/ui.c tandy-dos/tests/test_ui.c

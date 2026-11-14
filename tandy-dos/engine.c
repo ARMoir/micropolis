@@ -11,6 +11,7 @@
  */
 #include "city.h"
 #include "engine.h"
+#include "zoning.h"
 #include <stdlib.h>
 
 #ifdef __WATCOMC__
@@ -32,6 +33,13 @@
  * the lifetime of the application, so scans never malloc in the hot path.
  */
 static unsigned short ENGINE_FAR *work_queue = NULL;
+/* Cached generation capacity and live use let a NEW wire or vacant
+ * zoned lot extend the network without a second 12,000-tile rebuild.
+ * Removing a conductor still uses the exact original full scan.
+ */
+static unsigned long network_capacity=0UL;
+static unsigned int network_powered=0U;
+static int network_valid=0;
 
 static int ensure_queue(void)
 {
@@ -48,6 +56,24 @@ void engine_shutdown(void)
         free(work_queue);
         work_queue = NULL;
     }
+    network_valid=0;
+    network_capacity=0UL;
+    network_powered=0U;
+}
+
+void engine_power_invalidate(void)
+{
+    network_valid=0;
+}
+
+int engine_power_valid(void)
+{
+    return network_valid;
+}
+
+unsigned int engine_powered_count(void)
+{
+    return network_powered;
 }
 static unsigned char discovered[POWER_BYTES];
 
@@ -64,9 +90,19 @@ static int is_plant(unsigned short tile)
     unsigned int id = tile & TILE_ID;
     return id == COAL_PLANT || id == NUKE_PLANT;
 }
-static int can_conduct(unsigned short tile)
+static int can_conduct(unsigned int x,unsigned int y,
+                       unsigned short tile)
 {
-    return (tile & CONDBIT) != 0U || is_plant(tile);
+    unsigned int id=tile&TILE_ID;
+    if((tile&CONDBIT)!=0U || is_plant(tile)) return 1;
+    /* Independently zoned 1x1 lots relay electricity whether vacant
+     * or built. No CONDBIT is written, so original .CTY art and zone
+     * information remain intact. Ordinary unzoned grass/trees do NOT
+     * conduct. This also allows power from a powered lot into a newly
+     * connected wire and vice versa.
+     */
+    return (id==0U || (id>=21U && id<=43U)) &&
+           zoning_at(x,y)!=ZONE_NONE;
 }
 
 int engine_is_powered(unsigned int x, unsigned int y)
@@ -84,8 +120,11 @@ unsigned int engine_power_scan(void)
     static const int dx[4] = {0, 1, 0, -1};
     static const int dy[4] = {-1, 0, 1, 0};
 
-    if (!ensure_queue())
-        return 0U; /* Allocation failure: leave existing network intact. */
+    if (!ensure_queue()) {
+        network_valid=0;
+        return 0U; /* Allocation failure: retain old tile flags. */
+    }
+    network_valid=0;
 
     /* Clear stale power flags without destroying tile ID or other flags.
      * Seeds are the real POWERPLANT and NUCLEAR zone-center IDs.
@@ -126,12 +165,84 @@ unsigned int engine_power_scan(void)
             index = (unsigned int)nx * CITY_HEIGHT + (unsigned int)ny;
             if (seen(index))
                 continue;
-            if (can_conduct(city_at((unsigned int)nx, (unsigned int)ny))) {
+            if (can_conduct((unsigned int)nx,(unsigned int)ny,
+                            city_at((unsigned int)nx,(unsigned int)ny))) {
                 mark_seen(index);
                 if (tail < CITY_TILES)
                     work_queue[tail++] = (unsigned short)index;
             }
         }
     }
+    network_capacity=capacity;
+    network_powered=powered;
+    network_valid=1;
     return powered;
 }
+
+/* Add an attached branch of new conductor/zone tiles. A connected
+ * frontier can traverse existing unpowered wires and EMPTY RCI lots,
+ * but never unzoned terrain. BFS reuses the already allocated 24KB far
+ * queue and does NOT clear or scan the whole world. Every visited tile
+ * gets PWRBIT as it enters the queue, so there is no second bitset or
+ * repeated queue entry. The same plant-capacity limit applies.
+ */
+static unsigned int expand_one(unsigned int x,unsigned int y)
+{
+    unsigned int i,head=0U,tail=0U,added=0U,index;
+    unsigned short tile;
+    static const int dx[4]={0,1,0,-1};
+    static const int dy[4]={-1,0,1,0};
+    if(network_powered >= network_capacity || !network_valid)
+        return 0U;
+    tile=city_at(x,y);
+    if((tile&PWRBIT)!=0U || !can_conduct(x,y,tile))
+        return 0U;
+    /* Only a branch touching an ALREADY powered tile may energize. */
+    if(!((x>0U && engine_is_powered(x-1U,y)) ||
+         (x+1U<CITY_WIDTH && engine_is_powered(x+1U,y)) ||
+         (y>0U && engine_is_powered(x,y-1U)) ||
+         (y+1U<CITY_HEIGHT && engine_is_powered(x,y+1U))))
+        return 0U;
+    if(!ensure_queue()) return 0U;
+    city_set(x,y,(unsigned short)(tile|PWRBIT));
+    work_queue[tail++]=(unsigned short)(x*CITY_HEIGHT+y);
+    ++network_powered;
+    ++added;
+    while(head<tail && network_powered<network_capacity) {
+        int nx,ny;
+        index=work_queue[head++];
+        x=index/CITY_HEIGHT;
+        y=index%CITY_HEIGHT;
+        for(i=0U;i<4U && network_powered<network_capacity;++i) {
+            nx=(int)x+dx[i];
+            ny=(int)y+dy[i];
+            if(nx<0 || nx>=CITY_WIDTH || ny<0 || ny>=CITY_HEIGHT)
+                continue;
+            tile=city_at((unsigned int)nx,(unsigned int)ny);
+            if((tile&PWRBIT)!=0U ||
+               !can_conduct((unsigned int)nx,(unsigned int)ny,tile))
+                continue;
+            city_set((unsigned int)nx,(unsigned int)ny,
+                     (unsigned short)(tile|PWRBIT));
+            work_queue[tail++]=(unsigned short)
+                ((unsigned int)nx*CITY_HEIGHT+(unsigned int)ny);
+            ++network_powered;
+            ++added;
+        }
+    }
+    return added;
+}
+
+unsigned int engine_power_extend_rect(unsigned int x0,unsigned int y0,
+                                      unsigned int x1,unsigned int y1)
+{
+    unsigned int x,y,total=0U;
+    if(!network_valid) return 0U;
+    if(x0>x1 || y0>y1 || x1>=CITY_WIDTH || y1>=CITY_HEIGHT)
+        return 0U;
+    for(x=x0;x<=x1;++x)
+        for(y=y0;y<=y1;++y)
+            total+=expand_one(x,y);
+    return total;
+}
+

@@ -26,7 +26,6 @@
  * Both small lots and original 3x3 zones use the same access test.
  */
 #define TRANSPORT_RADIUS 6
-#define LOT_POWER_BYTES ((CITY_TILES + 7U) / 8U)
 
 static struct sim_statistics stats;
 static unsigned int cursor = 0U;
@@ -48,48 +47,11 @@ static unsigned int lots_res, lots_com, lots_ind;
 static unsigned int roads, wires, plants;
 static unsigned int growth_this_month = 0U, ready_month = 0U;
 static unsigned int no_road_month = 0U, no_power_month = 0U;
-/* 1500 bytes: which occupied small lots are connected to a source?
- * A developed house/shop/factory can relay electricity to an ADJACENT
- * developed lot. Empty/undeveloped squares never carry power.
- * Unlike adding CONDBIT to city tiles, this never mutates the original
- * CTY file or triggers a city-wide BFS when a house grows.
+/* Changes when the real power network or its vacant zoned-lot relays
+ * gain or lose electricity. The 32x21 viewport compares only changed
+ * 8x8 badge states, never blinking or rescanning the entire screen.
  */
-static unsigned char lot_power[LOT_POWER_BYTES];
-/* Changes only when effective electrical service may change. The GUI
- * checks visible badges in small chunks, never on an animation timer.
- */
-static unsigned int power_visual_revision = 0U;
-static void clear_lot_power(void)
-{
-    unsigned int i;
-    for(i=0U;i<LOT_POWER_BYTES;++i)
-        lot_power[i]=0U;
-    ++power_visual_revision;
-}
-static unsigned int lot_power_index(unsigned int x,unsigned int y)
-{
-    return x*CITY_HEIGHT+y;
-}
-static int lot_is_powered(unsigned int x,unsigned int y)
-{
-    unsigned int pos;
-    if(x>=CITY_WIDTH || y>=CITY_HEIGHT ||
-       zoning_at(x,y)==ZONE_NONE ||
-       zoning_development_at(x,y)==0U)
-        return 0;
-    pos=lot_power_index(x,y);
-    return (lot_power[pos>>3] & (1U<<(pos&7U)))!=0U;
-}
-static void set_lot_power(unsigned int x,unsigned int y,int enabled)
-{
-    unsigned int pos=lot_power_index(x,y);
-    unsigned char mask=(unsigned char)(1U<<(pos&7U));
-    unsigned char old=lot_power[pos>>3];
-    if(enabled) lot_power[pos>>3] |= mask;
-    else lot_power[pos>>3] &= (unsigned char)~mask;
-    if(old!=lot_power[pos>>3]) ++power_visual_revision;
-}
-
+static unsigned int power_visual_revision=0U;
 
 /* Avoid signed integer overflow on both 8086 and native test hosts. */
 static unsigned int random16(void)
@@ -145,28 +107,19 @@ static int transport_access(unsigned int x,unsigned int y)
     return 0;
 }
 
-/* A source powers its own square and its direct neighbors. Occupied
- * independently zoned squares can then pass that power to adjacent
- * OCCUPIED squares. This single-pass frontier progresses during the
- * normal 80..320-square simulation chunks; no extra full-map walk.
- * Cached relays reset immediately whenever conductors or zoning
- * change, so abandoned islands cannot continue supplying electricity.
+/* The electrical BFS now includes empty, independently zoned 1x1
+ * lots as relays. Power therefore reaches the next vacant lot BEFORE
+ * either lot develops. Neither ordinary empty ground nor trees can
+ * relay power unless they are explicitly zoned. A cached PWRBIT makes
+ * this a bounded five-tile lookup even on an 8086.
  */
 static int has_power(unsigned int x,unsigned int y)
 {
-    if (engine_is_powered(x,y) || lot_is_powered(x,y)) return 1;
-    if (x>0U &&
-        (engine_is_powered(x-1U,y) || lot_is_powered(x-1U,y)))
-        return 1;
-    if (x+1U<CITY_WIDTH &&
-        (engine_is_powered(x+1U,y) || lot_is_powered(x+1U,y)))
-        return 1;
-    if (y>0U &&
-        (engine_is_powered(x,y-1U) || lot_is_powered(x,y-1U)))
-        return 1;
-    if (y+1U<CITY_HEIGHT &&
-        (engine_is_powered(x,y+1U) || lot_is_powered(x,y+1U)))
-        return 1;
+    if(engine_is_powered(x,y)) return 1;
+    if(x>0U && engine_is_powered(x-1U,y)) return 1;
+    if(x+1U<CITY_WIDTH && engine_is_powered(x+1U,y)) return 1;
+    if(y>0U && engine_is_powered(x,y-1U)) return 1;
+    if(y+1U<CITY_HEIGHT && engine_is_powered(x,y+1U)) return 1;
     return 0;
 }
 /* Determine whether a zone needs a static no-power badge. The original
@@ -302,15 +255,6 @@ static int process_zone(unsigned int x, unsigned int y,
         last_radius = 0U;
         last_change_valid = 1U;
     }
-    /* Newly developed houses can carry electricity to adjoining
-     * developed small lots. Never mark an empty zone as a conductor.
-     * If a previously powered lot becomes vacant, clear the 1500-byte
-     * relay cache (not the expensive original-city electrical BFS).
-     */
-    if(next!=0U && power)
-        set_lot_power(x,y,1);
-    else if(stage!=0U && next==0U)
-        clear_lot_power();
     if (kind == ZONE_RES)
         pop_res += zone_developed_population(kind,next);
     else if (kind == ZONE_COM)
@@ -528,7 +472,7 @@ void simulation_init(void)
     scan_x = scan_y = 0U;
     changed = 0U;
     power_dirty = 1U;
-    clear_lot_power();
+    engine_power_invalidate(); /* the city may have been reloaded */
     power_scan_count = 0U;
     last_change_valid = 0U;
     last_home_valid = 0U;
@@ -555,14 +499,34 @@ void simulation_init(void)
 void simulation_mark_power_dirty(void)
 {
     power_dirty=1U;
-    clear_lot_power();
+    ++power_visual_revision;
 }
 void simulation_mark_lots_dirty(void)
 {
-    /* Changing/removing 1x1 zone plots is not an electrical network
-     * edit. Clear cached lot relays only (1500 bytes), NOT 12K BFS.
+    /* Removing a lot may disconnect downstream zoned relays. Use an
+     * exact network rebuild, but only on removal (zone *addition*
+     * takes the cheap incremental BFS below).
      */
-    clear_lot_power();
+    simulation_mark_power_dirty();
+}
+
+/* Power wire additions and new vacant plots can only CREATE paths.
+ * Reuse the existing 24KB power BFS queue and update just the region
+ * connected to the placed tiles. A standalone wire with no powered
+ * neighbor adds nothing, and NO 12,000-tile global flood is triggered.
+ * The same code works when adding a lot bridging two neighborhoods.
+ */
+unsigned int simulation_power_added_rect(unsigned int x0,unsigned int y0,
+                                         unsigned int x1,unsigned int y1)
+{
+    unsigned int gained;
+    if(power_dirty || !engine_power_valid()) return 0U;
+    gained=engine_power_extend_rect(x0,y0,x1,y1);
+    if(gained!=0U) {
+        stats.powered_tiles=engine_powered_count();
+        ++power_visual_revision;
+    }
+    return gained;
 }
 const struct sim_statistics *simulation_stats(void) { return &stats; }
 void simulation_last_change(unsigned int *x, unsigned int *y)

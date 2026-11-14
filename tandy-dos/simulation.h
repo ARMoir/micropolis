@@ -42,10 +42,13 @@ struct sim_statistics {
 void simulation_seed_demo(void);
 void simulation_init(void);
 void simulation_mark_power_dirty(void);
-/* Changes to individual 1x1 lots invalidate only the compact
- * adjacent-building electricity cache, not the main power network.
+/* Removing an electricity relay requests exact network rebuilding.
+ * Positive additions of wires or already-vacant zoned lots can extend
+ * the cached live network without a 12K scan, even before construction.
  */
 void simulation_mark_lots_dirty(void);
+unsigned int simulation_power_added_rect(unsigned int x0,unsigned int y0,
+                                         unsigned int x1,unsigned int y1);
 unsigned int simulation_advance(unsigned int max_tiles);
 const struct sim_statistics *simulation_stats(void);
 void simulation_last_change(unsigned int *x, unsigned int *y);
@@ -55,8 +58,8 @@ unsigned int simulation_progress(void);
  * ordinary building density growth. */
 unsigned int simulation_power_scan_count(void);
 unsigned int simulation_lot_service(unsigned int x, unsigned int y);
-/* Draw-only service information; neither API starts a full power scan.
- * Revision advances on conductive scans and adjacent-lot relay changes.
+/* Draw-only service information; neither API starts a full scan.
+ * Revision advances after power additions and network rescans.
  */
 int simulation_needs_power_warning(unsigned int x, unsigned int y);
 unsigned int simulation_power_visual_revision(void);

@@ -505,19 +505,20 @@ static void draw_city_tile(unsigned int px, unsigned int py,
  * AH=09h writes ONE glyph at a fixed cursor without auto-advancing.
  * Explicit positioning also guarantees no accidental screen scroll.
  */
-/* Red bolt with a dark silhouette, placed on the 8x8 zone center.
- * This is a one-time overlay when a tile is drawn, never blinking.
+/* Bright Tandy yellow (EGA 14), not pink/red 12. A black backing
+ * retains crisp readability on green, gray and colorful roof tiles.
+ * Static overlay, redrawn ONLY when the affected tile changes.
  */
 static void draw_no_power_badge(unsigned int px, unsigned int py)
 {
     box_pixels(px+3U,py,5U,7U,0U);
-    pixel(px+5U,py+1U,12U);
-    pixel(px+4U,py+2U,12U);
-    pixel(px+3U,py+3U,12U);
-    pixel(px+6U,py+3U,12U);
-    pixel(px+5U,py+4U,12U);
-    pixel(px+4U,py+5U,12U);
-    pixel(px+3U,py+6U,12U);
+    pixel(px+5U,py+1U,14U);
+    pixel(px+4U,py+2U,14U);
+    pixel(px+3U,py+3U,14U);
+    pixel(px+6U,py+3U,14U);
+    pixel(px+5U,py+4U,14U);
+    pixel(px+4U,py+5U,14U);
+    pixel(px+3U,py+6U,14U);
 }
 
 static void draw_display_tile(unsigned int sx, unsigned int sy)
@@ -1643,22 +1644,30 @@ static void build_preview_finish(void)
     applied = placement_commit();
     build_drag_active = 0;
     last_action = applied ? "BUILT" : "BLOCKED";
-    redraw_recent_preview();
     if (applied != 0U) {
-        /* Only a changed CONDBIT invalidates the power graph.
-         * Roads laid over wires keep conductivity and are scan-free.
-         * New electric wires/crossings still request a scan.
+        /* Positive additions can only GROW the electrical network.
+         * Extend it from the newly constructed line/empty lots using
+         * a bounded local BFS, not the expensive 12K full city scan.
+         * Deletions still use an exact global rebuild on the next
+         * simulation tick to prevent phantom power islands.
          */
-        if (placement_changed_power())
+        if (placement_changed_power() &&
+            selected_tool == EDIT_POWER)
+            (void)simulation_power_added_rect(x0,y0,x1,y1);
+        else if (placement_changed_power())
             simulation_mark_power_dirty();
         else if (selected_zone_kind()!=ZONE_NONE)
-            simulation_mark_lots_dirty();
+            (void)simulation_power_added_rect(x0,y0,x1,y1);
         /* The 56x44 minimap is sampled from world tile coordinates;
          * update only its pixels corresponding to funded edits.
          */
         draw_overview_world_rect(x0,y0,x1,y1,1);
         draw_city_stats();
     }
+    /* Show the new power state on painted tiles immediately after
+     * the fast extension rather than repainting stale no-power icons.
+     */
+    redraw_recent_preview();
     draw_status();
 }
 

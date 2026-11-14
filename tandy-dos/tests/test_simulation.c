@@ -274,6 +274,53 @@ int main(int argc, char **argv)
         assert(simulation_power_visual_revision()!=revision);
     }
     assert(simulation_power_scan_count()==0U);
+    /* A newly zoned EMPTY plot must relay power to another empty
+     * plot without waiting for growth, and an added wire must not
+     * trigger the expensive full-world power scan.
+     */
+    city_make_demo();
+    for(x=0U;x<CITY_WIDTH;++x)
+        for(y=0U;y<CITY_HEIGHT;++y)
+            city_set(x,y,0U);
+    zoning_clear();
+    city_set(10U,10U,750U|1024U|16384U);
+    city_set(11U,10U,208U|16384U);
+    assert(zoning_set(12U,10U,ZONE_RES));
+    assert(zoning_set(13U,10U,ZONE_RES));
+    for(x=15U;x<=22U;++x)
+        assert(zoning_set(x,10U,ZONE_COM));
+    simulation_init();
+    (void)simulation_advance(1U); /* initial full scan exactly once */
+    assert(simulation_power_scan_count()==1U);
+    assert((simulation_lot_service(13U,10U)&SIM_SERVICE_POWER)!=0U);
+    assert((simulation_lot_service(22U,10U)&SIM_SERVICE_POWER)==0U);
+    assert(simulation_needs_power_warning(22U,10U));
+    assert(zoning_development_at(13U,10U)==0U);
+    {
+        unsigned int old_revision=simulation_power_visual_revision();
+        city_set(14U,10U,210U|16384U);
+        assert(simulation_power_added_rect(14U,10U,14U,10U)==9U);
+        assert(simulation_power_scan_count()==1U);
+        assert(simulation_power_visual_revision()!=old_revision);
+        assert(!simulation_needs_power_warning(22U,10U));
+        assert((simulation_lot_service(22U,10U)&SIM_SERVICE_POWER)!=0U);
+        assert(zoning_development_at(22U,10U)==0U);
+        /* Adding a vacant zoned cell between a powered lot and a new
+         * group works by the same addition-only, branch-local path.
+         */
+        assert(zoning_set(23U,10U,ZONE_RES));
+        assert(simulation_power_added_rect(23U,10U,23U,10U)==1U);
+        assert((simulation_lot_service(23U,10U)&SIM_SERVICE_POWER)!=0U);
+        assert(zoning_development_at(23U,10U)==0U);
+        assert(simulation_power_scan_count()==1U);
+        city_set(14U,10U,0U);
+        simulation_mark_power_dirty();
+        (void)simulation_advance(1U); /* exact network rebuild */
+        assert(simulation_power_scan_count()==2U);
+        assert(simulation_needs_power_warning(22U,10U));
+        assert((simulation_lot_service(23U,10U)&SIM_SERVICE_POWER)==0U);
+    }
+    puts("Vacant lots relay power immediately; new wires skip full scans");
     puts("Six-tile road/rail reach and static power-warning checks passed");
     puts("Phased RCI growth (1x1 / 3x3), demo, clock, taxes and persistence passed");
     return 0;

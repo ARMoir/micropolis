@@ -1022,3 +1022,34 @@ A deterministic test compares all 61,440 packed pixels against the
 original conversion; only the green pixels in dense residential or
 commercial artwork may differ. The converted file stays 30,720 bytes,
 without increasing RAM consumption or CPU work during gameplay.
+
+## Fast electrical extension and vacant-lot power relay
+
+Vacant independently zoned 1x1 residential, commercial and industrial
+lots now relay electricity to adjoining zoned lots **before any houses
+or other buildings grow**. This changes only transient power flags; the
+original .CTY tile IDs, zone assignments, source sprites and saved
+sidecar data remain unchanged. Unzoned empty ground, trees, and ordinary
+roads cannot relay electricity.
+
+Building positive power-line connections does not cause a global
+120x100-tile rebuild. The active power network retains its source
+capacity and powered-node count, and reuses the existing far-memory BFS
+queue to energize **only newly reachable** wires and vacant zoned lots.
+Completely disconnected new wires require no propagation. Attaching a
+previously unpowered branch energizes it immediately, within the
+original coal/nuclear capacity constraints. No extra VRAM refresh or
+polling is required.
+
+Removing a powered wire, a power station or a zoned relay can fragment
+the grid and still schedules one exact full reconstruction, after the
+mouse button is released. Initial load similarly scans once.
+
+The **no-power warning is now bright yellow (Tandy index 14)** rather
+than the old red (12), with a thin dark backing. The small indicator
+remains static, and disappears on restored service without blinking.
+
+Automated tests check vacant-chain power inheritance, wire connection
+and disconnection, immediate change notifications, and that additions
+do not increment the full-scan counter. Actual timing should still be
+assessed on 7 MHz V20 hardware.
