@@ -64,6 +64,10 @@ static int zone_erase_active = 0;
 static unsigned int zone_drag_x = 0U, zone_drag_y = 0U;
 static int zone_minimap_dirty = 0;
 static int build_drag_active = 0;
+/* Do not run a whole-city power scan in the middle of a mouse-held
+ * bulldozer stroke. A single dirty flag is processed after release.
+ */
+static int doze_mouse_active = 0;
 static unsigned int build_drag_x = 0U, build_drag_y = 0U;
 static unsigned int sim_last_clock = 0U;
 static int sim_clock_started = 0;
@@ -1539,8 +1543,13 @@ static void run_menu_action(enum ui_action action)
         last_action = power_message;
         break;
     case UI_CENTER_CURSOR:
+        /* The old popup path used render_full() to erase the cursor.
+         * Redraw just its previous and new tiles instead.
+         */
+        erase_cursor();
         cursor_x = VIEW_W / 2U;
         cursor_y = VIEW_H / 2U;
+        draw_cursor();
         last_action = "CENTER";
         break;
     case UI_ROTATE_CW: rotate_view(1); break;
@@ -1684,6 +1693,8 @@ static void handle_mouse(void)
                                          &world_x,&world_y);
                         build_preview_start(world_x,world_y);
                     } else {
+                        if (selected_tool==EDIT_BULLDOZE)
+                            doze_mouse_active=1;
                         apply_selected_tool();
                     }
                 }
@@ -1713,6 +1724,8 @@ static void handle_mouse(void)
         mouse_pointer_show();
     }
 
+    if (left_release)
+        doze_mouse_active=0;
     if (left_release && build_drag_active) {
         mouse_pointer_hide();
         build_preview_finish();
@@ -1752,7 +1765,8 @@ static void simulation_idle(void)
         return;
     sim_last_clock = now;
     if (simulation_is_paused() || open_menu != MENU_NONE ||
-        info_page != 0 || build_drag_active || zone_erase_active)
+        info_page != 0 || build_drag_active || zone_erase_active ||
+        doze_mouse_active)
         return;
     amount = 80U * simulation_speed();
     mouse_pointer_hide();
