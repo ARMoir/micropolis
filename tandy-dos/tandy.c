@@ -1037,9 +1037,31 @@ static void redraw_new_preview(void)
  */
 static void redraw_recent_preview(void)
 {
-    unsigned int sx,sy,mx,my;
-    for(sy=0U;sy<VIEW_H;++sy)
-        for(sx=0U;sx<VIEW_W;++sx) {
+    unsigned int x0,y0,x1,y1,dx0,dy0,dx1,dy1,mw,mh;
+    unsigned int dx,dy,mx,my,sx,sy;
+    placement_bounds(&x0,&y0,&x1,&y1);
+    mw=view_rotation_width(map_turns);
+    mh=view_rotation_height(map_turns);
+    /* Passing virtual map dimensions yields exact screen-tile bounds
+     * for the rotated original-world rectangle, with no fractions.
+     */
+    view_rotation_minimap_rect(map_turns,x0,y0,x1,y1,
+                               mw,mh,&dx0,&dy0,&dx1,&dy1);
+    if(dx0>0U)--dx0;
+    if(dy0>0U)--dy0;
+    if(dx1<mw)++dx1;
+    if(dy1<mh)++dy1;
+    if(dx0<scroll_x)dx0=scroll_x;
+    if(dy0<scroll_y)dy0=scroll_y;
+    if(dx1>scroll_x+VIEW_W)dx1=scroll_x+VIEW_W;
+    if(dy1>scroll_y+VIEW_H)dy1=scroll_y+VIEW_H;
+    /* A single tile edit checks only 3x3 displayed squares; the
+     * fallback is bounded to 32x21 even for a long diagonal stroke.
+     */
+    for(dy=dy0;dy<dy1;++dy)
+        for(dx=dx0;dx<dx1;++dx) {
+            sx=dx-scroll_x;
+            sy=dy-scroll_y;
             display_to_world(sx,sy,&mx,&my);
             if(placement_recent_at(mx,my)!=PREVIEW_NONE ||
                (mx>0U && placement_recent_at(mx-1U,my)!=PREVIEW_NONE) ||
