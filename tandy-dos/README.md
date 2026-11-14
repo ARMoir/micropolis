@@ -1345,3 +1345,47 @@ road/rail exclusions, source-pixel preservation, all four map
 rotations, complete 1x1/2x2/3x3 frontage geometry, and that
 actual converted source sprites contain visible grassy pixels
 under the proposed access marks.
+
+## Reliable Save/Resume for XT-IDE CompactFlash (Build after #392)
+
+Earlier builds used File > Save/F2 to create a fresh
+`CITY0001.CTY`, then `CITY0002.CTY` on every press, without
+showing the filename. This made saving *appear* broken, particularly
+when launching `MICROPOL.EXE HAPPISLE.CTY` after saving: the game
+simply loaded the **original unmodified Happisle** again.
+
+The new system uses **one save slot per playthrough**. First F2 makes
+an unused `CITYnnnn.CTY` file with matching `CITYnnnn.ZON`
+and `CITYnnnn.NBL`. Every subsequent F2 updates that same slot.
+The status clearly reports `SAVED CITYnnnn` rather than a generic
+`SAVED`, and while writing displays `SAVING...`. Separate
+`CTY DISK ERROR`, `ZON DISK ERROR`, `NBL DISK ERROR` and
+`SAVE COMMIT ERR` identify media/space problems.
+
+Writes first create temporary DOS 8.3 files (`.TCT`, `.TZN`,
+`.TNB`) and close **all three successfully** before replacing any
+live save. Previous saves are retained as `.BCT`, `.BZN`,
+and `.BNB` backup sidecars. Failed temporary writes leave the
+previous save intact; failed renames attempt to restore backups.
+`LASTCITY.CFG` holds a small checked last-slot pointer only after
+a successful commit. Keep `.CTY`, `.ZON`, and `.NBL` together
+if copying a city to another disk.
+
+**Restart/resume:** Running `MICROPOL.EXE` **without a city
+argument** automatically reloads the most recent committed save,
+if `LASTCITY.CFG` exists. Running `MICROPOL.EXE HAPPISLE.CTY`
+always deliberately starts that original city instead. In either
+case, File > **Load last (F3)** reopens the most recent saved city
+during play. Unsaved changes are replaced when F3 loads a saved
+city. Passing a local filename `CITYnnnn.CTY` also reopens that
+specific saved slot for repeated F2 updates.
+
+The .CTY writer still produces exactly 27,120 big-endian bytes,
+but now writes 120 buffered columns of 200 bytes instead of calling
+fputc 24,000 times. This improves save responsiveness on the
+7MHz V20/XT-IDE CF while adding only a 200-byte stack buffer.
+The existing TILES.DAT, NEWER1.DAT, NEWERM8.DAT, source art,
+and saved-file formats are unchanged. A native-independent C89
+regression validates initial and repeated F2 saves, all three
+sidecars, exact .CTY content, complete NBL ownership reload,
+previous-version backups and corruption detection.

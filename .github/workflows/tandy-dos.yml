@@ -85,6 +85,11 @@ jobs:
             tandy-dos/tests/test_newer_lot.c
           ./test-newer-lot
           cc -std=c89 -Wall -Wextra -pedantic \
+            -o test-game-save tandy-dos/city.c tandy-dos/zoning.c \
+            tandy-dos/newer_lot.c tandy-dos/game_save.c \
+            tandy-dos/tests/test_game_save.c
+          ./test-game-save
+          cc -std=c89 -Wall -Wextra -pedantic \
             -o test-newer-site tandy-dos/city.c tandy-dos/view_rotation.c \
             tandy-dos/newer_site.c tandy-dos/tests/test_newer_site.c
           ./test-newer-site
@@ -160,7 +165,7 @@ jobs:
       - name: Build native 8086-compatible DOS executable
         run: |
           wcl -bcl=dos -0 -ml -q -fe=MICROPOL.EXE \
-            tandy-dos/tandy.c tandy-dos/city.c tandy-dos/editor.c tandy-dos/connections.c tandy-dos/engine.c \
+            tandy-dos/tandy.c tandy-dos/city.c tandy-dos/game_save.c tandy-dos/editor.c tandy-dos/connections.c tandy-dos/engine.c \
              tandy-dos/ui.c tandy-dos/mouse.c tandy-dos/zoning.c tandy-dos/newer_lot.c tandy-dos/newer_site.c tandy-dos/zone_highlight.c \
             tandy-dos/placement.c tandy-dos/simulation.c tandy-dos/stadium_fx.c tandy-dos/video_ops.c tandy-dos/menu_font.c tandy-dos/view_rotation.c tandy-dos/tool_art.c tandy-dos/infrastructure.c tandy-dos/small_lot_art.c
           test -s MICROPOL.EXE

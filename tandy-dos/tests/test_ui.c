@@ -66,7 +66,12 @@ int main(void)
     assert(UI_MINIMAP_Y + UI_MINIMAP_H <= UI_FOOTER_Y);
     assert(ui_menu_command(MENU_TOOLS, 1U) == UI_TOOL_ROAD);
     assert(ui_menu_command(MENU_TOOLS, 7U) == UI_TOOL_COAL);
-    assert(ui_menu_command(MENU_FILE, 1U) == UI_EXIT);
+    assert(ui_menu_count(MENU_FILE) == 4U);
+    assert(ui_menu_command(MENU_FILE, 0U) == UI_SAVE);
+    assert(ui_menu_command(MENU_FILE, 1U) == UI_LOAD_LAST);
+    assert(ui_menu_command(MENU_FILE, 2U) == UI_EXIT);
+    assert(ui_dropdown_hit(MENU_FILE, 9U*8U,3U*8U)==1);
+    assert(ui_dropdown_hit(MENU_FILE, 9U*8U,4U*8U)==2);
     assert(ui_menu_command(MENU_VIEW, 0U) == UI_SCAN_POWER);
     assert(ui_menu_count(MENU_VIEW) == 5U);
     assert(ui_menu_command(MENU_VIEW, 2U) == UI_ROTATE_CW);

@@ -4,10 +4,11 @@
 #include "ui.h"
 
 static const char *const file_items[] = {
-    "Save city  F2", "Exit to DOS", "Close menu"
+    "Save city  F2", "Load last  F3",
+    "Exit to DOS", "Close menu"
 };
 static const enum ui_action file_cmds[] = {
-    UI_SAVE, UI_EXIT, UI_CLOSE
+    UI_SAVE, UI_LOAD_LAST, UI_EXIT, UI_CLOSE
 };
 
 static const char *const tools_items[] = {
@@ -55,7 +56,7 @@ unsigned int ui_menu_origin(enum ui_menu menu)
 unsigned int ui_menu_count(enum ui_menu menu)
 {
     switch (menu) {
-    case MENU_FILE: return 3U;
+    case MENU_FILE: return 4U;
     case MENU_TOOLS: return 9U;
     case MENU_VIEW: return 5U;
     case MENU_HELP: return 4U;

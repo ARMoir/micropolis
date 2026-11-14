@@ -213,6 +213,7 @@ int city_save_as(const char *path)
     FILE *f;
     unsigned int x, y;
     unsigned short tile;
+    unsigned char column[CITY_HEIGHT * 2U];
     int okay = 1;
 
     f = fopen(path, "wb");
@@ -220,15 +221,19 @@ int city_save_as(const char *path)
         return 0;
     if (fwrite(city_header, 1U, sizeof(city_header), f) != sizeof(city_header))
         okay = 0;
-    for (x = 0; okay && x < CITY_WIDTH; ++x) {
-        for (y = 0; y < CITY_HEIGHT; ++y) {
+    /* Preserve exact big-endian, column-major 27,120-byte CTY layout.
+     * One 200-byte column at a time cuts 24,000 fputc() calls down
+     * to 120 buffered writes on a 7 MHz V20 and XT-IDE CF drive.
+     * This costs only a 200-byte temporary stack buffer.
+     */
+    for (x = 0U; okay && x < CITY_WIDTH; ++x) {
+        for (y = 0U; y < CITY_HEIGHT; ++y) {
             tile = city_tiles[x * CITY_HEIGHT + y];
-            if (fputc((tile >> 8) & 255U, f) == EOF ||
-                fputc(tile & 255U, f) == EOF) {
-                okay = 0;
-                break;
-            }
+            column[y * 2U] = (unsigned char)(tile >> 8U);
+            column[y * 2U + 1U] = (unsigned char)(tile & 255U);
         }
+        if (fwrite(column, 1U, sizeof(column), f) != sizeof(column))
+            okay = 0;
     }
     if (fclose(f) != 0)
         okay = 0;

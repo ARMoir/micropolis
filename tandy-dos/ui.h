@@ -34,6 +34,7 @@ enum ui_action {
     UI_NOTHING = 0,
     UI_CLOSE,
     UI_SAVE,
+    UI_LOAD_LAST,
     UI_EXIT,
     UI_TOOL_INSPECT,
     UI_TOOL_ROAD,

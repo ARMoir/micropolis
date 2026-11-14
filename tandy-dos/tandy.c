@@ -26,6 +26,7 @@
 #include "pointer_policy.h"
 #include "small_lot_art.h"
 #include "newer_lot.h"
+#include "game_save.h"
 #include "newer_site.h"
 #include "zone_highlight.h"
 #include "badge_flash.h"
@@ -62,6 +63,8 @@ static unsigned int hold_tick = 0U;
 static unsigned int picker_kind = 0U; /* 0=closed, 1=road, 2=civic */
 static unsigned int picker_highlight = 0U;
 static const char *last_action = "READY";
+static unsigned int active_save_slot = 0U;
+static char save_action[24];
 static char power_message[12];
 
 /* Menus and mouse input are optional; keyboard remains the default.
@@ -1697,44 +1700,56 @@ static void render_full(void)
     mouse_pointer_show();
 }
 
-static int save_city_new_file(void)
+/* F2 creates one new numbered three-file city only ONCE. Every
+ * subsequent save updates that SAME slot, with previous .BCT/.BZN/
+ * .BNB backups. The status line shows the actual DOS 8.3 file.
+ * Source HAPPISLE.CTY is never silently overwritten.
+ */
+static void save_current_city(void)
 {
-    unsigned int slot;
-    char cityname[13], zonename[13], buildingname[13];
-    FILE *f;
+    unsigned int result;
+    last_action="SAVING...";
+    draw_status();
+    result=game_save_write(&active_save_slot);
+    if(result==GAME_SAVE_OK) {
+        sprintf(save_action,"SAVED CITY%04u",active_save_slot);
+        last_action=save_action;
+    } else if(result==GAME_SAVE_LAST_ERROR) {
+        sprintf(save_action,"CITY%04u SAVED*",active_save_slot);
+        last_action=save_action; /* CTY/ZON/NBL intact; index failed */
+    } else if(result==GAME_SAVE_CTY_ERROR)last_action="CTY DISK ERROR";
+    else if(result==GAME_SAVE_ZON_ERROR)last_action="ZON DISK ERROR";
+    else if(result==GAME_SAVE_NBL_ERROR)last_action="NBL DISK ERROR";
+    else if(result==GAME_SAVE_COMMIT_ERROR)last_action="SAVE COMMIT ERR";
+    else last_action="NO FREE SLOT";
+}
 
-    /* DOS 8.3 names, skip a slot if EITHER file exists. Don't clobber
-     * an orphan .ZON file left by a failed previous save operation.
-     */
-    for (slot = 1U; slot < 10000U; ++slot) {
-        sprintf(cityname, "CITY%04u.CTY", slot);
-        sprintf(zonename, "CITY%04u.ZON", slot);
-        sprintf(buildingname,"CITY%04u.NBL",slot);
-        f = fopen(cityname, "rb");
-        if (f != NULL) {
-            fclose(f);
-            continue;
-        }
-        f = fopen(zonename, "rb");
-        if (f != NULL) {
-            fclose(f);
-            continue;
-        }
-        f=fopen(buildingname,"rb");
-        if(f!=NULL){fclose(f);continue;}
-        if (!city_save_as(cityname))
-            return 0;
-        if (!zoning_save(zonename)) {
-            last_action = "ZON ERR";
-            return 0;
-        }
-        if(!newer_lot_save(buildingname)) {
-            last_action = "NBL ERR";
-            return 0;
-        }
-        return 1;
+/* Reopen the newest fully committed save without restarting DOS.
+ * This works even if the player's startup BAT always launches
+ * HAPPISLE.CTY. The currently loaded unsaved state is replaced.
+ */
+static void load_saved_city(void)
+{
+    unsigned int slot=0U;
+    if(!game_save_load_last(&slot)) {
+        last_action="LOAD ERROR";
+        return;
     }
-    return 0;
+    active_save_slot=slot;
+    simulation_init();
+    map_turns=0U;
+    if(!city_suggest_view(VIEW_W,VIEW_H,&scroll_x,&scroll_y)) {
+        scroll_x=0U;scroll_y=0U;
+    }
+    cursor_x=VIEW_W/2U;
+    cursor_y=VIEW_H/2U;
+    zone_minimap_dirty=0;
+    badge_sweep_pos=VIEW_W*VIEW_H;
+    stadium_last_scroll_x=65535U;
+    sim_clock_started=0;
+    sprintf(save_action,"LOADED CITY%04u",slot);
+    last_action=save_action;
+    render_full();
 }
 
 /* If another tool/menu is chosen while the mouse is held, the unfinished
@@ -1988,7 +2003,10 @@ static void run_menu_action(enum ui_action action)
     unsigned int powered;
     switch (action) {
     case UI_SAVE:
-        last_action = save_city_new_file() ? "SAVED" : "SAVE ERR";
+        save_current_city();
+        break;
+    case UI_LOAD_LAST:
+        load_saved_city();
         break;
     case UI_EXIT:
         exit_requested = 1;
@@ -2755,6 +2773,11 @@ static void keyboard_loop(void)
             run_menu_action(UI_SCAN_POWER);
         else if (scan == 0x3cU)
             run_menu_action(UI_SAVE);
+        else if (scan == 0x3dU) {
+            run_menu_action(UI_LOAD_LAST);
+            mouse_pointer_show();
+            continue;
+        }
 
         if (scroll_x != prev_x || scroll_y != prev_y) {
             next_x = scroll_x;
@@ -2981,6 +3004,10 @@ int main(int argc, char **argv)
             allow_mouse = 0;
         } else if (!have_city && city_load(argv[i])) {
             have_city = 1;
+            /* A local saved CITYnnnn.CTY can be updated via F2.
+             * Explicit original HAPPISLE.CTY is copied instead.
+             */
+            (void)game_save_parse_slot(argv[i],&active_save_slot);
             /* Original HAPPISLE starts with water in the upper left.
              * Start near actual homes so growth is visible to players.
              * This is camera-only; it never changes the city file.
@@ -3004,6 +3031,13 @@ int main(int argc, char **argv)
                     argv[i]);
             return 1;
         }
+    }
+    if (!have_city && game_save_load_last(&active_save_slot)) {
+        have_city=1;
+        (void)city_suggest_view(VIEW_W,VIEW_H,
+                                &scroll_x,&scroll_y);
+        sprintf(save_action,"RESUME CITY%04u",active_save_slot);
+        last_action=save_action;
     }
     if (!have_city) {
         city_make_demo();
