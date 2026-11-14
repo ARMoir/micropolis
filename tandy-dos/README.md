@@ -811,3 +811,45 @@ an isolated blank viewport to compare raw VRAM byte-vs-word copy speed.
 The new `/TIMEDEMO` intentionally renders real tiles and real camera
 motion, like Wolfenstein's gameplay benchmark. Neither benchmark
 result claims a performance increase until tested on real hardware.
+
+## Menu and bulldozer latency fixes (Tandy V20)
+
+On the actual 7 MHz Tandy, interacting with **SYSTEM, TOOLS, VIEW,
+HELP** previously triggered `render_full()` to repaint the whole
+32x21 city, all eight icon buttons, and the minimap. It also repainted
+*every* row of a dropdown on every highlighted-item change.
+
+Now each popup remembers the packed B800 video-memory pixels directly
+under its 128-pixel-wide rectangle. Opening and changing dropdowns
+touches **only the popup**, switching/closing restores only its saved
+pixels, and navigating between entries redraws **the two affected
+rows**. The SYSTEM dropdown begins at x=64, beyond the sidebar; no
+dropdown covers the left toolbar. Menus keep the exact same controls,
+actions and keyboard shortcuts. The overlay backup is at most
+9 rows × 8 scanlines × 64 bytes = **4,608 bytes**, and it does not
+require a second frame buffer or graphics-mode switch. Help/about
+screens and intentional 90-degree camera rotations may still redraw
+their larger content.
+
+Bulldozer now redraws **3x3 nearby tiles** rather than a 5x5 region
+after each map edit (coal placement retains its required 5x5 area).
+A one-square edit updates only the corresponding sampled minimap
+pixel(s), preserving the bright camera border even after rotating the
+view, rather than repainting all 56x44 minimap pixels. The
+`test-view-rotation` regression checks the precise minimap projection
+for all 12,000 world squares at all four view orientations.
+
+Removing a tile marks the power network dirty **only when the removed
+tile actually had CONDBIT set**; deleting grass, ordinary roads, or
+railways doesn't need a 12,000-cell electrical rescan. A mouse-held
+bulldozer stroke additionally defers that scan until release so a
+continuous demolition doesn't repeatedly stop on the V20. Wire,
+power-crossing, conductive-building, and power-plant removal still
+invalidate the network correctly. The next simulation update performs
+one required scan, not one scan per bulldozed square.
+
+**Hardware validation:** GitHub Actions proves Open Watcom 8086
+compilation and host regression correctness; actual wall-clock menu
+speed and bulldozer responsiveness still need to be tried on the
+Tandy itself. Use `MICROPOL /TIMEDEMO` to separately measure actual
+viewport scrolling and city+HUD performance, without changing saves.
