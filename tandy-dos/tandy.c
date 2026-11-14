@@ -896,13 +896,17 @@ static void erase_cursor(void)
     draw_display_tile(cursor_x,cursor_y);
 }
 
-static void redraw_edit_area(void)
+static void redraw_edit_area(unsigned int radius)
 {
     unsigned int x, y, min_x, max_x, min_y, max_y;
-    min_x = cursor_x > 2U ? cursor_x - 2U : 0U;
-    min_y = cursor_y > 2U ? cursor_y - 2U : 0U;
-    max_x = cursor_x + 2U < VIEW_W ? cursor_x + 2U : VIEW_W - 1U;
-    max_y = cursor_y + 2U < VIEW_H ? cursor_y + 2U : VIEW_H - 1U;
+    /* Bulldozer's neighbor repair touches only this square and its
+     * four cardinal neighbors: 3x3 is plenty. Keep 5x5 for the 4x4
+     * coal-plant artwork because it spans farther than the cursor.
+     */
+    min_x = cursor_x > radius ? cursor_x - radius : 0U;
+    min_y = cursor_y > radius ? cursor_y - radius : 0U;
+    max_x = cursor_x + radius < VIEW_W ? cursor_x + radius : VIEW_W - 1U;
+    max_y = cursor_y + radius < VIEW_H ? cursor_y + radius : VIEW_H - 1U;
     for (y = min_y; y <= max_y; ++y)
         for (x = min_x; x <= max_x; ++x)
             draw_display_tile(x,y);
@@ -1416,7 +1420,8 @@ static void apply_selected_tool(void)
 {
     unsigned int kind = selected_zone_kind();
     unsigned int mx,my;
-    int erased = 0;
+    unsigned short previous_tile;
+    int erased = 0, placed;
     display_to_world(cursor_x,cursor_y,&mx,&my);
     if (kind != ZONE_NONE || selected_tool == EDIT_ROAD ||
         selected_tool == EDIT_POWER) {
@@ -1452,22 +1457,37 @@ static void apply_selected_tool(void)
             last_action = "INSPECT";
         }
     } else {
+        previous_tile=city_at(mx,my);
         if (selected_tool == EDIT_BULLDOZE)
             erased = zoning_set(mx, my, ZONE_NONE);
-        if (edit_place(selected_tool, mx, my)) {
-            simulation_mark_power_dirty();
+        placed = edit_place(selected_tool,mx,my);
+        if (placed) {
+            /* Ordinary bulldozing of trees, roads, rail, or housing
+             * with no CONDBIT does NOT affect electricity. Scanning
+             * all 12,000 city cells in that case caused V20 pauses.
+             * Coal construction and removing conductive crossings,
+             * wires or powered buildings still invalidate the graph.
+             */
+            if (selected_tool != EDIT_BULLDOZE ||
+                (previous_tile & 16384U) != 0U)
+                simulation_mark_power_dirty();
             last_action = "PLACED";
-            redraw_edit_area();
+            redraw_edit_area(selected_tool==EDIT_BULLDOZE?1U:2U);
             draw_cursor();
-            draw_overview();
-        } else if (erased) {
-            last_action = "UNZONED";
         } else {
-            last_action = "BLOCKED";
+            last_action=erased?"UNZONED":"BLOCKED";
         }
-        if (erased) {
-            redraw_zoning_brush(mx, my, mx, my);
-            draw_overview();
+        if (erased)
+            redraw_zoning_brush(mx,my,mx,my);
+        if (placed || erased) {
+            if (selected_tool == EDIT_BULLDOZE) {
+                /* One projected minimap pixel, not 2464 pixel writes
+                 * for every tile during a bulldozer mouse stroke.
+                 */
+                draw_overview_world_tile(mx,my);
+            } else {
+                draw_overview(); /* coal changes a whole 4x4 footprint */
+            }
         }
     }
     draw_status();
