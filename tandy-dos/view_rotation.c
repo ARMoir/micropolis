@@ -203,8 +203,12 @@ unsigned int view_rotation_building_tile(unsigned int turns,
         first=240U;span=3U;
     } else if(graphic>=261U && graphic<=404U) {
         first=261U+((graphic-261U)/9U)*9U;span=3U;
-    } else if(graphic>=409U && graphic<=426U) {
-        first=409U+((graphic-409U)/9U)*9U;span=3U;
+    } else if(graphic>=405U && graphic<=422U) {
+        /* HOSPITAL=409 and CHURCH=418 are CENTER tile IDs, so
+         * the source 3x3 artwork begins at 405 / 414. Starting
+         * at 409 would overlap the first commercial sprite group.
+         */
+        first=405U+((graphic-405U)/9U)*9U;span=3U;
     } else if(graphic>=423U && graphic<=431U) {
         first=423U;span=3U;
     } else if(graphic>=432U && graphic<=611U) {

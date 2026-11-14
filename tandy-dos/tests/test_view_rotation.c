@@ -241,7 +241,7 @@ int main(void)
      */
     {
         static const unsigned int bases[10]={
-            240U,261U,409U,418U,423U,432U,
+            240U,261U,405U,414U,423U,432U,
             745U,761U,770U,811U
         };
         static const unsigned int spans[10]={
