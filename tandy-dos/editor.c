@@ -6,6 +6,7 @@
 #include "city.h"
 #include "editor.h"
 #include "connections.h"
+#include "infrastructure.h"
 
 #define TILE_ID  1023U
 #define BULLBIT  4096U
@@ -50,14 +51,27 @@ int edit_place(enum edit_tool tool, unsigned int x, unsigned int y)
         return 1;
     }
     if (tool == EDIT_ROAD || tool == EDIT_POWER) {
-        /* First milestone: only empty land or vegetation. */
-        if (tile > 43U || (tile >= 1U && tile <= 20U))
+        unsigned int crossing;
+        unsigned short placed;
+        if (!infrastructure_can_place(tool,x,y))
             return 0;
-        if (tool == EDIT_ROAD)
-            city_set(x, y, 66U | BURNBIT | BULLBIT);
-        else
-            city_set(x, y, 210U | BURNBIT | BULLBIT | CONDBIT);
-        connections_fix_cross(x, y);
+        crossing = infrastructure_crossing_id(tool,tile);
+        if (crossing != 0U) {
+            /* Original _LayRoad/_LayWire perpendicular crossings:
+             * retain both transport geometries and electrical
+             * conductivity where the completed tile contains wire.
+             */
+            placed = (unsigned short)(crossing | BURNBIT | BULLBIT);
+            if (crossing == 77U || crossing == 78U ||
+                crossing == 221U || crossing == 222U)
+                placed |= CONDBIT;
+        } else if (tool == EDIT_ROAD) {
+            placed = 66U | BURNBIT | BULLBIT;
+        } else {
+            placed = 210U | BURNBIT | BULLBIT | CONDBIT;
+        }
+        city_set(x,y,placed);
+        connections_fix_cross(x,y);
         return 1;
     }
 
