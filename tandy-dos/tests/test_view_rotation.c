@@ -133,6 +133,37 @@ int main(void)
             id=view_rotation_utility_tile(1U,id);
         assert(id==x); /* four 90-degree turns restore all sprites */
     }
+    /* A 56x44 minimap samples the 120x100 city at one nearest-neighbor
+     * world tile per pixel. Updating one bulldozed world tile must
+     * repaint EXACTLY the screen pixels sampling that tile, including
+     * after 90/180/270-degree rotations, and never its neighbors.
+     */
+    for(turn=0U;turn<4U;++turn) {
+        unsigned int mw=view_rotation_width(turn);
+        unsigned int mh=view_rotation_height(turn);
+        unsigned int px,py,x0,y0,x1,y1,wx,wy;
+        for(px=0U;px<56U;++px)
+            for(py=0U;py<44U;++py) {
+                view_rotation_to_world(turn,px*mw/56U,py*mh/44U,
+                                       &wx,&wy);
+                view_rotation_minimap_bounds(turn,wx,wy,56U,44U,
+                                             &x0,&y0,&x1,&y1);
+                assert(px>=x0 && px<x1 && py>=y0 && py<y1);
+            }
+        for(x=0U;x<CITY_WIDTH;++x)
+            for(y=0U;y<CITY_HEIGHT;++y) {
+                view_rotation_minimap_bounds(turn,x,y,56U,44U,
+                                             &x0,&y0,&x1,&y1);
+                assert(x0<=x1 && x1<=56U);
+                assert(y0<=y1 && y1<=44U);
+                for(px=x0;px<x1;++px)
+                    for(py=y0;py<y1;++py) {
+                        view_rotation_to_world(turn,px*mw/56U,
+                                               py*mh/44U,&wx,&wy);
+                        assert(wx==x && wy==y);
+                    }
+            }
+    }
     puts("120x100 rotation, zone edges, viewport bounds and map integrity passed");
     return 0;
 }
