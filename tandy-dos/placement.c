@@ -6,6 +6,7 @@
 #include "placement.h"
 #include "city.h"
 #include "zoning.h"
+#include "infrastructure.h"
 
 #define PLAN_BYTES ((CITY_TILES + 3U) / 4U)
 #define TILE_ID 1023U
@@ -63,7 +64,11 @@ static int can_place(unsigned int x, unsigned int y)
     }
     if (zoning_at(x, y) != ZONE_NONE)
         return 0; /* infrastructure must not silently delete zoning */
-    return tile == 0U || (tile >= 21U && tile <= 43U);
+    /* Preview MUST use the same crossing rules as edit_place().
+     * Otherwise a valid road-over-rail or wire-over-road crossing
+     * gets rejected before mouse-up despite having original art.
+     */
+    return infrastructure_can_place(current_tool,x,y);
 }
 
 int placement_active(void) { return active; }
