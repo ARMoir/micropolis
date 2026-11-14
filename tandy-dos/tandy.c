@@ -1316,7 +1316,32 @@ static void apply_selected_tool(void)
         return;
     }
     if (selected_tool == EDIT_INSPECT) {
-        last_action = "INSPECT";
+        /* Original Happisle has many more rails than roads. Identify
+         * what the player actually clicked instead of treating the
+         * railway graphics as a failed road render. For new custom
+         * 1x1 RCI lots, explain why residents may not yet move in.
+         */
+        unsigned int tile = city_at(mx,my) & 1023U;
+        unsigned int zone = zoning_at(mx,my);
+        unsigned int services;
+        if (tile >= 64U && tile <= 207U) {
+            last_action = "ROAD TILE";
+        } else if (tile >= 224U && tile <= 238U) {
+            last_action = "RAIL TILE";
+        } else if (tile >= 208U && tile <= 223U) {
+            last_action = "POWER LINE";
+        } else if (zone != ZONE_NONE &&
+                   (tile == 0U || (tile >= 21U && tile <= 43U))) {
+            services = simulation_lot_service(mx,my);
+            if (!(services & SIM_SERVICE_TRANSPORT))
+                last_action = "NEED ROAD/RAIL";
+            else if (!(services & SIM_SERVICE_POWER))
+                last_action = "NEED POWER";
+            else
+                last_action = "LOT SERVICED";
+        } else {
+            last_action = "INSPECT";
+        }
     } else {
         if (selected_tool == EDIT_BULLDOZE)
             erased = zoning_set(mx, my, ZONE_NONE);
