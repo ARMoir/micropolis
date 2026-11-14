@@ -29,7 +29,7 @@ int small_lot_art_load(const char *path)
 const unsigned char *small_lot_art_pixels(unsigned int tile,
     unsigned int kind, unsigned int stage, unsigned int x, unsigned int y)
 {
-    /* Source order: commercial 7C..83, industrial 84..87.
+    /* NewerSource order: commercial 7C..83, industrial 84..87.
      * Stable world-coordinate variety survives reload and view rotation.
      * Bigger shops/offices and industrial plant appear at higher density.
      */

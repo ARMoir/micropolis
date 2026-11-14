@@ -16,6 +16,7 @@
 #include "engine.h"
 #include "simulation.h"
 #include "zoning.h"
+#include "newer_lot.h"
 #include <stddef.h>
 
 #define TILE_MASK 1023U
@@ -237,6 +238,28 @@ static int process_zone(unsigned int x, unsigned int y,
             if (kind == ZONE_RES) ++growth_res;
             else if (kind == ZONE_COM) ++growth_com;
             else ++growth_ind;
+        }
+    }
+    /* Mature adjacent 1x1 plots may consolidate into a complete 2x2
+     * source building, then expand to 3x3 if contiguous same-type
+     * serviced land permits. This is checked only on occasional
+     * mature-square scans, never on every terrain tile or frame.
+     * The overlay owns the whole footprint; original CTY tiles stay.
+     */
+    if(next==3U && stage==3U && road && power &&
+       (roll&15U)==0U) {
+        unsigned int bx=0U,by=0U;
+        unsigned int span=newer_lot_try_grow(x,y,kind,&bx,&by);
+        if(span!=0U) {
+            ++growth_this_month;
+            changed=1U;
+            last_x=bx;last_y=by;
+            last_radius=span; /* 2x2 or 3x3 upper-left for renderer */
+            last_change_valid=1U;
+            if(kind==ZONE_RES){
+                last_home_x=bx;last_home_y=by;
+                last_home_valid=1U;
+            }
         }
     }
     if (next != stage) {

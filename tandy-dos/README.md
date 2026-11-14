@@ -1136,3 +1136,50 @@ the 128x16 Road/Rail or 128x32 civic-popup pixels immediately. No
 full viewport refresh or simulation-tick delay is needed. These changes
 also preserve the existing 4,608-byte scratch buffer and pointer
 hide/show rules, without adding work to ordinary gameplay.
+
+## NewerSource complete residential, commercial and industrial lots
+
+Original Micropolis `TILES.DAT`, original built-in 3x3 buildings, and
+the underlying .CTY city tile IDs are preserved unchanged. Residential
+custom 1x1 plots may use the original detached-house art. Developed
+commercial and industrial 1x1 plots **never** show a cropped center
+piece from an original 3x3 building. They use the full 1x1 source
+sprite or a simple fallback silhouette when optional assets are absent.
+Vacant 1x1 lots show normal ground.
+
+The legacy 12-sprite small-lot pack is **byte-for-byte unchanged**.
+Its new public filename `NEWER1.DAT` is copied directly from legacy
+`SC2K.DAT`; the older filename continues to load as a fallback. The
+new `NEWERM8.DAT` contains the full 797-tile 8x8 footprint library.
+Both are bundled beside the original `TILES.DAT`.
+
+During phased growth, four mature adjacent 1x1 same-type RCI plots can
+consolidate into a complete **2x2 apartment, office/shop or factory**.
+With a sufficiently mature and unobstructed adjoining neighborhood, a
+2x2 building can later expand into a complete **3x3** building. Each
+zone type uses its own source building family and complete subtile
+graphics. Unavailable space leaves existing independent 1x1 buildings
+alone. Source 4x4 resources are power/civic facilities and arcologies,
+not ordinary RCI density tiers; those assets are preserved separately
+for future work.
+
+Multi-lot records use a compact owner lookup and sparse entries rather
+than putting new IDs into the original .CTY map. Each saved city now has
+a matching `CITYnnnn.NBL` footprint sidecar in addition to its original
+`CITYnnnn.CTY` and `CITYnnnn.ZON`. .NBL records have a versioned
+header, checksum and load-time validation for bounds, building identity
+and overlap. The existing .ZON format remains v3, and older cities with
+no .NBL still open normally.
+
+**Bulldozing any tile** of a new 2x2 or 3x3 building removes its entire
+structure but leaves all its underlying 1x1 zone assignments intact,
+now vacant (development density zero). Explicit zone erasure also
+dismantles its containing multi-lot before unzoning that single cell.
+Roads, rails, wires, existing source buildings, mixed zone types and
+water cannot be consumed by automatic expansion.
+
+All 8x8 sprite pieces are precomputed at build time; camera rotation
+selects the correct piece of the upright whole building. There is no
+dynamic sprite scaling or per-frame full-city lookup. Source provenance
+remains in the archived resource documentation; public runtime asset
+names use `NewerSource` and do not imply ownership of original art.

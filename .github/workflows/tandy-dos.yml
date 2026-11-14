@@ -5,11 +5,13 @@ on:
     branches: [master]
     paths:
       - 'tandy-dos/**'
+      - 'resources/sc2k-buildings/**'
       - '.github/workflows/tandy-dos.yml'
   pull_request:
     branches: [master]
     paths:
       - 'tandy-dos/**'
+      - 'resources/sc2k-buildings/**'
       - '.github/workflows/tandy-dos.yml'
   workflow_dispatch:
 
@@ -35,19 +37,19 @@ jobs:
             -o test-city tandy-dos/city.c tandy-dos/tests/test_city.c
           ./test-city micropolis-activity/cities/happisle.cty
           cc -std=c89 -Wall -Wextra -pedantic \
-            -o test-editor tandy-dos/city.c tandy-dos/zoning.c tandy-dos/editor.c tandy-dos/connections.c tandy-dos/infrastructure.c tandy-dos/tests/test_editor.c
+            -o test-editor tandy-dos/city.c tandy-dos/zoning.c tandy-dos/newer_lot.c tandy-dos/editor.c tandy-dos/connections.c tandy-dos/infrastructure.c tandy-dos/tests/test_editor.c
           ./test-editor
           cc -std=c89 -Wall -Wextra -pedantic \
-            -o test-connections tandy-dos/city.c tandy-dos/zoning.c tandy-dos/editor.c tandy-dos/connections.c tandy-dos/infrastructure.c tandy-dos/tests/test_connections.c
+            -o test-connections tandy-dos/city.c tandy-dos/zoning.c tandy-dos/newer_lot.c tandy-dos/editor.c tandy-dos/connections.c tandy-dos/infrastructure.c tandy-dos/tests/test_connections.c
           ./test-connections
           cc -std=c89 -Wall -Wextra -pedantic \
             -o test-crossings tandy-dos/city.c tandy-dos/editor.c \
             tandy-dos/connections.c tandy-dos/infrastructure.c \
-            tandy-dos/placement.c tandy-dos/zoning.c tandy-dos/engine.c \
+            tandy-dos/placement.c tandy-dos/zoning.c tandy-dos/newer_lot.c tandy-dos/engine.c \
             tandy-dos/tests/test_crossings.c
           ./test-crossings
           cc -std=c89 -Wall -Wextra -pedantic \
-            -o test-engine tandy-dos/city.c tandy-dos/zoning.c \
+            -o test-engine tandy-dos/city.c tandy-dos/zoning.c tandy-dos/newer_lot.c \
             tandy-dos/engine.c tandy-dos/tests/test_engine.c
           ./test-engine
           cc -std=c89 -Wall -Wextra -pedantic \
@@ -74,15 +76,21 @@ jobs:
             -o test-video-ops tandy-dos/video_ops.c tandy-dos/tests/test_video_ops.c
           ./test-video-ops
           cc -std=c89 -Wall -Wextra -pedantic \
-            -o test-zoning tandy-dos/city.c tandy-dos/zoning.c tandy-dos/tests/test_zoning.c
+            -o test-zoning tandy-dos/city.c tandy-dos/zoning.c tandy-dos/newer_lot.c tandy-dos/tests/test_zoning.c
           ./test-zoning
           cc -std=c89 -Wall -Wextra -pedantic \
-            -o test-placement tandy-dos/city.c tandy-dos/zoning.c \
+            -o test-newer-lot tandy-dos/city.c tandy-dos/zoning.c \
+            tandy-dos/newer_lot.c tandy-dos/editor.c \
+            tandy-dos/connections.c tandy-dos/infrastructure.c \
+            tandy-dos/tests/test_newer_lot.c
+          ./test-newer-lot
+          cc -std=c89 -Wall -Wextra -pedantic \
+            -o test-placement tandy-dos/city.c tandy-dos/zoning.c tandy-dos/newer_lot.c \
             tandy-dos/editor.c tandy-dos/connections.c \
             tandy-dos/placement.c tandy-dos/infrastructure.c tandy-dos/tests/test_placement.c
           ./test-placement
           cc -std=c89 -Wall -Wextra -pedantic \
-            -o test-simulation tandy-dos/city.c tandy-dos/zoning.c \
+            -o test-simulation tandy-dos/city.c tandy-dos/zoning.c tandy-dos/newer_lot.c \
             tandy-dos/engine.c tandy-dos/simulation.c \
             tandy-dos/tests/test_simulation.c
           ./test-simulation micropolis-activity/cities/happisle.cty
@@ -90,6 +98,10 @@ jobs:
       - name: Convert original Micropolis tile art to Tandy format
         run: |
           cp resources/sc2k-buildings/SC2K.DAT SC2K.DAT
+          cp resources/sc2k-buildings/SC2K.DAT NEWER1.DAT
+          cp resources/sc2k-buildings/SC2KM8.DAT NEWERM8.DAT
+          cmp -s NEWER1.DAT SC2K.DAT
+          test "$(wc -c < NEWERM8.DAT)" -eq 25504
           python3 tandy-dos/tools/convert_tiles.py micropolis-activity/images/tiles.xpm TILES.DAT
           test "$(wc -c < TILES.DAT)" -eq 30720
           python3 tandy-dos/tests/test_tile_palette.py micropolis-activity/images/tiles.xpm TILES.DAT
@@ -134,7 +146,7 @@ jobs:
         run: |
           wcl -bcl=dos -0 -ml -q -fe=MICROPOL.EXE \
             tandy-dos/tandy.c tandy-dos/city.c tandy-dos/editor.c tandy-dos/connections.c tandy-dos/engine.c \
-            tandy-dos/ui.c tandy-dos/mouse.c tandy-dos/zoning.c \
+            tandy-dos/ui.c tandy-dos/mouse.c tandy-dos/zoning.c tandy-dos/newer_lot.c \
             tandy-dos/placement.c tandy-dos/simulation.c tandy-dos/video_ops.c tandy-dos/menu_font.c tandy-dos/view_rotation.c tandy-dos/tool_art.c tandy-dos/infrastructure.c tandy-dos/small_lot_art.c
           test -s MICROPOL.EXE
           file MICROPOL.EXE
@@ -147,6 +159,8 @@ jobs:
             MICROPOL.EXE
             TILES.DAT
             SC2K.DAT
+            NEWER1.DAT
+            NEWERM8.DAT
             HAPPISLE.CTY
             micropolis-activity/COPYING
             tandy-dos/README.md
@@ -180,13 +194,13 @@ jobs:
           test -s micropolis-activity/COPYING
           test -s tandy-dos/README.md
           mkdir -p release/package
-          cp MICROPOL.EXE TILES.DAT SC2K.DAT HAPPISLE.CTY release/package/
+          cp MICROPOL.EXE TILES.DAT SC2K.DAT NEWER1.DAT NEWERM8.DAT HAPPISLE.CTY release/package/
           cp micropolis-activity/COPYING release/package/COPYING
           cp tandy-dos/README.md release/package/README.md
           (
             cd release/package
             zip -q -9 ../MICROPOL-TANDY-DOS.zip \
-              MICROPOL.EXE TILES.DAT SC2K.DAT HAPPISLE.CTY README.md COPYING
+              MICROPOL.EXE TILES.DAT SC2K.DAT NEWER1.DAT NEWERM8.DAT HAPPISLE.CTY README.md COPYING
           )
           unzip -t release/MICROPOL-TANDY-DOS.zip
 
@@ -205,11 +219,13 @@ jobs:
             release/package/MICROPOL.EXE \
             release/package/TILES.DAT \
             release/package/SC2K.DAT \
+            release/package/NEWER1.DAT \
+            release/package/NEWERM8.DAT \
             release/package/HAPPISLE.CTY \
             --repo "$GITHUB_REPOSITORY" \
             --target "$GITHUB_SHA" \
             --title "Micropolis Tandy DOS Build #$GITHUB_RUN_NUMBER" \
-            --notes "Successful Open Watcom 16-bit DOS build from master. Run #$GITHUB_RUN_NUMBER (attempt $GITHUB_RUN_ATTEMPT), commit $GITHUB_SHA. Includes MICROPOL.EXE, TILES.DAT, HAPPISLE.CTY, README and license." \
+            --notes "Successful Open Watcom 16-bit DOS build from master. Run #$GITHUB_RUN_NUMBER (attempt $GITHUB_RUN_ATTEMPT), commit $GITHUB_SHA. Includes MICROPOL.EXE, original TILES.DAT, unchanged 1x1 art and complete 2x2/3x3 NewerSource art, HAPPISLE.CTY and license." \
             --latest
 
           # Use paginated REST results so this cleans up ALL older

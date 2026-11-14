@@ -8,6 +8,7 @@
 #include "connections.h"
 #include "infrastructure.h"
 #include "zoning.h"
+#include "newer_lot.h"
 
 #define TILE_ID  1023U
 #define BULLBIT  4096U
@@ -49,6 +50,12 @@ int edit_place(enum edit_tool tool, unsigned int x, unsigned int y)
     if (tool == EDIT_INSPECT)
         return 0;
     if (tool == EDIT_BULLDOZE) {
+        /* A single demolished piece removes the entire NEWER 2x2/3x3
+         * footprint, restoring all its separate original vacant zones.
+         * Do NOT touch source city art or erase its zoning.
+         */
+        if(newer_lot_demolish(x,y,0,0)!=0U)
+            return 1;
         if (tile == 0U || (tile >= 1U && tile <= 20U))
             return 0; /* don't delete waterways */
         /* Removing a bridge uncovers the river, not a dirt tile.

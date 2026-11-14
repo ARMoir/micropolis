@@ -41,9 +41,10 @@ banked buffers and 32-bit offsets rather than a single 16-bit-sized allocation.
 Checksums are in `SHA256SUMS-FOOTPRINTS`.
 
 These packs do not replace `TILES.DAT` or the 12-building `SC2K.DAT`.
-Placement, growth, bulldozing, anchor selection and gameplay tile IDs for
-new multi-tile buildings are future work. The existing 1×1 C/I integration
-and its pack remain byte-for-byte unchanged.
+The Tandy DOS runtime now displays full 2×2/3×3 RCI buildings and
+supports growth, demolition and separate, validated .NBL footprint
+records. The original .CTY tile IDs and the existing 1×1 C/I data
+are unchanged. 4×4 facility/arcology gameplay remains future work.
 
 ![Footprint-sized classic buildings](preview-multi-16.png)
 
@@ -76,11 +77,21 @@ Record `i` represents SC2000 ID `0x70 + i`; byte offsets are `i*32` and
 **The full libraries are not replacements for the original TILES.DAT.**
 Their IDs and counts differ from Micropolis's 960-tile atlas. The legacy 16×16 XPM
 is a classic-size artwork library, not a plug-and-play SimCity Classic game
-file: assigning gameplay IDs and composing larger footprints remains future
-integration work. Each source building is fitted into one icon, including
+file: The Tandy DOS implementation now composes complete 2×2 and 3×3 RCI
+footprints in a sidecar overlay; assigning original CTY gameplay IDs
+remains explicitly out of scope. Each source building is fitted into one icon, including
 buildings whose original footprint is 2×2, 3×3 or larger.
 
 ## Using the current integration
+
+For the DOS build, the public runtime filenames are now
+`NEWER1.DAT` (an exact copy of the unchanged 1×1 pack) and
+`NEWERM8.DAT` (the full 797-tile footprint library). The legacy
+`SC2K.DAT` remains accepted for existing installations. The archival
+conversion directory below uses historical source names to preserve
+accurate provenance and reproducibility; its documented origin is not
+a claim of copyright ownership.
+
 
 Copy `SC2K.DAT` beside the newly built `MICROPOL.EXE` and normal `TILES.DAT`.
 Developed custom 1×1 commercial/industrial lots use eight commercial and

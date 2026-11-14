@@ -2,7 +2,7 @@
 #ifndef TANDY_SMALL_LOT_ART_H
 #define TANDY_SMALL_LOT_ART_H
 
-/* Optional SC2K.DAT: 8-byte S2LT/version/size/count/stride header,
+/* Optional neutral NEWER1.DAT (legacy SC2K.DAT accepted): 8-byte S2LT/version/size/count/stride header,
  * followed by twelve 8x8, high-nibble-first 16-color tiles.
  * Display-only art: never allocated a CTY tile ID or saved in a city.
  */

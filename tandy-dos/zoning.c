@@ -12,6 +12,7 @@
  */
 #include "city.h"
 #include "zoning.h"
+#include "newer_lot.h"
 #include <stdio.h>
 
 #define ZONING_LENGTH (CITY_WIDTH * CITY_HEIGHT)
@@ -154,6 +155,12 @@ int zoning_set(unsigned int x, unsigned int y, unsigned int kind)
     offset = x * CITY_HEIGHT + y;
     if (zone_get(offset) == kind)
         return 0;
+    /* Right-click rezoning/erasure cannot leave an orphaned half of a
+     * multi-lot building. Tear down its whole new overlay first while
+     * keeping the old per-square zones/density consistent.
+     */
+    if(newer_lot_at(x,y))
+        (void)newer_lot_demolish(x,y,0,0);
     zone_put(offset, kind);
     packed_put(density_grid, offset, 0U); /* changing zone clears old growth */
     return 1;

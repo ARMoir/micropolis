@@ -25,6 +25,7 @@
 #include "tool_picker.h"
 #include "pointer_policy.h"
 #include "small_lot_art.h"
+#include "newer_lot.h"
 
 #define SCREEN_W 320U
 #define SCREEN_H 200U
@@ -349,10 +350,57 @@ static void draw_city_tile(unsigned int px, unsigned int py,
     unsigned int i;
     int v, h;
     const unsigned char *small = NULL;
+    const unsigned char far *large = newer_lot_pixels(mx,my,map_turns);
+    unsigned int kind=ZONE_NONE,stage=0U;
 
-    if (t == 0U || (t >= 21U && t <= 43U))
-        small = small_lot_art_pixels(t,
-            zoning_at(mx,my), zoning_development_at(mx,my), mx,my);
+    /* The multi-lot overlay selects a complete 2x2 or 3x3 building
+     * from NEWERM8.DAT in the current view rotation. The original
+     * .CTY terrain remains underneath. Fall back to an intentional
+     * compact silhouette if the optional art pack is absent.
+     */
+    if(newer_lot_at(mx,my)) {
+        if(large != NULL) draw_packed_tile(px,py,large);
+        else {
+            kind=zoning_at(mx,my);
+            solid_tile(px,py,kind==ZONE_RES?8U:
+                             kind==ZONE_COM?1U:6U);
+            box_pixels(px+1U,py+1U,6U,6U,7U);
+            pixel(px+2U,py+2U,15U);
+            pixel(px+5U,py+2U,15U);
+        }
+        draw_zone_border(px,py,mx,my);
+        draw_pending_tile(px,py,mx,my);
+        return;
+    }
+    if (t == 0U || (t >= 21U && t <= 43U)) {
+        kind=zoning_at(mx,my);
+        stage=zoning_development_at(mx,my);
+        small=small_lot_art_pixels(t,kind,stage,mx,my);
+        /* Never use a single center piece of a legacy 3x3
+         * commercial/industrial zone as a 1x1 structure. When the
+         * optional original 12-sprite pack is missing, use a clean
+         * 8x8 office/factory silhouette instead.
+         */
+        if((kind==ZONE_COM || kind==ZONE_IND) && stage!=0U) {
+            if(small != NULL) draw_packed_tile(px,py,small);
+            else {
+                unsigned char shade=(unsigned char)
+                    (kind==ZONE_COM?8U:6U);
+                solid_tile(px,py,2U);
+                box_pixels(px+1U,py+1U,6U,6U,shade);
+                box_pixels(px+2U,py+2U,4U,1U,15U);
+                if(kind==ZONE_COM) {
+                    pixel(px+2U,py+4U,11U);
+                    pixel(px+5U,py+4U,11U);
+                } else {
+                    box_pixels(px+2U,py+4U,4U,2U,4U);
+                }
+            }
+            draw_zone_border(px,py,mx,my);
+            draw_pending_tile(px,py,mx,my);
+            return;
+        }
+    }
 
     if (small != NULL) {
         draw_packed_tile(px,py,small);
@@ -368,8 +416,8 @@ static void draw_city_tile(unsigned int px, unsigned int py,
          * the underlying .CTY sprite or map tile itself.
          */
         if (t == 0U || (t >= 21U && t <= 43U)) {
-            unsigned int kind = zoning_at(mx, my);
-            unsigned int stage = zoning_development_at(mx, my);
+            kind = zoning_at(mx, my);
+            stage = zoning_development_at(mx, my);
             /* The small-lot simulator changes ONLY the art displayed in
              * custom-zoned empty/wooded squares. Original 3x3 .CTY
              * building sprites are never overwritten or reinterpreted.
@@ -378,19 +426,13 @@ static void draw_city_tile(unsigned int px, unsigned int py,
              */
             if (kind == ZONE_RES) {
                 static const unsigned short res[4] = {
-                    244U, 249U, 252U, 258U
+                    0U, 249U, 252U, 258U
                 };
-                graphic = res[stage];
-            } else if (kind == ZONE_COM) {
-                static const unsigned short com[4] = {
-                    427U, 440U, 449U, 458U
-                };
-                graphic = com[stage];
-            } else if (kind == ZONE_IND) {
-                static const unsigned short ind[4] = {
-                    616U, 629U, 638U, 647U
-                };
-                graphic = ind[stage];
+                graphic = stage?res[stage]:t;
+            } else if (kind == ZONE_COM || kind == ZONE_IND) {
+                /* Vacant C/I remains genuine terrain, never a crop
+                 * of an incomplete original 3x3 sprite. */
+                graphic = t;
             }
         }
         /* Road and wire connections turn using ORIGINAL tiles.
@@ -1033,7 +1075,20 @@ static void apply_zone_stroke(unsigned int x0, unsigned int y0,
 {
     unsigned int changed = zoning_paint_line(x0, y0, x1, y1, kind);
     if (changed) {
-        redraw_zoning_brush(x0, y0, x1, y1);
+        if(kind==ZONE_NONE) {
+            /* One unzone can dismantle an entire 3x3 newer structure.
+             * Redraw that small perimeter, never the full viewport.
+             */
+            unsigned int xlo=(x0<x1?x0:x1);
+            unsigned int ylo=(y0<y1?y0:y1);
+            unsigned int xhi=(x0>x1?x0:x1);
+            unsigned int yhi=(y0>y1?y0:y1);
+            xlo=xlo>2U?xlo-2U:0U;
+            ylo=ylo>2U?ylo-2U:0U;
+            xhi=xhi+2U<CITY_WIDTH?xhi+2U:CITY_WIDTH-1U;
+            yhi=yhi+2U<CITY_HEIGHT?yhi+2U:CITY_HEIGHT-1U;
+            redraw_zoning_brush(xlo,ylo,xhi,yhi);
+        } else redraw_zoning_brush(x0, y0, x1, y1);
         last_action = kind == ZONE_NONE ? "UNZONED" : "ZONED";
         if (!zone_minimap_dirty) {
             simulation_mark_lots_dirty(); /* once per eraser stroke */
@@ -1515,7 +1570,7 @@ static void render_full(void)
 static int save_city_new_file(void)
 {
     unsigned int slot;
-    char cityname[13], zonename[13];
+    char cityname[13], zonename[13], buildingname[13];
     FILE *f;
 
     /* DOS 8.3 names, skip a slot if EITHER file exists. Don't clobber
@@ -1524,6 +1579,7 @@ static int save_city_new_file(void)
     for (slot = 1U; slot < 10000U; ++slot) {
         sprintf(cityname, "CITY%04u.CTY", slot);
         sprintf(zonename, "CITY%04u.ZON", slot);
+        sprintf(buildingname,"CITY%04u.NBL",slot);
         f = fopen(cityname, "rb");
         if (f != NULL) {
             fclose(f);
@@ -1534,10 +1590,16 @@ static int save_city_new_file(void)
             fclose(f);
             continue;
         }
+        f=fopen(buildingname,"rb");
+        if(f!=NULL){fclose(f);continue;}
         if (!city_save_as(cityname))
             return 0;
         if (!zoning_save(zonename)) {
             last_action = "ZON ERR";
+            return 0;
+        }
+        if(!newer_lot_save(buildingname)) {
+            last_action = "NBL ERR";
             return 0;
         }
         return 1;
@@ -1710,8 +1772,14 @@ static void apply_selected_tool(void)
             last_action = "INSPECT";
         }
     } else {
+        unsigned int larger=0U,bx=0U,by=0U;
         previous_tile=city_at(mx,my);
-        if (selected_tool == EDIT_BULLDOZE)
+        if(selected_tool==EDIT_BULLDOZE)
+            (void)newer_lot_info(mx,my,&bx,&by,&larger,0,0);
+        /* A multi-lot bulldoze must restore every underlying 1x1
+         * empty zone, not delete the one clicked zone assignment.
+         */
+        if (selected_tool == EDIT_BULLDOZE && !larger)
             erased = zoning_set(mx, my, ZONE_NONE);
         placed = edit_place(selected_tool,mx,my);
         if (placed) {
@@ -1727,8 +1795,12 @@ static void apply_selected_tool(void)
                 selected_tool==EDIT_FIRE ||
                 ((previous_tile ^ city_at(mx,my)) & 16384U)!=0U)
                 simulation_mark_power_dirty();
-            last_action = "PLACED";
-            redraw_edit_area(selected_tool==EDIT_BULLDOZE?1U:2U);
+            last_action = larger?"CLEARED":"PLACED";
+            if(larger) {
+                redraw_zoning_brush(bx,by,bx+larger-1U,
+                                   by+larger-1U);
+            } else
+                redraw_edit_area(selected_tool==EDIT_BULLDOZE?1U:2U);
             draw_cursor();
         } else {
             last_action=erased?"UNZONED":"BLOCKED";
@@ -1739,7 +1811,10 @@ static void apply_selected_tool(void)
         }
         if (placed || erased) {
             if(selected_tool==EDIT_BULLDOZE) {
-                draw_overview_world_tile(mx,my);
+                if(larger)
+                    draw_overview_world_rect(bx,by,bx+larger-1U,
+                                             by+larger-1U,0);
+                else draw_overview_world_tile(mx,my);
             } else if(selected_tool==EDIT_COAL ||
                       selected_tool==EDIT_NUCLEAR ||
                       selected_tool==EDIT_POLICE ||
@@ -2226,7 +2301,10 @@ static void simulation_idle(void)
         mouse_pointer_hide();
     if (event & SIM_EVENT_TILE) {
         simulation_last_change(&tx, &ty);
-        if (simulation_last_change_radius() != 0U) {
+        if(simulation_last_change_radius() >= 2U) {
+            unsigned int span=simulation_last_change_radius();
+            redraw_zoning_brush(tx,ty,tx+span-1U,ty+span-1U);
+        } else if (simulation_last_change_radius() != 0U) {
             /* Redraw each of the nine actual original Micropolis
              * building sprite cells, not just its zone center.
              */
@@ -2664,6 +2742,7 @@ int main(int argc, char **argv)
     int i, have_city = 0, allow_mouse = 1, bench_mode = 0;
     int timedemo_mode = 0;
     char sidecar[256];
+    newer_lot_clear();
     for (i = 1; i < argc; ++i) {
         if (dos_option_is(argv[i], "NOMOUSE")) {
             allow_mouse = 0;
@@ -2683,8 +2762,15 @@ int main(int argc, char **argv)
                                     &scroll_x, &scroll_y);
             zoning_seed_from_city();
             if (zoning_sidecar_name(argv[i], sidecar,
-                                    (unsigned int)sizeof(sidecar)))
+                                    (unsigned int)sizeof(sidecar))) {
+                char *ext;
                 (void)zoning_load(sidecar);
+                ext=strrchr(sidecar,'.');
+                if(ext!=NULL) {
+                    strcpy(ext,".NBL");
+                    (void)newer_lot_load(sidecar);
+                }
+            }
         } else {
             fprintf(stderr,
                     "Unrecognized argument or invalid 27120-byte city: %s\n",
@@ -2711,7 +2797,12 @@ int main(int argc, char **argv)
     video = (volatile unsigned char far *)MK_FP(0xb800, 0);
     tandy_init_scanlines();
     (void)load_original_art();
-    (void)small_lot_art_load("SC2K.DAT");
+    /* Canonical neutral filenames. The unchanged first-generation
+     * 1x1 byte pack remains accepted for existing installations.
+     */
+    if(!small_lot_art_load("NEWER1.DAT"))
+        (void)small_lot_art_load("SC2K.DAT");
+    (void)newer_lot_load_art("NEWERM8.DAT");
     mouse_on = allow_mouse ? mouse_init() : 0;
     if (mouse_on) {
         struct mouse_state state;
@@ -2733,6 +2824,7 @@ int main(int argc, char **argv)
     mouse_pointer_hide();
     mouse_shutdown();
     engine_shutdown();
+    newer_lot_free_art();
     set_video_mode(old_mode);
     if (art_data != NULL)
         free(art_data); /* art buffer used only in graphics mode */
