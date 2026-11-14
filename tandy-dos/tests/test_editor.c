@@ -28,7 +28,13 @@ int main(void)
     assert(!edit_place(EDIT_COAL, 80U, 20U));
     assert(edit_place(EDIT_ROAD, 3U, 3U));
     assert((city_at(3,3) & 1023U) == 66U);
-    assert(!edit_place(EDIT_POWER, 3U, 3U)); /* collision */
+    /* Original Micropolis supports POWER crossing an existing
+     * horizontal road. This used to be rejected by our editor.
+     */
+    assert(edit_place(EDIT_POWER, 3U, 3U));
+    assert((city_at(3U,3U) & 1023U) == 77U);
+    assert((city_at(3U,3U) & 16384U) != 0U);
+    assert(!edit_place(EDIT_POWER, 3U, 3U)); /* no triple crossing */
     assert(edit_place(EDIT_BULLDOZE, 3U, 3U));
     assert(city_at(3,3) == 0U);
     assert(city_save_as("editor.tmp"));
