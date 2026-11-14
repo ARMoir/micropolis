@@ -1929,6 +1929,72 @@ static void benchmark_video(void)
      */
 }
 
+/* WolfensteinCGA v1.0 used a repeatable TIMEDemo to measure real
+ * drawing work, rather than only timing isolated memory operations.
+ * Reuse our existing single-tile VRAM scrolling, 32x21 map, original
+ * assets and GUI. No extra framebuffer or render rewrite.
+ *
+ * The path is fixed: right 12, down 8, left 12, up 8, twice (80 pans).
+ * Initial camera is centered so the route always stays in bounds in
+ * both a 120x100 original city and the built-in demo. Every turn
+ * returns the camera to the same world square. Simulation, cursor and
+ * mouse are excluded; the second pass measures ordinary minimap/HUD
+ * refresh overhead separately from city drawing itself.
+ */
+#define TIMEDEMO_PANS 80U
+static unsigned long timedemo_city_ticks, timedemo_hud_ticks;
+
+static void timedemo_route(int include_hud)
+{
+    unsigned int frame, position, old_x, old_y;
+    for (frame=0U;frame<TIMEDEMO_PANS;++frame) {
+        position=frame%40U;
+        old_x=scroll_x;
+        old_y=scroll_y;
+        if (position<12U)
+            ++scroll_x;
+        else if (position<20U)
+            ++scroll_y;
+        else if (position<32U)
+            --scroll_x;
+        else
+            --scroll_y;
+        scroll_one_tile(old_x,old_y);
+        if (include_hud) {
+            draw_overview_camera();
+            draw_status();
+        }
+    }
+}
+
+static void benchmark_timdemo(void)
+{
+    unsigned long start;
+    /* Single initial screen draw, never a redraw on each frame.
+     * Cursor removal avoids carrying an 8x8 selection box while the
+     * camera moves. This intentionally shows live city scrolling.
+     */
+    map_turns=0U;
+    scroll_x=(CITY_WIDTH-VIEW_W)/2U;
+    scroll_y=(CITY_HEIGHT-VIEW_H)/2U;
+    render_full();
+    mouse_pointer_hide();
+    erase_cursor();
+
+    start=bench_bios_ticks();
+    timedemo_route(0);
+    timedemo_city_ticks=bench_bios_ticks()-start;
+
+    /* Reset pixels outside the timed block to compare like for like. */
+    render_full();
+    mouse_pointer_hide();
+    erase_cursor();
+    start=bench_bios_ticks();
+    timedemo_route(1);
+    timedemo_hud_ticks=bench_bios_ticks()-start;
+    /* Do not rebuild the screen on exit; DOS text mode is restored. */
+}
+
 /* Map a normal DOS 8.3 city save to its optional zone sidecar. */
 static int zoning_sidecar_name(const char *cityname,
                                char *dest, unsigned int capacity)
@@ -1969,12 +2035,16 @@ static int dos_option_is(const char *argument, const char *name)
 int main(int argc, char **argv)
 {
     int i, have_city = 0, allow_mouse = 1, bench_mode = 0;
+    int timedemo_mode = 0;
     char sidecar[256];
     for (i = 1; i < argc; ++i) {
         if (dos_option_is(argv[i], "NOMOUSE")) {
             allow_mouse = 0;
         } else if (dos_option_is(argv[i], "BENCH")) {
             bench_mode = 1;
+            allow_mouse = 0;
+        } else if (dos_option_is(argv[i], "TIMEDEMO")) {
+            timedemo_mode = 1;
             allow_mouse = 0;
         } else if (!have_city && city_load(argv[i])) {
             have_city = 1;
@@ -2026,6 +2096,8 @@ int main(int argc, char **argv)
     if (bench_mode) {
         /* Do not create/redraw toolbar or HUD in benchmark mode. */
         benchmark_video();
+    } else if (timedemo_mode) {
+        benchmark_timdemo();
     } else {
         render_full();
         keyboard_loop();
@@ -2048,6 +2120,25 @@ int main(int argc, char **argv)
             printf("Copy speed ratio   : %lu%% (higher is faster)\n",
                    (bench_byte_ticks*100UL)/bench_word_ticks);
         puts("Clock resolution ~55ms. All copies preserve identical pixels.");
+    }
+    if (timedemo_mode) {
+        unsigned long fps10;
+        puts("MICROPOL /TIMEDEMO - 80 real one-tile pans");
+        printf("City-only render  : %lu ticks (~%lu ms)\n",
+               timedemo_city_ticks,timedemo_city_ticks*55UL);
+        printf("City + HUD/map    : %lu ticks (~%lu ms)\n",
+               timedemo_hud_ticks,timedemo_hud_ticks*55UL);
+        if (timedemo_city_ticks != 0UL) {
+            fps10=(TIMEDEMO_PANS*182UL)/timedemo_city_ticks;
+            printf("City pan rate     : %lu.%lu pans/sec\n",
+                   fps10/10UL,fps10%10UL);
+        }
+        if (timedemo_hud_ticks != 0UL) {
+            fps10=(TIMEDEMO_PANS*182UL)/timedemo_hud_ticks;
+            printf("City+HUD rate     : %lu.%lu pans/sec\n",
+                   fps10/10UL,fps10%10UL);
+        }
+        puts("Measured with BIOS ~55ms ticks; no simulation or file edits.");
     }
     return 0;
 }
