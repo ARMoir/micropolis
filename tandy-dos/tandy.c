@@ -332,56 +332,9 @@ static void draw_pending_tile(unsigned int px, unsigned int py,
     }
 }
 
-/* A classic original building is composed of 3x3 or 4x4 individual
- * Micropolis graphic tiles. Simply rotating those positions scrambles
- * the picture. Keep each bitmap upright and select the corresponding
- * ORIGINAL tile art at its new screen-relative position instead.
- * This touches the renderer only when the player rotates the camera;
- * simulation data, roads, zones and .CTY tile IDs are never changed.
+/* All original multi-tile facility art uses the same host-tested
+ * view_rotation_building_tile transform, including fire and police.
  */
-static unsigned int upright_building_graphic(unsigned int wx,
-                                              unsigned int wy,
-                                              unsigned int graphic)
-{
-    unsigned int first=0U,span=0U,part,center_id;
-    unsigned int center_offset;
-    int center_x,center_y;
-    unsigned short center;
-    if (map_turns == 0U)
-        return graphic;
-    if (graphic >= 240U && graphic <= 248U) {
-        first=240U; span=3U;
-    } else if (graphic >= 261U && graphic <= 404U) {
-        first=261U + ((graphic-261U)/9U)*9U; span=3U;
-    } else if (graphic >= 423U && graphic <= 431U) {
-        first=423U; span=3U;
-    } else if (graphic >= 432U && graphic <= 611U) {
-        first=432U + ((graphic-432U)/9U)*9U; span=3U;
-    } else if (graphic >= 612U && graphic <= 620U) {
-        first=612U; span=3U;
-    } else if (graphic >= 621U && graphic <= 692U) {
-        first=621U + ((graphic-621U)/9U)*9U; span=3U;
-    } else if (graphic >= 745U && graphic <= 760U) {
-        first=745U; span=4U; /* coal plant */
-    } else if (graphic >= 811U && graphic <= 826U) {
-        first=811U; span=4U; /* nuclear plant */
-    } else {
-        return graphic; /* normal one-tile sprites remain upright */
-    }
-    part=graphic-first;
-    center_offset=1U; /* original zone flag is tile (1,1) */
-    center_x=(int)wx + (int)center_offset - (int)(part%span);
-    center_y=(int)wy + (int)center_offset - (int)(part/span);
-    if (center_x<0 || center_y<0 || center_x>=CITY_WIDTH ||
-        center_y>=CITY_HEIGHT)
-        return graphic;
-    center=city_at((unsigned int)center_x,(unsigned int)center_y);
-    center_id=first+center_offset*span+center_offset;
-    if (!(center & 1024U) || (center & TILE_MASK) != center_id)
-        return graphic;
-    return first+view_rotation_upright_part(map_turns,span,part);
-}
-
 static void draw_city_tile(unsigned int px, unsigned int py,
                            unsigned int mx, unsigned int my)
 {
@@ -429,7 +382,7 @@ static void draw_city_tile(unsigned int px, unsigned int py,
          */
         graphic = view_rotation_utility_tile(map_turns,graphic);
         draw_original_tile(px,py,
-                           upright_building_graphic(mx,my,graphic));
+                           view_rotation_building_tile(map_turns,mx,my,graphic));
         draw_zone_border(px, py, mx, my);
         draw_pending_tile(px, py, mx, my);
         return;
@@ -1753,13 +1706,19 @@ static void apply_selected_tool(void)
             redraw_zoning_brush(mx,my,mx,my);
         }
         if (placed || erased) {
-            if (selected_tool == EDIT_BULLDOZE) {
-                /* One projected minimap pixel, not 2464 pixel writes
-                 * for every tile during a bulldozer mouse stroke.
-                 */
+            if(selected_tool==EDIT_BULLDOZE) {
                 draw_overview_world_tile(mx,my);
+            } else if(selected_tool==EDIT_COAL ||
+                      selected_tool==EDIT_NUCLEAR ||
+                      selected_tool==EDIT_POLICE ||
+                      selected_tool==EDIT_FIRE) {
+                /* No 2,464-pixel minimap refresh for a 3x3/4x4 site. */
+                unsigned int reach=(selected_tool==EDIT_COAL ||
+                                    selected_tool==EDIT_NUCLEAR)?2U:1U;
+                draw_overview_world_rect(mx-1U,my-1U,
+                                         mx+reach,my+reach,0);
             } else {
-                draw_overview(); /* coal changes a whole 4x4 footprint */
+                draw_overview_world_tile(mx,my);
             }
         }
     }

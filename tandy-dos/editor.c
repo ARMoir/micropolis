@@ -7,6 +7,7 @@
 #include "editor.h"
 #include "connections.h"
 #include "infrastructure.h"
+#include "zoning.h"
 
 #define TILE_ID  1023U
 #define BULLBIT  4096U
@@ -109,10 +110,18 @@ int edit_place(enum edit_tool tool, unsigned int x, unsigned int y)
            y+width-2U>=CITY_HEIGHT)
             return 0;
         left=x-1U;top=y-1U;
+        /* Clear normal woods (IDs 21..43), but protect existing
+         * structures, waterways, infrastructure and custom zones.
+         * This makes civic facilities buildable in wooded Happisle.
+         */
         for(j=0U;j<width;++j)
-            for(i=0U;i<width;++i)
-                if((city_at(left+i,top+j)&TILE_ID)!=0U)
+            for(i=0U;i<width;++i) {
+                unsigned int wx=left+i,wy=top+j;
+                unsigned int old=city_at(wx,wy)&TILE_ID;
+                if((old!=0U && (old<21U || old>43U)) ||
+                   zoning_at(wx,wy)!=ZONE_NONE)
                     return 0;
+            }
         /* Original 4x4 generator for coal/nuclear and 3x3
          * police/fire. The zone center is (1,1).
          */

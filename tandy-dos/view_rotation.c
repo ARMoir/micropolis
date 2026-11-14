@@ -186,6 +186,54 @@ unsigned int view_rotation_upright_part(unsigned int turns,
     return sy * span + sx;
 }
 
+/* Choose the original sprite piece at its ROTATED screen-relative
+ * position, keeping intact 3x3 and 4x4 prefabs visually upright.
+ * Only real zone-centered groups rotate; stray pieces stay unchanged.
+ */
+unsigned int view_rotation_building_tile(unsigned int turns,
+                                         unsigned int wx,unsigned int wy,
+                                         unsigned int graphic)
+{
+    unsigned int first=0U,span=0U,part,center_id;
+    int cx,cy;
+    unsigned short center;
+    if((turns&3U)==0U || wx>=CITY_WIDTH || wy>=CITY_HEIGHT)
+        return graphic;
+    if(graphic>=240U && graphic<=248U) {
+        first=240U;span=3U;
+    } else if(graphic>=261U && graphic<=404U) {
+        first=261U+((graphic-261U)/9U)*9U;span=3U;
+    } else if(graphic>=409U && graphic<=426U) {
+        first=409U+((graphic-409U)/9U)*9U;span=3U;
+    } else if(graphic>=423U && graphic<=431U) {
+        first=423U;span=3U;
+    } else if(graphic>=432U && graphic<=611U) {
+        first=432U+((graphic-432U)/9U)*9U;span=3U;
+    } else if(graphic>=612U && graphic<=620U) {
+        first=612U;span=3U;
+    } else if(graphic>=621U && graphic<=692U) {
+        first=621U+((graphic-621U)/9U)*9U;span=3U;
+    } else if(graphic>=745U && graphic<=760U) {
+        first=745U;span=4U; /* coal */
+    } else if(graphic>=761U && graphic<=778U) {
+        first=761U+((graphic-761U)/9U)*9U;span=3U; /* fire/police */
+    } else if(graphic>=779U && graphic<=810U) {
+        first=779U+((graphic-779U)/16U)*16U;span=4U; /* stadium */
+    } else if(graphic>=811U && graphic<=826U) {
+        first=811U;span=4U; /* nuclear */
+    } else return graphic;
+    part=graphic-first;
+    cx=(int)wx+1-(int)(part%span);
+    cy=(int)wy+1-(int)(part/span);
+    if(cx<0 || cy<0 || cx>=CITY_WIDTH || cy>=CITY_HEIGHT)
+        return graphic;
+    center=city_at((unsigned int)cx,(unsigned int)cy);
+    center_id=first+span+1U;
+    if((center&1024U)==0U || (center&1023U)!=center_id)
+        return graphic;
+    return first+view_rotation_upright_part(turns,span,part);
+}
+
 /* The original Micropolis tile definitions use distinct families:
  *   64..207  roads, bridges and traffic variants
  *   208..222 power conductors and road/rail-power crossings

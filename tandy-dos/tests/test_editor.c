@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later */
 #include "../city.h"
 #include "../editor.h"
+#include "../zoning.h"
 #include <assert.h>
 #include <stdio.h>
 
@@ -9,6 +10,7 @@ int main(void)
     unsigned int x,y;
     /* Clear artificial demo map to deterministic flat terrain. */
     city_make_demo();
+    zoning_clear();
     for (x=0; x<CITY_WIDTH; ++x)
         for (y=0; y<CITY_HEIGHT; ++y)
             city_set(x,y,0U);
@@ -42,6 +44,40 @@ int main(void)
     assert(edit_place(EDIT_RAIL,10U,9U));
     assert((city_at(9U,9U)&1023U)==226U);
     assert((city_at(10U,9U)&1023U)==226U);
+    /* Civic buildings work over woods, but never erase zoning,
+     * a road, water, or an existing prefab just because one tile
+     * of the footprint was empty.
+     */
+    {
+        static const enum edit_tool tools[4]={
+            EDIT_COAL,EDIT_NUCLEAR,EDIT_POLICE,EDIT_FIRE
+        };
+        unsigned int k,i,j,cx,cy,span;
+        for(k=0U;k<4U;++k) {
+            cx=70U+k*10U;cy=60U;span=k<2U?4U:3U;
+            for(j=0U;j<span;++j)
+                for(i=0U;i<span;++i)
+                    city_set(cx-1U+i,cy-1U+j,
+                             (unsigned short)(21U+(i+j*span)%23U));
+            assert(edit_place(tools[k],cx,cy));
+            assert((city_at(cx,cy)&1024U)!=0U);
+            assert((city_at(cx,cy)&1023U)==
+                   (k==0U?750U:k==1U?816U:k==2U?774U:765U));
+            assert(!edit_place(tools[k],cx,cy));
+        }
+        assert(zoning_set(71U,80U,ZONE_RES));
+        assert(!edit_place(EDIT_FIRE,71U,80U));
+        assert(zoning_at(71U,80U)==ZONE_RES);
+        assert(zoning_set(71U,80U,ZONE_NONE));
+        city_set(71U,80U,2U);
+        assert(!edit_place(EDIT_FIRE,71U,80U));
+        city_set(71U,80U,66U);
+        assert(!edit_place(EDIT_FIRE,71U,80U));
+        city_set(71U,80U,0U);
+        assert(edit_place(EDIT_FIRE,71U,80U));
+        assert(!edit_place(EDIT_COAL,0U,90U));
+        assert(!edit_place(EDIT_NUCLEAR,119U,90U));
+    }
     assert(edit_place(EDIT_ROAD, 3U, 3U));
     assert((city_at(3,3) & 1023U) == 66U);
     /* Original Micropolis supports POWER crossing an existing

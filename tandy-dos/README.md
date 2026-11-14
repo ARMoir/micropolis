@@ -1053,3 +1053,25 @@ Automated tests check vacant-chain power inheritance, wire connection
 and disconnection, immediate change notifications, and that additions
 do not increment the full-scan counter. Actual timing should still be
 assessed on 7 MHz V20 hardware.
+
+## Civic woodland placement and upright facility rotation
+
+Coal and Nuclear 4x4 plants and Police and Fire 3x3 buildings now
+accept ordinary clearable woodland tiles (original IDs 21..43) as
+well as empty ground. Happisle has many wooded locations and the
+previous zero-only validator incorrectly made these tools appear
+broken. The entire footprint must still be available: water, roads,
+rail, power wires, existing buildings and even vacant individually
+zoned lots cannot be overwritten. The world boundary is enforced.
+
+Fire/Police source sprite groups were missing from the camera's
+upright-multi-tile rendering map, causing their artwork to jumble
+when viewing a city at 90/180/270 degrees. The source-art lookup is
+now host-tested for all four orientations and also covers plants,
+RCI buildings, hospitals, churches and stadiums. Camera turning
+never alters any original sprite bytes or .CTY map tiles.
+
+Civic placement also refreshes only the 3x3 or 4x4 minimap footprint
+instead of redrawing the complete 56x44 overview. The existing
+simplified DOS simulator does not yet implement Police and Fire
+coverage effects; this update fixes placement and appearance.

@@ -61,6 +61,12 @@ unsigned int view_rotation_edges(unsigned int turns, unsigned int edges);
 unsigned int view_rotation_upright_part(unsigned int turns,
                                          unsigned int span,
                                          unsigned int part);
+/* Display-only upright source sprite selection for 3x3/4x4
+ * facilities with a valid ZONEBIT center; never edits city data.
+ */
+unsigned int view_rotation_building_tile(unsigned int turns,
+                                         unsigned int wx,unsigned int wy,
+                                         unsigned int graphic);
 /* Pick existing pre-rendered road/wire tile art in the new direction.
  * No bitmap rotation, change to world tiles, or extra memory buffers.
  */

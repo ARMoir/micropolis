@@ -235,6 +235,45 @@ int main(void)
         view_rotation_to_world(target,left+cx,top+cy,&rx,&ry);
         assert(rx==wx && ry==wy);
     }
+    /* Entire buildings remain assembled in 0/90/180/270-degree
+     * views. Particularly check Fire and Police, omitted by the old
+     * rotation table, plus both plant types and original RCI art.
+     */
+    {
+        static const unsigned int bases[10]={
+            240U,261U,409U,418U,423U,432U,
+            745U,761U,770U,811U
+        };
+        static const unsigned int spans[10]={
+            3U,3U,3U,3U,3U,3U,4U,3U,3U,4U
+        };
+        unsigned int k,span,base,i,j,cx,cy,old;
+        for(k=0U;k<10U;++k) {
+            base=bases[k];span=spans[k];
+            cx=20U+k*9U;cy=65U;
+            for(j=0U;j<span;++j)
+                for(i=0U;i<span;++i) {
+                    old=base+j*span+i;
+                    if(i==1U && j==1U)old|=1024U;
+                    city_set(cx-1U+i,cy-1U+j,(unsigned short)old);
+                }
+            for(turn=0U;turn<4U;++turn)
+                for(j=0U;j<span;++j)
+                    for(i=0U;i<span;++i) {
+                        unsigned int part=j*span+i;
+                        assert(view_rotation_building_tile(
+                               turn,cx-1U+i,cy-1U+j,base+part)==
+                               base+view_rotation_upright_part(
+                                      turn,span,part));
+                    }
+            assert((city_at(cx,cy)&1023U)==base+span+1U);
+            old=city_at(cx,cy);
+            city_set(cx,cy,(unsigned short)(old&~1024U));
+            for(turn=1U;turn<4U;++turn)
+                assert(view_rotation_building_tile(
+                           turn,cx-1U,cy-1U,base)==base);
+        }
+    }
     puts("120x100 rotation, zone edges, viewport bounds and map integrity passed");
     return 0;
 }
