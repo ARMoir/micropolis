@@ -9,7 +9,6 @@
 #include "infrastructure.h"
 
 #define PLAN_BYTES ((CITY_TILES + 3U) / 4U)
-#define TILE_ID 1023U
 
 static unsigned char plan[PLAN_BYTES];
 static enum edit_tool current_tool;
@@ -56,7 +55,6 @@ long placement_unit_cost(enum edit_tool tool)
 static int can_place(unsigned int x, unsigned int y)
 {
     unsigned int kind = zone_type(current_tool);
-    unsigned int tile = city_at(x, y) & TILE_ID;
     if (kind) {
         if (zoning_at(x, y) == kind)
             return 0; /* already zoned, never charge again */
