@@ -46,6 +46,12 @@ static int neighbor_road(unsigned int x, unsigned int y, int ns)
     unsigned int id;
     if (x >= CITY_WIDTH || y >= CITY_HEIGHT)
         return 0;
+    id = city_at(x,y)&ID_MASK;
+    /* Source bridge animation variants retain their real direction,
+     * even when NeutralizeRoad would collapse BRWV 95 to 79.
+     */
+    if(ns && (id==95U || (id>=948U && id<=951U))) return 1;
+    if(!ns && (id==79U || (id>=828U && id<=831U))) return 1;
     id = neutral_road(city_at(x, y));
     /* Authentic HRAILROAD 237 carries a N/S roadway over E/W rail;
      * VRAILROAD 238 carries an E/W roadway over N/S rail.

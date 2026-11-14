@@ -49,7 +49,10 @@ int edit_place(enum edit_tool tool, unsigned int x, unsigned int y)
         /* Removing a bridge uncovers the river, not a dirt tile.
          * BRWH/BRWV are original animated bridge variants.
          */
-        if(tile==64U || tile==65U || tile==79U || tile==95U)
+        if(tile==64U || tile==65U || tile==79U || tile==95U ||
+           tile==208U || tile==209U || tile==224U || tile==225U ||
+           (tile>=828U && tile<=831U) ||
+           (tile>=948U && tile<=951U))
             city_set(x,y,2U);
         else
             city_set(x,y,0U);

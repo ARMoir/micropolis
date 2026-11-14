@@ -184,6 +184,26 @@ int main(void)
     assert(edit_place(EDIT_ROAD,20U,21U));
     assert(TILE(20U,20U)==65U && TILE(20U,21U)==65U);
     assert(TILE(20U,19U)==67U);
+    /* Source BRWV (95) and 948..951 are vertical variants, while
+     * BRWH (79) and 828..831 are horizontal bridge animations.
+     * Old traffic normalization must not confuse their directions.
+     */
+    clear_map();
+    city_set(20U,20U,2U);
+    city_set(20U,19U,95U);
+    assert(infrastructure_road_bridge_id(20U,20U)==65U);
+    city_set(20U,19U,948U);
+    assert(infrastructure_road_bridge_id(20U,20U)==65U);
+    city_set(20U,19U,0U);
+    city_set(19U,20U,79U);
+    assert(infrastructure_road_bridge_id(20U,20U)==64U);
+    city_set(19U,20U,828U);
+    assert(infrastructure_road_bridge_id(20U,20U)==64U);
+    assert(edit_place(EDIT_BULLDOZE,19U,20U));
+    assert(TILE(19U,20U)==2U);
+    city_set(19U,20U,951U);
+    assert(edit_place(EDIT_BULLDOZE,19U,20U));
+    assert(TILE(19U,20U)==2U);
 
     /* Drag over four river tiles: $50 per bridge plus $10 dry land.
      * The preview must accept water tiles following already funded

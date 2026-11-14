@@ -33,6 +33,10 @@ int infrastructure_is_water(unsigned int tile_id)
  */
 static unsigned int road_shape(unsigned int id)
 {
+    /* BRWV=95 is a special vertical bridge animation, not a
+     * traffic-variant horizontal road (its low nibble is 15).
+     */
+    if(id==95U) return id;
     if(id>=80U && id<=207U) return 64U+(id&15U);
     return id;
 }
@@ -45,9 +49,11 @@ static int road_anchor(unsigned int id,int vertical)
 {
     id=road_shape(id);
     if(vertical) {
-        if(id==VBRIDGE || id==95U || id==237U || id==78U) return 1;
+        if(id==VBRIDGE || id==95U || id==237U || id==78U ||
+           (id>=948U && id<=951U)) return 1;
     } else {
-        if(id==HBRIDGE || id==79U || id==238U || id==77U) return 1;
+        if(id==HBRIDGE || id==79U || id==238U || id==77U ||
+           (id>=828U && id<=831U)) return 1;
     }
     return id>=66U && id<=76U;
 }
