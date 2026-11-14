@@ -62,6 +62,24 @@ void view_rotation_from_world(unsigned int turns, unsigned int wx,
     }
 }
 
+void view_rotation_minimap_bounds(unsigned int turns,
+                                  unsigned int wx,unsigned int wy,
+                                  unsigned int width,unsigned int height,
+                                  unsigned int *x0,unsigned int *y0,
+                                  unsigned int *x1,unsigned int *y1)
+{
+    unsigned int vx,vy,mw,mh;
+    view_rotation_from_world(turns,wx,wy,&vx,&vy);
+    mw=view_rotation_width(turns);
+    mh=view_rotation_height(turns);
+    *x0=(vx*width+mw-1U)/mw;
+    *y0=(vy*height+mh-1U)/mh;
+    *x1=((vx+1U)*width+mw-1U)/mw;
+    *y1=((vy+1U)*height+mh-1U)/mh;
+    if (*x1>width) *x1=width;
+    if (*y1>height) *y1=height;
+}
+
 void view_rotation_clamp(unsigned int turns, unsigned int width,
                          unsigned int height, unsigned int *left,
                          unsigned int *top)
