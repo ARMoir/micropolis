@@ -696,3 +696,38 @@ icons contains real, distinguishable 16-color pixels, stays within
 16x16 bounds, and that every displayed icon still maps to its intended
 mouse and keyboard tool ID. Native 8086 DOS compilation is verified
 separately by the Open Watcom build.
+
+## Happisle railway access and imported-city growth fix
+
+HAPPISLE.CTY is a genuine **railway-heavy** original Micropolis city:
+its original map contains **935 railway tiles (IDs 224..238)** but
+only **230 road tiles (IDs 64..207)**. They are *not* being converted
+into train tracks by the DOS renderer. In contrast, our built-in
+demo is intentionally road-heavy. Preserve original city and art IDs;
+do not replace railway tiles with roads to hide this difference.
+
+The first simplified 1x1 and classic 3x3 RCI growth rules required a
+road beside each developable lot. This prevented residential growth
+on large areas of Happisle, where the original transportation network
+uses rails. Both **road or railway adjacency** now count as local
+transport access; electricity is still required. Empty residential
+lots have faster initial move-in chances, while later densities remain
+slower. This is a simplified DOS simulation rule, not an exact
+reproduction of original Micropolis commute and traffic modeling.
+
+The magnifying glass (**Inspect**, numeric shortcut 0) now reports
+`ROAD TILE`, `RAIL TILE` or `POWER LINE` when clicked on actual
+infrastructure. For a user-painted 1x1 zone on empty or wooded ground,
+it instead reports `NEED ROAD/RAIL`, `NEED POWER` or `LOT SERVICED`
+in the bottom diagnostic row. A serviced zone may still need several
+simulated months before a building appears. The full-city electricity
+scan is **not** triggered by inspecting a tile.
+
+A dedicated GitHub Actions regression loads the actual unmodified
+Happisle sample, checks its **935 original rails and 230 roads**,
+and tests development of a wooded residential lot at world tile
+(25,34), which has **rail access but no adjacent roads**. It verifies
+the new residence develops, the original terrain artwork remains
+unchanged, and every original rail/road tile stays in its own family.
+The new transport checks add only a handful of local tile lookups,
+suitable for the NEC V20 at 7 MHz.
