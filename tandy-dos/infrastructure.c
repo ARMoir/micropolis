@@ -76,10 +76,46 @@ unsigned int infrastructure_road_bridge_id(unsigned int x,unsigned int y)
     return 0U;
 }
 
+unsigned int infrastructure_rail_bridge_id(unsigned int x,unsigned int y)
+{
+    unsigned int id;
+    if(x>=CITY_WIDTH || y>=CITY_HEIGHT ||
+       !infrastructure_is_water(city_at(x,y)&TILE_MASK)) return 0U;
+    /* _LayRail: 224 horizontal, 225 vertical rail bridge. */
+    if(x+1U<CITY_WIDTH) {
+        id=city_at(x+1U,y)&TILE_MASK;
+        if(id==224U || id==221U || id==237U ||
+           (id>=226U && id<=236U)) return 224U;
+    }
+    if(x>0U) {
+        id=city_at(x-1U,y)&TILE_MASK;
+        if(id==224U || id==221U || id==237U ||
+           (id>=226U && id<=236U)) return 224U;
+    }
+    if(y+1U<CITY_HEIGHT) {
+        id=city_at(x,y+1U)&TILE_MASK;
+        if(id==225U || id==222U || id==238U ||
+           (id>=226U && id<=236U)) return 225U;
+    }
+    if(y>0U) {
+        id=city_at(x,y-1U)&TILE_MASK;
+        if(id==225U || id==222U || id==238U ||
+           (id>=226U && id<=236U)) return 225U;
+    }
+    return 0U;
+}
+
 unsigned int infrastructure_crossing_id(enum edit_tool tool,
                                         unsigned int existing_id)
 {
-    if (tool == EDIT_ROAD) {
+    if (tool == EDIT_RAIL) {
+        if(existing_id==210U) return 222U;
+        if(existing_id==211U) return 221U;
+        if(existing_id>=66U && existing_id<=207U) {
+            if((existing_id&15U)==2U) return 238U;
+            if((existing_id&15U)==3U) return 237U;
+        }
+    } else if (tool == EDIT_ROAD) {
         if (existing_id == 210U) return 78U;
         if (existing_id == 211U) return 77U;
         if (existing_id == 226U) return 237U;
@@ -103,7 +139,7 @@ int infrastructure_can_place(enum edit_tool tool,
 {
     unsigned int id;
     if (x >= CITY_WIDTH || y >= CITY_HEIGHT ||
-        (tool != EDIT_ROAD && tool != EDIT_POWER))
+        (tool != EDIT_ROAD && tool != EDIT_RAIL && tool != EDIT_POWER))
         return 0;
     id = city_at(x,y) & TILE_MASK;
     /* Water bridge construction is distinct from road/wire
@@ -111,6 +147,8 @@ int infrastructure_can_place(enum edit_tool tool,
      */
     if(tool==EDIT_ROAD && infrastructure_is_water(id))
         return infrastructure_road_bridge_id(x,y)!=0U;
+    if(tool==EDIT_RAIL && infrastructure_is_water(id))
+        return infrastructure_rail_bridge_id(x,y)!=0U;
     if(id==0U || (id>=21U && id<=43U))
         return 1;
     return infrastructure_crossing_id(tool,id)!=0U;

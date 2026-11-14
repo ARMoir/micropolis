@@ -12,7 +12,11 @@ enum edit_tool {
     EDIT_COMMERCIAL,
     EDIT_INDUSTRIAL,
     EDIT_COAL,
-    EDIT_BULLDOZE
+    EDIT_BULLDOZE,
+    EDIT_RAIL,
+    EDIT_NUCLEAR,
+    EDIT_POLICE,
+    EDIT_FIRE
 };
 
 const char *edit_tool_name(enum edit_tool tool);

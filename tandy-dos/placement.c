@@ -50,6 +50,7 @@ long placement_unit_cost(enum edit_tool tool)
 {
     switch (tool) {
     case EDIT_ROAD: return 10L;
+    case EDIT_RAIL: return 20L;
     case EDIT_POWER: return 5L;
     /* Original Micropolis RCI tools are $100 per 3x3 plot.
      * This per-square brush prorates those costs: ceil(100/9)=12.
@@ -66,9 +67,10 @@ long placement_unit_cost(enum edit_tool tool)
  */
 static long cell_cost(unsigned int x,unsigned int y)
 {
-    if(current_tool==EDIT_ROAD &&
-       infrastructure_is_water(city_at(x,y)&1023U))
-        return 50L;
+    if(infrastructure_is_water(city_at(x,y)&1023U)) {
+        if(current_tool==EDIT_ROAD) return 50L;
+        if(current_tool==EDIT_RAIL) return 100L;
+    }
     return placement_unit_cost(current_tool);
 }
 
@@ -102,7 +104,7 @@ static int can_place(unsigned int x, unsigned int y)
      * gets rejected before mouse-up despite having original art.
      */
     if(infrastructure_can_place(current_tool,x,y)) return 1;
-    if(current_tool==EDIT_ROAD &&
+    if((current_tool==EDIT_ROAD || current_tool==EDIT_RAIL) &&
        infrastructure_is_water(city_at(x,y)&1023U))
         return planned_road_neighbor(x,y);
     return 0;
@@ -276,7 +278,7 @@ unsigned int placement_commit(void)
             /* Bridges may not yet have a real road as their neighbor.
              * All land roads are committed first, then spans grow.
              */
-            if(current_tool==EDIT_ROAD &&
+            if((current_tool==EDIT_ROAD || current_tool==EDIT_RAIL) &&
                infrastructure_is_water(before&1023U))
                 continue;
             if(edit_place(current_tool,x,y)) {
@@ -290,7 +292,7 @@ unsigned int placement_commit(void)
             }
         }
 
-    if(current_tool==EDIT_ROAD) {
+    if(current_tool==EDIT_ROAD || current_tool==EDIT_RAIL) {
         do {
             made=0U;
             for(x=min_x;x<=max_x;++x)
@@ -299,10 +301,10 @@ unsigned int placement_commit(void)
                     if(state_get(offset)!=PREVIEW_FUNDED ||
                        !infrastructure_is_water(city_at(x,y)&1023U))
                         continue;
-                    if(edit_place(EDIT_ROAD,x,y)) {
+                    if(edit_place(current_tool,x,y)) {
                         ++made;
                         ++done;
-                        spent+=50L;
+                        spent+=(current_tool==EDIT_ROAD)?50L:100L;
                     }
                 }
         } while(made!=0U);

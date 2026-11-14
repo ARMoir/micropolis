@@ -23,6 +23,13 @@ static const unsigned short road_table[16] = {
     70U, 75U, 74U, 76U
 };
 
+static const unsigned short rail_table[16] = {
+    226U,227U,226U,228U,
+    227U,227U,229U,233U,
+    226U,231U,226U,232U,
+    230U,235U,234U,236U
+};
+
 static const unsigned short wire_table[16] = {
     210U, 211U, 210U, 212U,
     211U, 211U, 213U, 217U,
@@ -66,6 +73,19 @@ static int neighbor_road(unsigned int x, unsigned int y, int ns)
     return id>=66U && id<=78U && id!=78U;
 }
 
+static int neighbor_rail(unsigned int x,unsigned int y,int ns)
+{
+    unsigned int id;
+    if(x>=CITY_WIDTH || y>=CITY_HEIGHT) return 0;
+    id=city_at(x,y)&ID_MASK;
+    if(ns) {
+        if(id==225U || id==222U || id==238U) return 1;
+        return id>=226U && id<=236U;
+    }
+    if(id==224U || id==221U || id==237U) return 1;
+    return id>=226U && id<=236U;
+}
+
 static int neighbor_wire(unsigned int x, unsigned int y, int ns)
 {
     unsigned short tile;
@@ -97,6 +117,14 @@ static void fix_one(unsigned int x, unsigned int y)
         if (y + 1U < CITY_HEIGHT && neighbor_road(x, y + 1U, 1)) mask |= 4U;
         if (x > 0U && neighbor_road(x - 1U, y, 0)) mask |= 8U;
         city_set(x, y, road_table[mask] | BULLBIT | BURNBIT);
+        return;
+    }
+    if(id>=226U && id<=236U) {
+        if(y>0U && neighbor_rail(x,y-1U,1)) mask|=1U;
+        if(x+1U<CITY_WIDTH && neighbor_rail(x+1U,y,0)) mask|=2U;
+        if(y+1U<CITY_HEIGHT && neighbor_rail(x,y+1U,1)) mask|=4U;
+        if(x>0U && neighbor_rail(x-1U,y,0)) mask|=8U;
+        city_set(x,y,rail_table[mask]|BULLBIT|BURNBIT);
         return;
     }
     if (id >= 210U && id <= 220U) {

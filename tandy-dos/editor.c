@@ -18,11 +18,15 @@ const char *edit_tool_name(enum edit_tool tool)
 {
     switch (tool) {
     case EDIT_ROAD:        return "ROAD";
+    case EDIT_RAIL:        return "RAIL";
     case EDIT_POWER:       return "POWER";
     case EDIT_RESIDENTIAL: return "RES ZONE";
     case EDIT_COMMERCIAL:  return "COM ZONE";
     case EDIT_INDUSTRIAL:  return "IND ZONE";
     case EDIT_COAL:        return "COAL";
+    case EDIT_NUCLEAR:     return "NUCLEAR";
+    case EDIT_POLICE:      return "POLICE";
+    case EDIT_FIRE:        return "FIRE";
     case EDIT_BULLDOZE:    return "DOZE";
     default:               return "INSPECT";
     }
@@ -59,13 +63,15 @@ int edit_place(enum edit_tool tool, unsigned int x, unsigned int y)
         connections_fix_cross(x, y);
         return 1;
     }
-    if (tool == EDIT_ROAD || tool == EDIT_POWER) {
+    if (tool == EDIT_ROAD || tool == EDIT_RAIL || tool == EDIT_POWER) {
         unsigned int crossing, bridge=0U;
         unsigned short placed;
         if (!infrastructure_can_place(tool,x,y))
             return 0;
         if(tool==EDIT_ROAD && infrastructure_is_water(tile))
             bridge=infrastructure_road_bridge_id(x,y);
+        if(tool==EDIT_RAIL && infrastructure_is_water(tile))
+            bridge=infrastructure_rail_bridge_id(x,y);
         crossing = infrastructure_crossing_id(tool,tile);
         if(bridge!=0U) {
             /* Preserve the river: a bridge deck is bulldozable, but
@@ -83,6 +89,8 @@ int edit_place(enum edit_tool tool, unsigned int x, unsigned int y)
                 placed |= CONDBIT;
         } else if (tool == EDIT_ROAD) {
             placed = 66U | BURNBIT | BULLBIT;
+        } else if (tool == EDIT_RAIL) {
+            placed = 226U | BURNBIT | BULLBIT;
         } else {
             placed = 210U | BURNBIT | BULLBIT | CONDBIT;
         }
@@ -91,26 +99,29 @@ int edit_place(enum edit_tool tool, unsigned int x, unsigned int y)
         return 1;
     }
 
-    if (tool == EDIT_COAL) {
-        if (x == 0U || y == 0U ||
-            x >= CITY_WIDTH - 2U || y >= CITY_HEIGHT - 2U)
+    if(tool==EDIT_COAL || tool==EDIT_NUCLEAR ||
+       tool==EDIT_FIRE || tool==EDIT_POLICE) {
+        unsigned int width=(tool==EDIT_COAL || tool==EDIT_NUCLEAR)?4U:3U;
+        unsigned int base=(tool==EDIT_COAL)?745U:
+                          (tool==EDIT_NUCLEAR)?811U:
+                          (tool==EDIT_FIRE)?761U:770U;
+        if(x==0U || y==0U || x+width-1U>=CITY_WIDTH ||
+           y+width-1U>=CITY_HEIGHT)
             return 0;
-        left = x - 1U;
-        top = y - 1U;
-        for (j = 0U; j < 4U; ++j)
-            for (i = 0U; i < 4U; ++i)
-                if ((city_at(left + i, top + j) & TILE_ID) != 0U)
+        left=x-1U;top=y-1U;
+        for(j=0U;j<width;++j)
+            for(i=0U;i<width;++i)
+                if((city_at(left+i,top+j)&TILE_ID)!=0U)
                     return 0;
-        /* Original w_tool.c check4x4 with COALBASE 745 and aniFlag. */
-        for (j = 0U; j < 4U; ++j)
-            for (i = 0U; i < 4U; ++i) {
-                tile = (unsigned short)(745U + j * 4U + i +
-                                        BURNBIT + CONDBIT);
-                if (i == 1U && j == 1U)
-                    tile |= ZONEBIT;
-                if (i == 1U && j == 2U)
-                    tile |= 2048U; /* ANIMBIT for smoke tile */
-                city_set(left + i, top + j, tile);
+        /* Original 4x4 generator for coal/nuclear and 3x3
+         * police/fire. The zone center is (1,1).
+         */
+        for(j=0U;j<width;++j)
+            for(i=0U;i<width;++i) {
+                tile=(unsigned short)(base+j*width+i+BURNBIT+CONDBIT);
+                if(i==1U && j==1U) tile|=ZONEBIT;
+                if(width==4U && i==1U && j==2U) tile|=2048U;
+                city_set(left+i,top+j,tile);
             }
         return 1;
     }

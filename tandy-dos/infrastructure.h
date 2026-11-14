@@ -20,4 +20,6 @@ unsigned int infrastructure_crossing_id(enum edit_tool tool,
 int infrastructure_is_water(unsigned int tile_id);
 unsigned int infrastructure_road_bridge_id(unsigned int x,unsigned int y);
 
+/* Authentic HRAIL=224/VRAIL=225 bridges over river tiles 2..4. */
+unsigned int infrastructure_rail_bridge_id(unsigned int x,unsigned int y);
 #endif
