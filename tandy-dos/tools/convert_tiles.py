@@ -6,6 +6,7 @@ Each 16x16 tile becomes an 8x8 tile, packed 2 pixels/byte (high nibble first),
 32 bytes/tile. Output: 30,720-byte TILES.DAT loaded by MICROPOL.EXE.
 
 This is a build-time conversion of original artwork, not a recreated tile set.
+Dense residential/commercial sites optionally get a palette-only contrast fix.
 Source artwork © Electronic Arts; GPLv3-or-later with additional terms in COPYING.
 """
 from __future__ import annotations
@@ -43,7 +44,36 @@ def _nearest(rgb: tuple[int, int, int]) -> int:
         (rgb[k] - PALETTE[i][k]) ** 2 for k in range(3)))
 
 
-def convert(source: Path, preserve_traffic: bool = False) -> bytes:
+def _dense_urban_tile(tile: int) -> bool:
+    """Original high-density R/C 3x3 zone variants; not terrain or houses.
+
+    Original RZB=265: 261..404 are 16 nine-tile sets, with four density
+    tiers cycled through four land values. Keep the two lower tiers grassy.
+    Original CZB=436: 432..611 are 20 sets; keep the two lowest of five
+    density tiers grassy. Exclude empty zones, hospitals and churches.
+    """
+    if 261 <= tile <= 404:
+        return ((tile - 261) // 9) % 4 >= 2
+    if 432 <= tile <= 611:
+        return ((tile - 432) // 9) % 5 >= 2
+    return False
+
+
+def _urban_green_color(original_color: int, symbols: tuple[str, ...],
+                       enabled: bool) -> int:
+    """Restore brightness difference lost when both source greens map to 2.
+
+    Only green pixels change. Bright-green '#' becomes concrete gray 7;
+    shaded dark-green '$' becomes gray 8. Choose the palette AFTER 2x2
+    majority, so pixel silhouettes and every non-green index are identical.
+    """
+    if not enabled or original_color != 2:
+        return original_color
+    return 8 if symbols.count("$") > symbols.count("#") else 7
+
+
+def convert(source: Path, preserve_traffic: bool = False,
+            urban_concrete: bool = True) -> bytes:
     quoted = re.findall(r'^\s*"([^"]*)"', source.read_text(), re.M)
     if not quoted:
         raise ValueError("No XPM data found")
@@ -64,6 +94,7 @@ def convert(source: Path, preserve_traffic: bool = False) -> bytes:
     rows = quoted[1 + colors:]
     packed = bytearray()
     for tile in range(960):
+        urbanize = urban_concrete and _dense_urban_tile(tile)
         source_tile = tile
         # Micropolis road tiles 80..207 embed traffic-vehicle details.
         # Their 16x16 cars become noisy streaks on north-south roads after
@@ -83,10 +114,12 @@ def convert(source: Path, preserve_traffic: bool = False) -> bytes:
                 # 2x2 majority pixel, simple nearest-neighbor tie-breaking.
                 # Keep texture/roads legible at the 8x8 target resolution.
                 def get(x: int) -> int:
-                    samples = (lookup[top[x]], lookup[top[x + 1]],
-                               lookup[bottom[x]], lookup[bottom[x + 1]])
-                    return max(range(16), key=lambda c: (
+                    symbols = (top[x], top[x + 1],
+                               bottom[x], bottom[x + 1])
+                    samples = tuple(lookup[symbol] for symbol in symbols)
+                    chosen = max(range(16), key=lambda c: (
                         samples.count(c), -samples.index(c) if c in samples else -100))
+                    return _urban_green_color(chosen, symbols, urbanize)
                 hi = get(sx)
                 lo = get(sx + 2)
 
@@ -117,12 +150,16 @@ def main() -> None:
     parser.add_argument("destination", type=Path)
     parser.add_argument("--preserve-traffic", action="store_true",
                         help="Keep all original 16x16 traffic details in 8x8 sprites")
+    parser.add_argument("--original-building-colors", action="store_true",
+                        help="Disable urban concrete remap for exact A/B comparisons")
     args = parser.parse_args()
-    data = convert(args.source, preserve_traffic=args.preserve_traffic)
+    data = convert(args.source, preserve_traffic=args.preserve_traffic,
+                   urban_concrete=not args.original_building_colors)
     args.destination.parent.mkdir(parents=True, exist_ok=True)
     args.destination.write_bytes(data)
     print(f"Converted 960 Micropolis tiles to {len(data)} bytes at {args.destination}"
-          f" (vertical traffic smoothing: {not args.preserve_traffic})")
+          f" (vertical traffic smoothing: {not args.preserve_traffic},"
+          f" dense urban contrast: {not args.original_building_colors})")
 
 
 if __name__ == "__main__":

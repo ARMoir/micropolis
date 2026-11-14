@@ -985,3 +985,40 @@ Police and Fire stations place authentic 3x3 original art (center tiles
 yet simulate police coverage/crime or fire-protection effects. These
 are buildable buildings, not full municipal service implementations.
 The original game calls the fossil-fuel plant **Coal**, not Oil.
+
+## Dense-city building contrast without changing Micropolis artwork
+
+The Tandy build's high-density residential and commercial sites now
+use light- and dark-gray **paving** instead of green that was nearly
+indistinguishable from the surrounding lawn. This remaps only pixels
+which were already green in the original 8x8 converted tile, within
+the upper density tiers of the original RZB/CZB building families.
+Source **bright green** ('#') becomes light concrete **7**, and source
+**dark green** ('$') becomes shaded concrete **8**. The standard
+conversion had collapsed both source greens to color **2**, losing
+the original light/shadow differentiation.
+
+The original 16x16 XPM artwork, 8x8 silhouettes, windows, facades,
+roofs, black outlines and all other colors remain exactly the same.
+Low-density homes and offices, natural grass, forest, parks, water,
+roads, factories, hospitals, churches, power plants, and non-building
+tiles are **unchanged**. The patch does not change global color
+registers or add any screen-refresh work on the 7 MHz V20.
+
+The color remap is performed **offline**, while creating the standard
+30,720-byte `TILES.DAT`, so replace **TILES.DAT** on the Tandy to
+apply it. Replacing the DOS executable alone will not change art.
+
+For before/after comparison, the old building colors can be generated
+with the same source art and converter:
+
+```sh
+python3 tandy-dos/tools/convert_tiles.py \
+  micropolis-activity/images/tiles.xpm TILES-OLD.DAT \
+  --original-building-colors
+```
+
+A deterministic test compares all 61,440 packed pixels against the
+original conversion; only the green pixels in dense residential or
+commercial artwork may differ. The converted file stays 30,720 bytes,
+without increasing RAM consumption or CPU work during gameplay.

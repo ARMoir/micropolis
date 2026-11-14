@@ -85,6 +85,7 @@ jobs:
         run: |
           python3 tandy-dos/tools/convert_tiles.py micropolis-activity/images/tiles.xpm TILES.DAT
           test "$(wc -c < TILES.DAT)" -eq 30720
+          python3 tandy-dos/tests/test_tile_palette.py micropolis-activity/images/tiles.xpm TILES.DAT
           python3 - <<'PY'
           from pathlib import Path
           tiles = Path("TILES.DAT").read_bytes()
