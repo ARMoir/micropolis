@@ -251,9 +251,9 @@ static void draw_original_tile(unsigned int px, unsigned int py, unsigned int ti
     draw_packed_tile(px, py, art_data + tile * 32U);
 }
 
-/* Zoning is a separate, non-destructive overlay on original sprites.
- * Outlines identify still-VACANT freely-zoned lots. Completed original
- * structures and new 1x1/2x2/3x3 development must remain unobscured.
+/* Zoning overlay stays visual-only and never modifies the original
+ * or new source sprite bytes or saved city tiles. Vacant 1x1 parcels
+ * display hatching and a full per-cell outline until developed.
  */
 /* Display coordinates use a rotated virtual 100x120/120x100 map.
  * The existing tile renderer, editing, power and simulation always
@@ -278,35 +278,56 @@ static int world_to_visible(unsigned int wx, unsigned int wy,
     return 1;
 }
 
+/* Draw a persistent preview-style hatch and FULL individual 8x8
+ * outline over each vacant R/C/I parcel. A contiguous zone does not
+ * suppress shared internal borders: every 1x1 lot remains identifiable
+ * until it grows. Developed buildings are never overpainted.
+ *
+ * Fast mode-9 packed VRAM writes: no 8x8 framebuffer, no per-pixel
+ * vram_offset() work and no extra simulation or redraw passes.
+ * Matches the 9 interior tint pixels used by funded zone previews.
+ */
 static void draw_zone_border(unsigned int px, unsigned int py,
                              unsigned int mx, unsigned int my)
 {
-    unsigned int kind = zoning_at(mx, my);
-    unsigned int edge, x, y;
-    unsigned char color;
-    if (kind == ZONE_NONE)
+    unsigned int kind=zoning_at(mx,my),row,off,pattern;
+    unsigned char color,hi,lo,packed;
+    if(kind==ZONE_NONE ||
+       zone_highlight_mask(city_at(mx,my)&TILE_MASK,
+                           zoning_development_at(mx,my))==0U)
         return;
-    /* Important for industrial skylines: the bright border previously
-     * ran across real building roofs, especially at the irregular
-     * edges of 3x3 original lots and NewerSource 2x2/3x3 structures.
-     * Never scribble zone outlines over developed building pixels.
-     * This is only a few local lookups, no whole-screen repaint.
-     */
-    edge = zone_highlight_mask(
-        view_rotation_edges(map_turns,zoning_edge_mask(mx,my)),
-        city_at(mx,my)&TILE_MASK,
-        zoning_development_at(mx,my));
-    if(edge==0U) return;
-    color = kind == ZONE_RES ? 10U :
-            kind == ZONE_COM ? 9U : 14U;
-    if (edge & 1U)
-        for (x = 0U; x < 8U; ++x) pixel(px + x, py, color);
-    if (edge & 2U)
-        for (y = 0U; y < 8U; ++y) pixel(px + 7U, py + y, color);
-    if (edge & 4U)
-        for (x = 0U; x < 8U; ++x) pixel(px + x, py + 7U, color);
-    if (edge & 8U)
-        for (y = 0U; y < 8U; ++y) pixel(px, py + y, color);
+    color=(unsigned char)(kind==ZONE_RES?10U:
+                          kind==ZONE_COM?9U:14U);
+    hi=(unsigned char)(color<<4U);
+    lo=color;
+    packed=(unsigned char)(hi|lo);
+    for(row=0U;row<8U;++row) {
+        off=vram_offset(px,py+row);
+        if(row==0U || row==7U) {
+            /* Full top and bottom borders: 4 packed writes / row. */
+            video[off]=packed;
+            video[off+1U]=packed;
+            video[off+2U]=packed;
+            video[off+3U]=packed;
+        } else {
+            /* Both vertical sides. In mode 9 each packed byte has
+             * left pixel in its high nibble, right pixel in low. */
+            video[off]=(unsigned char)((video[off]&15U)|hi);
+            video[off+3U]=(unsigned char)((video[off+3U]&240U)|lo);
+            pattern=zone_highlight_hatch_row(row);
+            if(pattern==0x2aU) {
+                /* x=1,3,5 -- three odd interior pixels. */
+                video[off]=(unsigned char)((video[off]&240U)|lo);
+                video[off+1U]=(unsigned char)((video[off+1U]&240U)|lo);
+                video[off+2U]=(unsigned char)((video[off+2U]&240U)|lo);
+            } else if(pattern==0x54U) {
+                /* x=2,4,6 -- three even interior pixels. */
+                video[off+1U]=(unsigned char)((video[off+1U]&15U)|hi);
+                video[off+2U]=(unsigned char)((video[off+2U]&15U)|hi);
+                video[off+3U]=(unsigned char)((video[off+3U]&15U)|hi);
+            }
+        }
+    }
 }
 
 /* 2-bit pending construction state, rendered translucently over existing

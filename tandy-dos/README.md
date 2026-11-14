@@ -1212,3 +1212,25 @@ while unbuilt parcels retain the colored zoning boundary during
 construction. No extra RAM, redraw passes or global map work is needed.
 A C89 regression tests every edge-mask combination for vacant lots,
 developed 1x1 stages, original RCI/utility art, roads, and water.
+
+## Persistent vacant-zone hatch and individual lot outlines
+
+Vacant individually zoned 1x1 residential, commercial and industrial
+lots now **retain the same alternating 9-pixel stipple used by the
+placement preview after you release the mouse**. Every individual
+tile is surrounded by all four color-coded border sides, including
+internal borders between adjacent lots of the same type. The R/C/I
+colors remain green, blue, and bright yellow respectively.
+
+When a lot develops (density stage 1-3), both the hatch and outline
+disappear from that tile, leaving its original Micropolis or complete
+NewerSource artwork unobstructed. Original 3x3 prefabs, complete
+new 2x2/3x3 structures, roads, rails, power lines and water receive
+no vacant overlay. The saved .CTY/.ZON/.NBL files and TILES.DAT
+are unchanged by this purely cosmetic rendering policy.
+
+The renderer writes only the affected packed 4-bit Tandy VRAM nibbles
+rather than calling the pixel offset routine for every border point,
+so there is no new simulation scan, memory allocation, or full-screen
+refresh. Host regression exercises every tile ID and density stage,
+plus all nine hatching positions and full per-cell outlines.
