@@ -26,6 +26,7 @@
 #include "pointer_policy.h"
 #include "small_lot_art.h"
 #include "newer_lot.h"
+#include "zone_highlight.h"
 
 #define SCREEN_W 320U
 #define SCREEN_H 200U
@@ -250,9 +251,9 @@ static void draw_original_tile(unsigned int px, unsigned int py, unsigned int ti
     draw_packed_tile(px, py, art_data + tile * 32U);
 }
 
-/* Zoning is a separate, non-destructive overlay on original Micropolis
- * sprites. Draw only the OUTSIDE edges of adjoining same-type zones.
- * This allows a single 8x8 tile to have a complete green/blue/yellow border.
+/* Zoning is a separate, non-destructive overlay on original sprites.
+ * Outlines identify still-VACANT freely-zoned lots. Completed original
+ * structures and new 1x1/2x2/3x3 development must remain unobscured.
  */
 /* Display coordinates use a rotated virtual 100x120/120x100 map.
  * The existing tile renderer, editing, power and simulation always
@@ -281,12 +282,21 @@ static void draw_zone_border(unsigned int px, unsigned int py,
                              unsigned int mx, unsigned int my)
 {
     unsigned int kind = zoning_at(mx, my);
-    unsigned int edge = view_rotation_edges(map_turns,
-                                            zoning_edge_mask(mx, my));
-    unsigned int x, y;
+    unsigned int edge, x, y;
     unsigned char color;
-    if (kind == ZONE_NONE || edge == 0U)
+    if (kind == ZONE_NONE)
         return;
+    /* Important for industrial skylines: the bright border previously
+     * ran across real building roofs, especially at the irregular
+     * edges of 3x3 original lots and NewerSource 2x2/3x3 structures.
+     * Never scribble zone outlines over developed building pixels.
+     * This is only a few local lookups, no whole-screen repaint.
+     */
+    edge = zone_highlight_mask(
+        view_rotation_edges(map_turns,zoning_edge_mask(mx,my)),
+        city_at(mx,my)&TILE_MASK,
+        zoning_development_at(mx,my));
+    if(edge==0U) return;
     color = kind == ZONE_RES ? 10U :
             kind == ZONE_COM ? 9U : 14U;
     if (edge & 1U)

@@ -1194,3 +1194,21 @@ The checked-in historical resource file remains the byte-for-byte
 source of `NEWER1.DAT`. A locally supplied `SC2K.DAT` is still
 accepted by older installations via the backward-compatible loader;
 it is no longer generated at build root or uploaded as a release asset.
+
+## Industrial and developed-area highlighting cleanup
+
+The Tandy 16-color city renderer now draws bright residential,
+commercial and industrial zoning outlines **only on vacant** 1x1
+zoned land. In earlier builds, the yellow industrial overlay followed
+individual zoning edges *across the pixel art of developed buildings*,
+producing disconnected L-shaped roof highlights, extra bright borders
+and visually broken original industrial blocks.
+
+Original Micropolis 3x3 developed sprites, small occupied 1x1 lots
+and new complete 2x2/3x3 NewerSource buildings are no longer painted
+over by the zoning perimeter. Their source pixels and color palette
+are unchanged. The minimap and Inspector still distinguish R/C/I types,
+while unbuilt parcels retain the colored zoning boundary during
+construction. No extra RAM, redraw passes or global map work is needed.
+A C89 regression tests every edge-mask combination for vacant lots,
+developed 1x1 stages, original RCI/utility art, roads, and water.
