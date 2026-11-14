@@ -40,7 +40,11 @@ static const enum ui_action help_cmds[] = {
 unsigned int ui_menu_origin(enum ui_menu menu)
 {
     switch (menu) {
-    case MENU_FILE:  return 1U;
+    /* Popups start at or to the right of the x=64 city boundary.
+     * Otherwise opening SYSTEM overwrites the visible tool buttons.
+     * Header click targets remain unchanged (SYSTEM is still at x=8).
+     */
+    case MENU_FILE:  return 8U;
     case MENU_TOOLS: return 9U;
     case MENU_VIEW:  return 17U;
     case MENU_HELP:  return 24U;
