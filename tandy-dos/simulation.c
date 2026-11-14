@@ -54,16 +54,32 @@ static int road_tile(unsigned int id)
 {
     return id >= 64U && id <= 207U;
 }
+static int rail_tile(unsigned int id)
+{
+    return id >= 224U && id <= 238U;
+}
+/* Both roads and railways provide transportation to zones. Happisle
+ * has substantially more railway than road squares, unlike the built-in
+ * demo. Restricting access to roads made new residences appear inert.
+ * This affects simulated service access only, never original CTY tiles
+ * or the distinct road/rail display artwork.
+ */
+static int transport_tile(unsigned int id)
+{
+    return road_tile(id) || rail_tile(id);
+}
 static int wire_tile(unsigned int id)
 {
     return id >= 208U && id <= 223U;
 }
-static int road_access(unsigned int x, unsigned int y)
+static int transport_access(unsigned int x, unsigned int y)
 {
-    if (x > 0U && road_tile(city_at(x-1U,y) & TILE_MASK)) return 1;
-    if (x+1U < CITY_WIDTH && road_tile(city_at(x+1U,y) & TILE_MASK)) return 1;
-    if (y > 0U && road_tile(city_at(x,y-1U) & TILE_MASK)) return 1;
-    if (y+1U < CITY_HEIGHT && road_tile(city_at(x,y+1U) & TILE_MASK)) return 1;
+    if (x > 0U && transport_tile(city_at(x-1U,y) & TILE_MASK)) return 1;
+    if (x+1U < CITY_WIDTH &&
+        transport_tile(city_at(x+1U,y) & TILE_MASK)) return 1;
+    if (y > 0U && transport_tile(city_at(x,y-1U) & TILE_MASK)) return 1;
+    if (y+1U < CITY_HEIGHT &&
+        transport_tile(city_at(x,y+1U) & TILE_MASK)) return 1;
     return 0;
 }
 static int has_power(unsigned int x, unsigned int y)
@@ -125,7 +141,7 @@ static int process_zone(unsigned int x, unsigned int y,
     /* Cache service checks once per tile: the original repeated four
      * neighbor lookups twice, expensive on the 7 MHz V20.
      */
-    road = road_access(x,y);
+    road = transport_access(x,y);
     power = has_power(x,y);
     if (!road)
         ++no_road_month;
@@ -148,7 +164,7 @@ static int process_zone(unsigned int x, unsigned int y,
                  pop_res > (pop_com * 2UL + 2UL))
             demand = 1;
         if (demand && ((roll >> 8U) &
-                       (stage == 0U ? 7U : 15U)) == 0U) {
+                       (stage == 0U ? 3U : 15U)) == 0U) {
             next = stage + 1U;
             if (kind == ZONE_RES) ++growth_res;
             else if (kind == ZONE_COM) ++growth_com;
@@ -188,21 +204,21 @@ static int process_zone(unsigned int x, unsigned int y,
  * nine original sprite IDs before changing anything so edited cities,
  * roads and utilities are never overwritten.
  */
-static int original_zone_road(unsigned int x, unsigned int y)
+static int original_zone_transport(unsigned int x, unsigned int y)
 {
     int k, xx, yy;
     for (k = -1; k <= 1; ++k) {
         xx = (int)x + k;
         yy = (int)y + k;
-        if (x >= 2U && road_tile(city_at(x-2U,(unsigned int)yy) & TILE_MASK))
+        if (x >= 2U && transport_tile(city_at(x-2U,(unsigned int)yy) & TILE_MASK))
             return 1;
         if (x + 2U < CITY_WIDTH &&
-            road_tile(city_at(x+2U,(unsigned int)yy) & TILE_MASK))
+            transport_tile(city_at(x+2U,(unsigned int)yy) & TILE_MASK))
             return 1;
-        if (y >= 2U && road_tile(city_at((unsigned int)xx,y-2U) & TILE_MASK))
+        if (y >= 2U && transport_tile(city_at((unsigned int)xx,y-2U) & TILE_MASK))
             return 1;
         if (y + 2U < CITY_HEIGHT &&
-            road_tile(city_at((unsigned int)xx,y+2U) & TILE_MASK))
+            transport_tile(city_at((unsigned int)xx,y+2U) & TILE_MASK))
             return 1;
     }
     return 0;
@@ -249,7 +265,7 @@ static int process_original_zone(unsigned int x, unsigned int y,
         delta = ((id - base) / 9U) % tiers;
     if (delta + 1U == tiers)
         return 0; /* full-density original building */
-    road = original_zone_road(x,y);
+    road = original_zone_transport(x,y);
     power = has_power(x,y);
     if (!road) ++no_road_month;
     else if (!power) ++no_power_month;
