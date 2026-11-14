@@ -19,7 +19,10 @@ struct newer_record {
     unsigned char x,y,kind,span,id,used;
 };
 /* Slot number + 1; zero means independently zoned 1x1 lot. */
-static unsigned char owner[CITY_TILES];
+/* Move the 12KB world index to the FAR heap: fixed DGROUP must stay
+ * below 64KB on Open Watcom 8086. Tile lookup remains constant-time.
+ */
+static unsigned char NEWER_FAR *owner=0;
 static struct newer_record records[NEWER_LOT_MAX];
 static struct newer_record staged[NEWER_LOT_MAX];
 static unsigned int count=0U;
@@ -28,6 +31,14 @@ static unsigned char NEWER_FAR *art=0;
 static unsigned int offset(unsigned int x,unsigned int y)
 {
     return x*CITY_HEIGHT+y;
+}
+static int ensure_owner(void)
+{
+    if(owner!=0) return 1;
+    owner=(unsigned char NEWER_FAR*)malloc(CITY_TILES);
+    if(owner==0) return 0;
+    memset(owner,0,CITY_TILES);
+    return 1;
 }
 static int terrain_usable(unsigned int x,unsigned int y,
                           unsigned int kind)
@@ -108,7 +119,7 @@ static void fill_owner(unsigned int slot)
 }
 void newer_lot_clear(void)
 {
-    memset(owner,0,sizeof(owner));
+    if(ensure_owner()) memset(owner,0,CITY_TILES);
     memset(records,0,sizeof(records));
     count=0U;
 }
@@ -137,7 +148,7 @@ void newer_lot_free_art(void)
 }
 int newer_lot_at(unsigned int x,unsigned int y)
 {
-    if(x>=CITY_WIDTH || y>=CITY_HEIGHT) return 0;
+    if(owner==0 || x>=CITY_WIDTH || y>=CITY_HEIGHT) return 0;
     return owner[offset(x,y)]!=0U;
 }
 int newer_lot_info(unsigned int x,unsigned int y,
@@ -147,7 +158,7 @@ int newer_lot_info(unsigned int x,unsigned int y,
 {
     unsigned int index;
     struct newer_record *r;
-    if(x>=CITY_WIDTH || y>=CITY_HEIGHT) return 0;
+    if(owner==0 || x>=CITY_WIDTH || y>=CITY_HEIGHT) return 0;
     index=owner[offset(x,y)];
     if(index==0U || index>NEWER_LOT_MAX)return 0;
     r=&records[index-1U];
@@ -164,7 +175,7 @@ const unsigned char NEWER_FAR *newer_lot_pixels(
 {
     unsigned int slot,part,span,lx,ly,index,first;
     struct newer_record *rec;
-    if(!art || x>=CITY_WIDTH || y>=CITY_HEIGHT) return 0;
+    if(!art || owner==0 || x>=CITY_WIDTH || y>=CITY_HEIGHT) return 0;
     slot=owner[offset(x,y)];
     if(!slot) return 0;
     rec=&records[slot-1U];
@@ -193,7 +204,7 @@ unsigned int newer_lot_try_grow(unsigned int x,unsigned int y,
     int available;
     struct newer_record *rec;
     if(x>=CITY_WIDTH || y>=CITY_HEIGHT ||
-       kind<ZONE_RES || kind>ZONE_IND) return 0U;
+       kind<ZONE_RES || kind>ZONE_IND || !ensure_owner()) return 0U;
     slot=owner[offset(x,y)];
     if(slot!=0U) {
         rec=&records[slot-1U];
@@ -245,7 +256,7 @@ unsigned int newer_lot_demolish(unsigned int x,unsigned int y,
 {
     unsigned int slot,i,j,span,ax,ay;
     struct newer_record *rec;
-    if(x>=CITY_WIDTH || y>=CITY_HEIGHT)return 0U;
+    if(owner==0 || x>=CITY_WIDTH || y>=CITY_HEIGHT)return 0U;
     slot=owner[offset(x,y)];
     if(!slot)return 0U;
     rec=&records[slot-1U];
@@ -362,7 +373,7 @@ int newer_lot_load(const char *path)
     expected=(unsigned int)c;
     c=fgetc(f);if(c==EOF){fclose(f);return 0;}
     expected|=(unsigned int)c<<8U;
-    if(fclose(f)!=0 || expected!=hash)return 0;
+    if(fclose(f)!=0 || expected!=hash || !ensure_owner())return 0;
     newer_lot_clear();
     for(i=0U;i<count_in;++i) {
         records[i]=staged[i];
