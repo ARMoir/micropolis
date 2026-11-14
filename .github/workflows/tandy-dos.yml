@@ -97,10 +97,12 @@ jobs:
 
       - name: Convert original Micropolis tile art to Tandy format
         run: |
-          cp resources/sc2k-buildings/SC2K.DAT SC2K.DAT
+          # Use the checked-in 1x1 art as the source, but do not
+          # generate or distribute its obsolete runtime filename.
           cp resources/sc2k-buildings/SC2K.DAT NEWER1.DAT
           cp resources/sc2k-buildings/SC2KM8.DAT NEWERM8.DAT
-          cmp -s NEWER1.DAT SC2K.DAT
+          cmp -s NEWER1.DAT resources/sc2k-buildings/SC2K.DAT
+          test ! -e SC2K.DAT
           test "$(wc -c < NEWERM8.DAT)" -eq 25504
           python3 tandy-dos/tools/convert_tiles.py micropolis-activity/images/tiles.xpm TILES.DAT
           test "$(wc -c < TILES.DAT)" -eq 30720
@@ -158,7 +160,6 @@ jobs:
           path: |
             MICROPOL.EXE
             TILES.DAT
-            SC2K.DAT
             NEWER1.DAT
             NEWERM8.DAT
             HAPPISLE.CTY
@@ -194,15 +195,23 @@ jobs:
           test -s micropolis-activity/COPYING
           test -s tandy-dos/README.md
           mkdir -p release/package
-          cp MICROPOL.EXE TILES.DAT SC2K.DAT NEWER1.DAT NEWERM8.DAT HAPPISLE.CTY release/package/
+          cp MICROPOL.EXE TILES.DAT NEWER1.DAT NEWERM8.DAT HAPPISLE.CTY release/package/
+          test ! -e release/package/SC2K.DAT
           cp micropolis-activity/COPYING release/package/COPYING
           cp tandy-dos/README.md release/package/README.md
           (
             cd release/package
             zip -q -9 ../MICROPOL-TANDY-DOS.zip \
-              MICROPOL.EXE TILES.DAT SC2K.DAT NEWER1.DAT NEWERM8.DAT HAPPISLE.CTY README.md COPYING
+              MICROPOL.EXE TILES.DAT NEWER1.DAT NEWERM8.DAT HAPPISLE.CTY README.md COPYING
           )
           unzip -t release/MICROPOL-TANDY-DOS.zip
+          # Regression guard: legacy art filename must never ship.
+          if unzip -Z -1 release/MICROPOL-TANDY-DOS.zip | grep -Fxq 'SC2K.DAT'; then
+            echo "ERROR: obsolete SC2K.DAT found in release ZIP" >&2
+            exit 1
+          fi
+          test -s release/package/NEWER1.DAT
+          test -s release/package/NEWERM8.DAT
 
       - name: Publish new release, then completely delete older releases and tags
         shell: bash
@@ -218,7 +227,6 @@ jobs:
             release/MICROPOL-TANDY-DOS.zip \
             release/package/MICROPOL.EXE \
             release/package/TILES.DAT \
-            release/package/SC2K.DAT \
             release/package/NEWER1.DAT \
             release/package/NEWERM8.DAT \
             release/package/HAPPISLE.CTY \

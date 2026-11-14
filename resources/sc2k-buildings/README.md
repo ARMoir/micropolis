@@ -93,7 +93,7 @@ accurate provenance and reproducibility; its documented origin is not
 a claim of copyright ownership.
 
 
-Copy `SC2K.DAT` beside the newly built `MICROPOL.EXE` and normal `TILES.DAT`.
+Copy `NEWER1.DAT` and `NEWERM8.DAT` beside the newly built `MICROPOL.EXE` and the original `TILES.DAT`. The archived `SC2K.DAT` is no longer packaged under its old filename.
 Developed custom 1×1 commercial/industrial lots use eight commercial and
 four industrial sprites. Density stages choose groups of sprites; world
 coordinates choose repeatable variants. Original residential sprites,

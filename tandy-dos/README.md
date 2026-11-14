@@ -203,9 +203,11 @@ stages using the existing original 8x8 tiles, while authentic vacant
 3x3 plots and previously developed classic buildings can advance to
 higher authentic density stages using complete original 3x3 artwork.
 Imported input files are not overwritten.
-Commercial and industrial 1x1 buildings use the optional `SC2K.DAT`
-small-building pack when installed; otherwise they reuse center tiles
-from the original artwork. See the optional-pack instructions below.
+Commercial and industrial 1x1 buildings use the complete optional
+`NEWER1.DAT` small-building pack when installed, or a complete
+8x8 fallback building silhouette when it is absent. They never use
+cropped center tiles from original 3x3 commercial/industrial buildings.
+See the optional-pack instructions below.
 The original traffic, pollution, land-value, policing, disasters,
 historical census and detailed city economics remain to be ported.
 Keep your original saves.
@@ -247,15 +249,15 @@ cc -std=c89 -Wall -Wextra -pedantic -o test-zoning tandy-dos/city.c tandy-dos/zo
 
 ## Remaining simulation-port work
 
-### Optional SC2000 commercial/industrial small-lot art
+### Optional NewerSource commercial/industrial small-lot art
 
 Build the optional pack from a local Windows 95 Special Edition installation:
 
 ```sh
-python3 tandy-dos/tools/convert_sc2k_lots.py /path/to/WIN95/SC2K SC2K.DAT
+python3 tandy-dos/tools/convert_sc2k_lots.py /path/to/WIN95/SC2K NEWER1.DAT
 ```
 
-Place `SC2K.DAT` beside `MICROPOL.EXE` and `TILES.DAT` in the working
+Place `NEWER1.DAT` beside `MICROPOL.EXE` and `TILES.DAT` in the working
 directory. The 392-byte file contains eight commercial and four industrial
 sprites extracted from `DATA/LARGE.DAT` using `BITMAPS/PAL_MSTR.BMP`.
 Conversion fits each sprite inside a 6x6 area of its 8x8 Tandy tile,
@@ -1183,3 +1185,12 @@ selects the correct piece of the upright whole building. There is no
 dynamic sprite scaling or per-frame full-city lookup. Source provenance
 remains in the archived resource documentation; public runtime asset
 names use `NewerSource` and do not imply ownership of original art.
+
+### Release asset cleanup
+
+The normal DOS release and ZIP now include `NEWER1.DAT` and
+`NEWERM8.DAT`, **not** the redundant legacy `SC2K.DAT` filename.
+The checked-in historical resource file remains the byte-for-byte
+source of `NEWER1.DAT`. A locally supplied `SC2K.DAT` is still
+accepted by older installations via the backward-compatible loader;
+it is no longer generated at build root or uploaded as a release asset.
