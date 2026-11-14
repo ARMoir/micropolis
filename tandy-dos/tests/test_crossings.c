@@ -57,6 +57,11 @@ int main(void)
     test_cross(EDIT_POWER,67U,78U,1);
     test_cross(EDIT_POWER,226U,221U,1);
     test_cross(EDIT_POWER,227U,222U,1);
+    /* Rail is the reciprocal crossing tool, using source IDs. */
+    test_cross(EDIT_RAIL,210U,222U,1);
+    test_cross(EDIT_RAIL,211U,221U,1);
+    test_cross(EDIT_RAIL,66U,238U,0);
+    test_cross(EDIT_RAIL,67U,237U,0);
     /* Traffic-loaded straight road variants neutralize to the same
      * original road/power crossing art, not to railway sprites. */
     test_cross(EDIT_POWER,82U,77U,1);
@@ -256,6 +261,29 @@ int main(void)
     assert(placement_commit()==4U);
     for(x=21U;x<=24U;++x) assert(TILE(x,20U)==64U);
     assert(city_get_funds()==0L);
+
+    /* Railroad bridges share the original 2-bit drag transaction:
+     * ground tracks cost $20 and river segments $100 per square.
+     */
+    clear_map();
+    city_set(40U,40U,226U|4096U|8192U);
+    for(x=41U;x<=43U;++x) city_set(x,40U,2U);
+    city_set_funds(320L);
+    placement_begin(EDIT_RAIL);
+    assert(placement_extend(40U,40U,44U,40U)==5U);
+    assert(placement_at(40U,40U)==PREVIEW_BLOCKED);
+    assert(placement_cost()==320L);
+    assert(placement_commit()==4U);
+    for(x=41U;x<=43U;++x) assert(TILE(x,40U)==224U);
+    assert(TILE(44U,40U)==226U);
+    assert(city_get_funds()==0L);
+    clear_map();
+    city_set(40U,40U,227U|4096U|8192U);
+    for(y=41U;y<=42U;++y) city_set(40U,y,3U);
+    assert(infrastructure_rail_bridge_id(40U,41U)==225U);
+    assert(edit_place(EDIT_RAIL,40U,41U));
+    assert(edit_place(EDIT_RAIL,40U,42U));
+    assert(TILE(40U,41U)==225U && TILE(40U,42U)==225U);
 
     /* No road or rail identity changes in the original HAPPISLE map
      * are required by this edit path. The combined intersection IDs

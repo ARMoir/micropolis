@@ -26,6 +26,22 @@ int main(void)
     assert((city_at(80U,20U) & 1023U) == 750U);
     assert((city_at(80U,20U) & 1024U) != 0U);
     assert(!edit_place(EDIT_COAL, 80U, 20U));
+    /* New grouped variants retain original Micropolis art and size. */
+    assert(edit_place(EDIT_NUCLEAR,90U,20U));
+    assert((city_at(90U,20U)&1023U)==816U);
+    assert((city_at(90U,20U)&1024U)!=0U);
+    assert(!edit_place(EDIT_COAL,90U,20U));
+    assert(edit_place(EDIT_POLICE,45U,55U));
+    assert((city_at(45U,55U)&1023U)==774U);
+    assert((city_at(45U,55U)&1024U)!=0U);
+    assert(edit_place(EDIT_FIRE,54U,55U));
+    assert((city_at(54U,55U)&1023U)==765U);
+    assert(!edit_place(EDIT_FIRE,54U,55U));
+    assert(edit_place(EDIT_RAIL,9U,9U));
+    assert((city_at(9U,9U)&1023U)==226U);
+    assert(edit_place(EDIT_RAIL,10U,9U));
+    assert((city_at(9U,9U)&1023U)==226U);
+    assert((city_at(10U,9U)&1023U)==226U);
     assert(edit_place(EDIT_ROAD, 3U, 3U));
     assert((city_at(3,3) & 1023U) == 66U);
     /* Original Micropolis supports POWER crossing an existing

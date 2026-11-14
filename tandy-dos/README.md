@@ -956,3 +956,32 @@ ends, and bulldozing restores river water instead of dirt. No additional
 rendering or simulation scans run continuously. C89 host regressions
 cover horizontal/vertical bridge art, preview costs, money limits,
 reverse-direction drags and CTY save/load persistence.
+
+## Press-and-hold grouped toolbar tools
+
+A short click on the top-row Road button repeats the last Road/Rail
+choice. A short click on the bottom-right Coal button repeats the most
+recent civic choice. Holding either button for roughly **0.44 seconds**
+(eight BIOS clock ticks) opens a compact flyout to the right of the
+sidebar: **Road / Rail** or **Coal / Nuclear / Police / Fire**. Move the
+mouse into the flyout and release on the chosen option. Releasing on the
+original button leaves the flyout open for a second click; Esc or
+right-click closes it. Keys 1..4, arrows and Enter work while open.
+
+The flyout shares the existing 4,608-byte menu pixel-underlay buffer,
+redrawing only its affected option rows, not the city/toolbar. The
+normal 0..7 keyboard shortcuts and Tools menu remain backward-compatible.
+The selected Road/Rail and Coal/Nuclear/Police/Fire variants share their
+original physical button and show the correct source artwork or grouped
+icon, with a small disclosure corner.
+
+Rails use original Micropolis connection sprites and crossings. Their
+land cost is **$20/tile**, bridge cost **$100/tile**, with the same
+preview/commit and save behavior as roads. Nuclear plants are original
+4x4 buildings (center tile **816**) and function as power sources in
+the existing electricity scan; coal center tile **750** remains supported.
+Police and Fire stations place authentic 3x3 original art (center tiles
+**774** and **765**), but the stripped-down DOS simulation does **not**
+yet simulate police coverage/crime or fire-protection effects. These
+are buildable buildings, not full municipal service implementations.
+The original game calls the fossil-fuel plant **Coal**, not Oil.

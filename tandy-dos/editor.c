@@ -105,8 +105,8 @@ int edit_place(enum edit_tool tool, unsigned int x, unsigned int y)
         unsigned int base=(tool==EDIT_COAL)?745U:
                           (tool==EDIT_NUCLEAR)?811U:
                           (tool==EDIT_FIRE)?761U:770U;
-        if(x==0U || y==0U || x+width-1U>=CITY_WIDTH ||
-           y+width-1U>=CITY_HEIGHT)
+        if(x==0U || y==0U || x+width-2U>=CITY_WIDTH ||
+           y+width-2U>=CITY_HEIGHT)
             return 0;
         left=x-1U;top=y-1U;
         for(j=0U;j<width;++j)

@@ -22,6 +22,7 @@
 #include "menu_font.h"
 #include "view_rotation.h"
 #include "tool_art.h"
+#include "tool_picker.h"
 #include "pointer_policy.h"
 
 #define SCREEN_W 320U
@@ -47,6 +48,13 @@ static unsigned char far *art_data = NULL;
 static unsigned int cursor_x = VIEW_W / 2U;
 static unsigned int cursor_y = VIEW_H / 2U;
 static enum edit_tool selected_tool = EDIT_INSPECT;
+/* Quick clicks repeat the last member picked in each tool group. */
+static enum edit_tool favorite_road = EDIT_ROAD;
+static enum edit_tool favorite_civic = EDIT_COAL;
+static int hold_button = -1;
+static unsigned int hold_tick = 0U;
+static unsigned int picker_kind = 0U; /* 0=closed, 1=road, 2=civic */
+static unsigned int picker_highlight = 0U;
 static const char *last_action = "READY";
 static char power_message[12];
 
@@ -553,10 +561,6 @@ static void bios_text(unsigned int row, unsigned int column,
  * Others use complete 16x16 pictograms instead of one enlarged map cell.
  */
 #define ROAD_TOOL_TILE 66U
-static const char *const tool_labels[8] = {
-    "INS", "RD", "PWR", "RES", "COM", "IND", "DOZ", "PLT"
-};
-
 /* Small authentic 16-color world overview below the compact tools.
  * Cache the previous camera outline so panning only restores/draws its
  * border, instead of repainting thousands of pixels each keypress.
@@ -737,7 +741,9 @@ static void draw_overview_world_rect(unsigned int x0,unsigned int y0,
 static unsigned int tool_key_from_enum(enum edit_tool tool)
 {
     if (tool == EDIT_BULLDOZE) return 6U;
-    if (tool == EDIT_COAL) return 7U;
+    if (tool == EDIT_RAIL) return 1U;
+    if (tool == EDIT_COAL || tool == EDIT_NUCLEAR ||
+        tool == EDIT_POLICE || tool == EDIT_FIRE) return 7U;
     return (unsigned int)tool;
 }
 
@@ -808,6 +814,23 @@ static void draw_tool_art(unsigned int tool, unsigned int px,
         draw_tool_pictogram(tool,px,py);
         return;
     }
+    /* Real 2x2 blocks of the original city art identify alternate
+     * civic tools, instead of showing the coal icon for everything.
+     */
+    if(tool==7U && art_data!=NULL && selected_tool!=EDIT_COAL) {
+        unsigned int base=(selected_tool==EDIT_NUCLEAR)?811U:
+                          (selected_tool==EDIT_POLICE)?770U:761U;
+        unsigned int span=selected_tool==EDIT_NUCLEAR?4U:3U;
+        for(iy=0U;iy<16U;++iy)
+            for(ix=0U;ix<16U;++ix) {
+                unsigned int id=base+(iy>>3U)*span+(ix>>3U);
+                src=id*32U+(iy&7U)*4U+((ix&7U)>>1U);
+                packed=art_data[src];
+                color=(ix&1U)?(packed&15U):(packed>>4U);
+                pixel(px+ix,py+iy,(unsigned char)color);
+            }
+        return;
+    }
     if (tool_art_has_icon(tool)) {
         for (iy=0U;iy<16U;++iy)
             for (ix=0U;ix<16U;++ix) {
@@ -817,9 +840,10 @@ static void draw_tool_art(unsigned int tool, unsigned int px,
             }
         return;
     }
+    /* Rail is the authentic straight-track sprite at twice scale. */
     if (tool != 1U || art_data == NULL)
         return;
-    src=ROAD_TOOL_TILE*32U;
+    src=(selected_tool==EDIT_RAIL ? 226U : ROAD_TOOL_TILE)*32U;
     for (iy=0U;iy<8U;++iy)
         for (ix=0U;ix<8U;++ix) {
             packed=art_data[src+iy*4U+(ix>>1)];
@@ -860,6 +884,13 @@ static void draw_tool_button(unsigned int n)
     draw_tool_art(tool,bx+(selected?8U:7U),by+(selected?4U:3U));
     /* Classic R/C/I colors; other tools get restrained accents. */
     box_pixels(bx+3U,by+20U,24U,2U,accent);
+    /* Small corner marker identifies the two expandable buttons. */
+    if(n==1U || n==7U) {
+        pixel(bx+26U,by+15U,0U);
+        pixel(bx+26U,by+16U,15U);
+        pixel(bx+25U,by+16U,15U);
+        pixel(bx+24U,by+16U,15U);
+    }
 }
 
 /* These two narrow sidebar headings share the transparent 5x7
@@ -1131,11 +1162,11 @@ static void draw_status(void)
     display_to_world(cursor_x,cursor_y,&wx,&wy);
     if (mouse_on) {
         sprintf(debug,"TOOL:%s MAP:%03u,%03u M:%03u,%03u",
-                tool_labels[tool_key_from_enum(selected_tool)],
+                edit_tool_name(selected_tool),
                 wx,wy,mouse_x,mouse_y);
     } else {
         sprintf(debug,"TOOL:%s MAP:%03u,%03u M:OFF",
-                tool_labels[tool_key_from_enum(selected_tool)],wx,wy);
+                edit_tool_name(selected_tool),wx,wy);
     }
     draw_status_text(23U,debug,debug_shadow,&debug_valid,11U);
     if (placement_active()) {
@@ -1178,7 +1209,8 @@ static void mouse_pointer_show(void)
     };
     if (!mouse_on || mouse_drawn ||
         !pointer_should_show(mouse_x,mouse_y,
-                             open_menu!=MENU_NONE,info_page!=0))
+                             open_menu!=MENU_NONE || picker_kind!=0U,
+                             info_page!=0))
         return;
     px = (mouse_x > 311U ? 312U : mouse_x) & ~1U;
     py = mouse_y > 192U ? 192U : mouse_y;
@@ -1533,25 +1565,38 @@ static int save_city_new_file(void)
 static void build_preview_cancel(void);
 
 /* Map number-row shortcuts, toolbar, and Tools menu onto one function. */
-static void select_tool(unsigned int number)
+/* Group members share a physical toolbar button, but the tool
+ * selection (and icon art) reflect the actual chosen variant.
+ */
+static void select_variant(enum edit_tool next)
 {
-    unsigned int previous = tool_button_index(selected_tool);
-    if (build_drag_active)
-        build_preview_cancel();
-    switch (number) {
-    case 0U: selected_tool = EDIT_INSPECT; break;
-    case 1U: selected_tool = EDIT_ROAD; break;
-    case 2U: selected_tool = EDIT_POWER; break;
-    case 3U: selected_tool = EDIT_RESIDENTIAL; break;
-    case 4U: selected_tool = EDIT_COMMERCIAL; break;
-    case 5U: selected_tool = EDIT_INDUSTRIAL; break;
-    case 6U: selected_tool = EDIT_BULLDOZE; break;
-    case 7U: selected_tool = EDIT_COAL; break;
-    }
-    last_action = "SELECT";
-    if (previous != tool_button_index(selected_tool)) {
+    unsigned int previous=tool_button_index(selected_tool);
+    enum edit_tool old=selected_tool;
+    if(build_drag_active) build_preview_cancel();
+    selected_tool=next;
+    if(next==EDIT_ROAD || next==EDIT_RAIL) favorite_road=next;
+    if(next==EDIT_COAL || next==EDIT_NUCLEAR ||
+       next==EDIT_POLICE || next==EDIT_FIRE) favorite_civic=next;
+    last_action="SELECT";
+    if(previous!=tool_button_index(selected_tool)) {
         draw_tool_button(previous);
         draw_tool_button(tool_button_index(selected_tool));
+    } else if(old!=next) {
+        draw_tool_button(previous); /* new variant picture only */
+    }
+}
+
+static void select_tool(unsigned int number)
+{
+    switch(number) {
+    case 0U: select_variant(EDIT_INSPECT); break;
+    case 1U: select_variant(EDIT_ROAD); break;
+    case 2U: select_variant(EDIT_POWER); break;
+    case 3U: select_variant(EDIT_RESIDENTIAL); break;
+    case 4U: select_variant(EDIT_COMMERCIAL); break;
+    case 5U: select_variant(EDIT_INDUSTRIAL); break;
+    case 6U: select_variant(EDIT_BULLDOZE); break;
+    case 7U: select_variant(EDIT_COAL); break;
     }
 }
 
@@ -1638,7 +1683,7 @@ static void apply_selected_tool(void)
     int erased = 0, placed;
     display_to_world(cursor_x,cursor_y,&mx,&my);
     if (kind != ZONE_NONE || selected_tool == EDIT_ROAD ||
-        selected_tool == EDIT_POWER) {
+        selected_tool == EDIT_RAIL || selected_tool == EDIT_POWER) {
         build_preview_start(mx, my);
         build_preview_finish();
         return;
@@ -1682,8 +1727,11 @@ static void apply_selected_tool(void)
              * Coal construction and removing conductive crossings,
              * wires or powered buildings still invalidate the graph.
              */
-            if (selected_tool != EDIT_BULLDOZE ||
-                (previous_tile & 16384U) != 0U)
+            if (selected_tool==EDIT_COAL ||
+                selected_tool==EDIT_NUCLEAR ||
+                selected_tool==EDIT_POLICE ||
+                selected_tool==EDIT_FIRE ||
+                ((previous_tile ^ city_at(mx,my)) & 16384U)!=0U)
                 simulation_mark_power_dirty();
             last_action = "PLACED";
             redraw_edit_area(selected_tool==EDIT_BULLDOZE?1U:2U);
@@ -1772,8 +1820,101 @@ static void run_menu_action(enum ui_action action)
     }
 }
 
+/* Popup shares the 4,608-byte screen-underlay buffer with the main
+ * menus. These are mutually exclusive and therefore allocate no new
+ * 128x32 framebuffer in precious 16-bit DOS conventional memory.
+ */
+#define PICKER_COLUMN 8U
+#define PICKER_PIXELS_X (PICKER_COLUMN*8U)
+static unsigned int picker_top_row(void)
+{
+    return picker_kind==1U?3U:12U;
+}
+static unsigned int picker_count(void)
+{
+    return picker_kind==1U?2U:4U;
+}
+static const char *picker_text(unsigned int index)
+{
+    static const char *const road_items[2]={" ROAD"," RAIL"};
+    static const char *const civic_items[4]={
+        " COAL"," NUCLEAR"," POLICE"," FIRE DEPT"
+    };
+    return picker_kind==1U?road_items[index]:civic_items[index];
+}
+static int picker_hit(unsigned int x,unsigned int y)
+{
+    return tool_picker_hit(picker_kind,x,y);
+}
+static void picker_row(unsigned int index)
+{
+    unsigned int col,py;
+    if(!picker_kind || index>=picker_count()) return;
+    py=(picker_top_row()+index)*8U;
+    for(col=0U;col<16U;++col)
+        solid_tile(PICKER_PIXELS_X+col*8U,py,
+                   (unsigned char)(index==picker_highlight?5U:1U));
+    bios_text(picker_top_row()+index,PICKER_COLUMN+1U,
+              picker_text(index),
+              (unsigned char)(index==picker_highlight?15U:14U));
+}
+static void picker_close(void)
+{
+    if(!picker_kind) return;
+    mouse_pointer_hide();
+    menu_overlay_restore();
+    picker_kind=0U;
+    hold_button=-1;
+}
+static void picker_open(unsigned int button)
+{
+    unsigned int row,n,off,base,first;
+    if(picker_kind || open_menu!=MENU_NONE) return;
+    mouse_pointer_hide();
+    picker_kind=button==1U?1U:2U;
+    picker_highlight=0U;
+    menu_back_origin=PICKER_COLUMN;
+    menu_back_lines=picker_count()*8U;
+    first=picker_top_row()*8U;
+    for(row=0U;row<menu_back_lines;++row) {
+        off=vram_offset(PICKER_PIXELS_X,first+row);
+        base=row*64U;
+        for(n=0U;n<64U;++n) menu_back[base+n]=video[off+n];
+    }
+    menu_back_valid=1;
+    for(row=0U;row<picker_count();++row) picker_row(row);
+    mouse_pointer_show();
+}
+static void picker_hover(int item)
+{
+    unsigned int old;
+    if(item<0 || (unsigned int)item>=picker_count() ||
+       (unsigned int)item==picker_highlight) return;
+    old=picker_highlight;
+    picker_highlight=(unsigned int)item;
+    picker_row(old);
+    picker_row(picker_highlight);
+}
+static void picker_choose(unsigned int item)
+{
+    enum edit_tool next;
+    if(!picker_kind || item>=picker_count()) return;
+    next=tool_picker_choice(picker_kind,item);
+    picker_close();
+    select_variant(next);
+    draw_status();
+}
+static unsigned int mouse_bios_tick(void)
+{
+    union REGS r;
+    r.h.ah=0U;
+    int86(0x1a,&r,&r);
+    return r.x.dx;
+}
+
 static void show_menu(enum ui_menu menu)
 {
+    if (picker_kind) picker_close();
     if (build_drag_active)
         build_preview_cancel();
     /* A change of menus restores just the old 128-pixel-wide popup,
@@ -1816,7 +1957,8 @@ static void handle_mouse(void)
         mouse_pointer_hide();
         mouse_x = state.x;
         mouse_y = state.y;
-        if (info_page == 0 && open_menu == MENU_NONE && inside) {
+        if (info_page == 0 && open_menu == MENU_NONE &&
+            !picker_kind && inside) {
             next_x = (state.x - VIEW_X) / 8U;
             next_y = (state.y - VIEW_Y) / 8U;
             if (next_x != cursor_x || next_y != cursor_y) {
@@ -1845,6 +1987,8 @@ static void handle_mouse(void)
                     draw_status();
                 }
             }
+        } else if (picker_kind) {
+            picker_hover(picker_hit(state.x,state.y));
         } else if (open_menu != MENU_NONE) {
             item = ui_dropdown_hit(open_menu, state.x, state.y);
             if (item >= 0 && (unsigned int)item != menu_highlight) {
@@ -1861,7 +2005,11 @@ static void handle_mouse(void)
 
     if (left_press) {
         mouse_pointer_hide();
-        if (info_page != 0) {
+        if (picker_kind) {
+            item=picker_hit(state.x,state.y);
+            if(item>=0) picker_choose((unsigned int)item);
+            else picker_close();
+        } else if (info_page != 0) {
             info_page = 0;
             render_full();
         } else if (open_menu != MENU_NONE) {
@@ -1895,7 +2043,18 @@ static void handle_mouse(void)
             } else {
                 toolbar = ui_toolbar_hit(state.x, state.y);
                 if (toolbar >= 0) {
-                    select_tool(ui_toolbar_tool((unsigned int)toolbar));
+                    if(tool_picker_button(toolbar)) {
+                        /* Immediate selection with no click delay.
+                         * Holding on this button opens the variants.
+                         */
+                        select_variant(toolbar==1?favorite_road:
+                                                 favorite_civic);
+                        hold_button=toolbar;
+                        hold_tick=mouse_bios_tick();
+                    } else {
+                        select_tool(ui_toolbar_tool((unsigned int)toolbar));
+                        hold_button=-1;
+                    }
                     draw_status();
                 } else if (state.x>=UI_MINIMAP_X &&
                            state.x<UI_MINIMAP_X+UI_MINIMAP_W &&
@@ -1916,6 +2075,7 @@ static void handle_mouse(void)
                 } else if (inside) {
                     if (selected_zone_kind() != ZONE_NONE ||
                         selected_tool == EDIT_ROAD ||
+                        selected_tool == EDIT_RAIL ||
                         selected_tool == EDIT_POWER) {
                         display_to_world(cursor_x,cursor_y,
                                          &world_x,&world_y);
@@ -1933,7 +2093,9 @@ static void handle_mouse(void)
 
     if (right_press) {
         mouse_pointer_hide();
-        if (info_page != 0) {
+        if (picker_kind) {
+            picker_close();
+        } else if (info_page != 0) {
             info_page = 0;
             render_full();
         } else if (open_menu == MENU_NONE && inside &&
@@ -1952,8 +2114,21 @@ static void handle_mouse(void)
         mouse_pointer_show();
     }
 
-    if (left_release)
+    if (left_release) {
         doze_mouse_active=0;
+        if(picker_kind) {
+            item=picker_hit(state.x,state.y);
+            if(item>=0) {
+                mouse_pointer_hide();
+                picker_choose((unsigned int)item);
+                mouse_pointer_show();
+            }
+            /* Releasing on the original button leaves options
+             * open for a later click.
+             */
+        }
+        hold_button=-1;
+    }
     if (left_release && build_drag_active) {
         mouse_pointer_hide();
         build_preview_finish();
@@ -1967,6 +2142,17 @@ static void handle_mouse(void)
                                  zone_dirty_x1,zone_dirty_y1,0);
         mouse_pointer_show();
         zone_minimap_dirty = 0;
+    }
+    /* Read the BIOS clock only while one group button is held.
+     * Regular mouse movements incur no extra clock interrupts.
+     */
+    if(hold_button>=0 && (state.buttons&1U) && !picker_kind) {
+        if(ui_toolbar_hit(state.x,state.y)!=hold_button)
+            hold_button=-1;
+        else if(tool_picker_ready(mouse_bios_tick(),hold_tick)) {
+            picker_open((unsigned int)hold_button);
+            hold_button=-1;
+        }
     }
     mouse_buttons = state.buttons;
 }
@@ -2029,7 +2215,8 @@ static void simulation_idle(void)
         return;
     sim_last_clock = now;
     if (simulation_is_paused() || open_menu != MENU_NONE ||
-        info_page != 0 || build_drag_active || zone_erase_active ||
+        picker_kind != 0U || info_page != 0 ||
+        build_drag_active || zone_erase_active ||
         doze_mouse_active)
         return;
     amount = 80U * simulation_speed();
@@ -2090,6 +2277,25 @@ static void keyboard_loop(void)
         if (info_page != 0) {
             info_page = 0;
             render_full();
+            continue;
+        }
+
+        if (picker_kind) {
+            if(ascii==27U) picker_close();
+            else if(ascii>='1' && ascii<='4' &&
+                    (unsigned int)(ascii-'1')<picker_count())
+                picker_choose((unsigned int)(ascii-'1'));
+            else if(ascii==13U || ascii==' ')
+                picker_choose(picker_highlight);
+            else if(scan==0x48U && picker_highlight>0U) {
+                mouse_pointer_hide();
+                picker_hover((int)picker_highlight-1);
+            } else if(scan==0x50U &&
+                      picker_highlight+1U<picker_count()) {
+                mouse_pointer_hide();
+                picker_hover((int)picker_highlight+1);
+            }
+            mouse_pointer_show();
             continue;
         }
 
