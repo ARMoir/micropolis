@@ -124,7 +124,12 @@ static void fix_one(unsigned int x, unsigned int y)
         if(x+1U<CITY_WIDTH && neighbor_rail(x+1U,y,0)) mask|=2U;
         if(y+1U<CITY_HEIGHT && neighbor_rail(x,y+1U,1)) mask|=4U;
         if(x>0U && neighbor_rail(x-1U,y,0)) mask|=8U;
-        city_set(x,y,rail_table[mask]|BULLBIT|BURNBIT);
+        /* Do not rotate an existing isolated straight rail merely
+         * because a ROAD beside it was edited. This preserves the
+         * source railway's intended crossing orientation.
+         */
+        if(mask!=0U)
+            city_set(x,y,rail_table[mask]|BULLBIT|BURNBIT);
         return;
     }
     if (id >= 210U && id <= 220U) {
