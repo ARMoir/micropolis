@@ -1267,3 +1267,38 @@ host regression checks every zone type through 1x1, 2x2 and 3x3
 growth, classic 3x3 source artwork, every rotation, and full
 demolition back to hatched vacant lots. The original TILES.DAT,
 NEWER1.DAT and NEWERM8.DAT are not modified.
+
+## Gentle no-power warning blink and occasional stadium football games
+
+Unpowered-zone lightning bolts now pulse **bright yellow (EGA 14) to
+dim gray (EGA 8)** slowly, holding each phase for 24 BIOS timer ticks
+(~1.32 seconds). The original black symbol backing remains fixed so
+that badges are legible on grass, industrial roofs and gray paving.
+Only the original seven lightning pixels in the **existing 84-byte
+visible badge cache** change on each phase; no 12,000-tile power
+rescan, whole city redraw or new framebuffer. The pointer is hidden
+and restored only once per phase even if multiple warnings are visible.
+
+Authentic Micropolis **stadium games** return as a display-only event.
+A powered 4x4 stadium (original source center tile 784 or 800) plays
+occasionally, about 12 seconds per minute, staggered between stadiums.
+During a game the view substitutes the original fully attended stadium
+tiles **795..810** and real animated football-field frames
+**932..939 / 940..947** in their original positions. The old stadium
+tiles 779..794 return between games. Timing uses BIOS ticks, with
+one football frame about every 0.44 seconds for 8 frames cycling.
+The source artwork is **not edited, replaced or approximated**.
+
+The animation respects 0/90/180/270-degree view orientations and uses
+the same already-tested original 4x4 upright-art mapping. The
+underlying .CTY city tiles and all flags are never overwritten.
+The display cache looks for visible original stadiums only when the
+camera moves/rotates; each game frame draws at most the affected 4x4
+sprite footprint, not the whole viewport. When there are no stadiums
+or a stadium lacks power, this does essentially no rendering work.
+
+All effects pause while menus, long-press flyouts or construction
+drags are active, retaining mouse stability on the 7MHz V20.
+The host regression checks timing/phase changes, both original stadium
+states, correct original football sprites in four rotations,
+no-power behavior and that world tiles remain bit-for-bit intact.

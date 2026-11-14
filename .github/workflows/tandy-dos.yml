@@ -90,6 +90,10 @@ jobs:
             tandy-dos/zone_highlight.c tandy-dos/tests/test_zone_highlight.c
           ./test-zone-highlight
           cc -std=c89 -Wall -Wextra -pedantic \
+            -o test-stadium-fx tandy-dos/city.c tandy-dos/view_rotation.c \
+            tandy-dos/stadium_fx.c tandy-dos/tests/test_stadium_fx.c
+          ./test-stadium-fx
+          cc -std=c89 -Wall -Wextra -pedantic \
             -o test-placement tandy-dos/city.c tandy-dos/zoning.c tandy-dos/newer_lot.c \
             tandy-dos/editor.c tandy-dos/connections.c \
             tandy-dos/placement.c tandy-dos/infrastructure.c tandy-dos/tests/test_placement.c
@@ -154,7 +158,7 @@ jobs:
           wcl -bcl=dos -0 -ml -q -fe=MICROPOL.EXE \
             tandy-dos/tandy.c tandy-dos/city.c tandy-dos/editor.c tandy-dos/connections.c tandy-dos/engine.c \
             tandy-dos/ui.c tandy-dos/mouse.c tandy-dos/zoning.c tandy-dos/newer_lot.c tandy-dos/zone_highlight.c \
-            tandy-dos/placement.c tandy-dos/simulation.c tandy-dos/video_ops.c tandy-dos/menu_font.c tandy-dos/view_rotation.c tandy-dos/tool_art.c tandy-dos/infrastructure.c tandy-dos/small_lot_art.c
+            tandy-dos/placement.c tandy-dos/simulation.c tandy-dos/stadium_fx.c tandy-dos/video_ops.c tandy-dos/menu_font.c tandy-dos/view_rotation.c tandy-dos/tool_art.c tandy-dos/infrastructure.c tandy-dos/small_lot_art.c
           test -s MICROPOL.EXE
           file MICROPOL.EXE
 

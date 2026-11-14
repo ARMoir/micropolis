@@ -27,6 +27,8 @@
 #include "small_lot_art.h"
 #include "newer_lot.h"
 #include "zone_highlight.h"
+#include "badge_flash.h"
+#include "stadium_fx.h"
 
 #define SCREEN_W 320U
 #define SCREEN_H 200U
@@ -87,6 +89,21 @@ static int doze_mouse_active = 0;
 static unsigned int build_drag_x = 0U, build_drag_y = 0U;
 static unsigned int sim_last_clock = 0U;
 static int sim_clock_started = 0;
+/* Pure display effects: never modify any .CTY tile or the power graph.
+ * Slow yellow/dim warning alternation, and occasional authentic 4x4
+ * Micropolis stadium/football graphics.
+ */
+static unsigned int badge_visible_color=BADGE_FLASH_BRIGHT;
+static unsigned int stadium_clock=0U;
+static unsigned int stadium_last_update=0U;
+#define STADIUM_MAX_VISIBLE 12U
+static unsigned char stadium_x[STADIUM_MAX_VISIBLE];
+static unsigned char stadium_y[STADIUM_MAX_VISIBLE];
+static unsigned char stadium_frame[STADIUM_MAX_VISIBLE];
+static unsigned int stadium_count=0U;
+static unsigned int stadium_last_scroll_x=65535U;
+static unsigned int stadium_last_scroll_y=65535U;
+static unsigned int stadium_last_turns=65535U;
 
 /* One bit per visible 8x8 tile (84 bytes for the 32x21 viewport).
  * The badge is STATIC; a power-state change triggers a budgeted scan
@@ -475,8 +492,21 @@ static void draw_city_tile(unsigned int px, unsigned int py,
          * Multi-tile building art stays upright with no pixel rotation.
          */
         graphic = view_rotation_utility_tile(map_turns,graphic);
-        draw_original_tile(px,py,
-                           view_rotation_building_tile(map_turns,mx,my,graphic));
+        /* Games temporarily swap in original FULLSTADIUM and its
+         * two 8-frame FOOTBALLGAME strips. The world keeps its
+         * authentic STADIUM tile IDs; rotations select matching
+         * subtile positions without rotating the source pixels.
+         */
+        if((t>=779U && t<=810U) ||
+           (t>=932U && t<=947U)) {
+            unsigned int art=stadium_fx_art(mx,my,map_turns,stadium_clock);
+            if(art!=STADIUM_FX_NONE)
+                graphic=art;
+            else
+                graphic=view_rotation_building_tile(map_turns,mx,my,graphic);
+        } else
+            graphic=view_rotation_building_tile(map_turns,mx,my,graphic);
+        draw_original_tile(px,py,graphic);
         draw_zone_border(px, py, mx, my);
         draw_pending_tile(px, py, mx, my);
         return;
@@ -552,20 +582,25 @@ static void draw_city_tile(unsigned int px, unsigned int py,
  * AH=09h writes ONE glyph at a fixed cursor without auto-advancing.
  * Explicit positioning also guarantees no accidental screen scroll.
  */
-/* Bright Tandy yellow (EGA 14), not pink/red 12. A black backing
- * retains crisp readability on green, gray and colorful roof tiles.
- * Static overlay, redrawn ONLY when the affected tile changes.
+/* Alternate only seven color pixels, never repaint the city/tile or
+ * recompute its warning every time the icon flashes. Keep the black
+ * silhouette as a permanent backdrop so it remains legible on grass.
  */
+static void recolor_no_power_badge(unsigned int px,unsigned int py,
+                                    unsigned int color)
+{
+    pixel(px+5U,py+1U,color);
+    pixel(px+4U,py+2U,color);
+    pixel(px+3U,py+3U,color);
+    pixel(px+6U,py+3U,color);
+    pixel(px+5U,py+4U,color);
+    pixel(px+4U,py+5U,color);
+    pixel(px+3U,py+6U,color);
+}
 static void draw_no_power_badge(unsigned int px, unsigned int py)
 {
     box_pixels(px+3U,py,5U,7U,0U);
-    pixel(px+5U,py+1U,14U);
-    pixel(px+4U,py+2U,14U);
-    pixel(px+3U,py+3U,14U);
-    pixel(px+6U,py+3U,14U);
-    pixel(px+5U,py+4U,14U);
-    pixel(px+4U,py+5U,14U);
-    pixel(px+3U,py+6U,14U);
+    recolor_no_power_badge(px,py,badge_visible_color);
 }
 
 static void draw_display_tile(unsigned int sx, unsigned int sy)
@@ -2301,6 +2336,98 @@ static void update_power_badges(void)
     if(redrawn) mouse_pointer_show();
 }
 
+/* Gently pulse the *cached* visible warnings once per ~1.3 sec.
+ * No power or zone lookups. Recolor only seven VRAM pixels per icon,
+ * with one mouse pointer hide/show for the entire phase transition.
+ */
+static void update_badge_flash(unsigned int now)
+{
+    unsigned int color=badge_flash_color(now),i;
+    int hidden=0;
+    if(color==badge_visible_color) return;
+    badge_visible_color=color;
+    for(i=0U;i<VIEW_W*VIEW_H;++i) {
+        if(!badge_shadow_get(i))continue;
+        if(!hidden){mouse_pointer_hide();hidden=1;}
+        recolor_no_power_badge(VIEW_X+(i%VIEW_W)*8U,
+                               VIEW_Y+(i/VIEW_W)*8U,color);
+    }
+    if(hidden) {
+        draw_cursor();
+        mouse_pointer_show();
+    }
+}
+
+/* Cache visible authentic stadium center coordinates only when the
+ * view moves/rotates. Do not scan all 12,000 city tiles or every 8x8
+ * city square on every football animation frame.
+ */
+static void stadium_find_visible(unsigned int now)
+{
+    unsigned int sx,sy,wx,wy,cx,cy,i;
+    stadium_count=0U;
+    stadium_last_scroll_x=scroll_x;
+    stadium_last_scroll_y=scroll_y;
+    stadium_last_turns=map_turns;
+    for(sy=0U;sy<VIEW_H;++sy)
+        for(sx=0U;sx<VIEW_W;++sx) {
+            display_to_world(sx,sy,&wx,&wy);
+            if(!stadium_fx_center(wx,wy,&cx,&cy))continue;
+            for(i=0U;i<stadium_count;++i)
+                if(stadium_x[i]==cx && stadium_y[i]==cy)break;
+            if(i!=stadium_count ||
+               stadium_count>=STADIUM_MAX_VISIBLE)continue;
+            stadium_x[stadium_count]=(unsigned char)cx;
+            stadium_y[stadium_count]=(unsigned char)cy;
+            /* Force one synchronized redraw. This is infrequent;
+             * subsequent frames only touch stadiums that changed.
+             */
+            stadium_frame[stadium_count]=255U;
+            ++stadium_count;
+        }
+    (void)now;
+}
+
+/* About two football frames/second during short, staggered games.
+ * Four-by-four original-art redraws are limited to visible stadiums,
+ * and unchanged periods cost only a handful of integer comparisons.
+ */
+static void update_stadium_games(unsigned int now)
+{
+    unsigned int i,j,k,cx,cy,phase,sx,sy;
+    int hidden=0;
+    if((unsigned int)(now-stadium_last_update)<STADIUM_FX_FRAME_TICKS)
+        return;
+    stadium_last_update=now;
+    stadium_clock=now;
+    if(stadium_last_scroll_x!=scroll_x ||
+       stadium_last_scroll_y!=scroll_y ||
+       stadium_last_turns!=map_turns)
+        stadium_find_visible(now);
+    for(i=0U;i<stadium_count;++i) {
+        cx=stadium_x[i];cy=stadium_y[i];
+        if(!stadium_fx_center(cx,cy,0,0)) {
+            stadium_frame[i]=0U;
+            continue;
+        }
+        phase=stadium_fx_frame(now,cx,cy,
+                               (city_at(cx,cy)&32768U)!=0U);
+        if(phase==stadium_frame[i])continue;
+        stadium_frame[i]=(unsigned char)phase;
+        if(!hidden){mouse_pointer_hide();hidden=1;}
+        for(j=0U;j<4U;++j)
+            for(k=0U;k<4U;++k) {
+                unsigned int wx=cx-1U+k,wy=cy-1U+j;
+                if(world_to_visible(wx,wy,&sx,&sy))
+                    draw_display_tile(sx,sy);
+            }
+    }
+    if(hidden) {
+        draw_cursor();
+        mouse_pointer_show();
+    }
+}
+
 /* BIOS time-of-day ticks are ~18.2 Hz and wrap at 16-bit CX:DX.
  * Work is limited to 80..320 cells per tick, keeping keyboard and serial
  * mouse handling responsive on the 7 MHz V20. Never process during a
@@ -2361,6 +2488,11 @@ static void simulation_idle(void)
     update_power_badges();
     if (event & (SIM_EVENT_TILE | SIM_EVENT_MONTH))
         mouse_pointer_show();
+    /* Separate visual effects from simulation: neither changes
+     * electrical connectivity, city tile IDs, or the save files.
+     */
+    update_badge_flash(now);
+    update_stadium_games(now);
 }
 
 static void keyboard_loop(void)
