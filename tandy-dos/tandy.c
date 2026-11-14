@@ -992,6 +992,7 @@ static void apply_zone_stroke(unsigned int x0, unsigned int y0,
         redraw_zoning_brush(x0, y0, x1, y1);
         last_action = kind == ZONE_NONE ? "UNZONED" : "ZONED";
         if (!zone_minimap_dirty) {
+            simulation_mark_lots_dirty(); /* once per eraser stroke */
             zone_dirty_x0=x0<x1?x0:x1;
             zone_dirty_y0=y0<y1?y0:y1;
             zone_dirty_x1=x0>x1?x0:x1;
@@ -1508,6 +1509,8 @@ static void build_preview_finish(void)
          */
         if (placement_changed_power())
             simulation_mark_power_dirty();
+        else if (selected_zone_kind()!=ZONE_NONE)
+            simulation_mark_lots_dirty();
         /* The 56x44 minimap is sampled from world tile coordinates;
          * update only its pixels corresponding to funded edits.
          */
@@ -1591,8 +1594,10 @@ static void apply_selected_tool(void)
         } else {
             last_action=erased?"UNZONED":"BLOCKED";
         }
-        if (erased)
+        if (erased) {
+            simulation_mark_lots_dirty();
             redraw_zoning_brush(mx,my,mx,my);
+        }
         if (placed || erased) {
             if (selected_tool == EDIT_BULLDOZE) {
                 /* One projected minimap pixel, not 2464 pixel writes
