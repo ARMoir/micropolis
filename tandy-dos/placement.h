@@ -24,4 +24,19 @@ long placement_remaining(void);
 void placement_bounds(unsigned int *x0, unsigned int *y0,
                       unsigned int *x1, unsigned int *y1);
 long placement_unit_cost(enum edit_tool tool);
+/* Newly touched preview squares from the LAST extend only. This list
+ * contains at most 221 world indices, even if the mouse skipped tiles.
+ */
+unsigned int placement_new_count(void);
+void placement_new_cell(unsigned int entry, unsigned int *x,
+                        unsigned int *y);
+/* The previous preview remains readable immediately after commit/cancel
+ * for selective cleanup, until the next placement_begin().
+ * PREVIEW_FUNDED indicates a square that was actually committed after
+ * placement_commit().
+ */
+unsigned int placement_recent_at(unsigned int x, unsigned int y);
+/* True only if the last commit changed electrical conductivity. */
+int placement_changed_power(void);
+
 #endif
