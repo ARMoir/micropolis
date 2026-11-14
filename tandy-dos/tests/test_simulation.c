@@ -171,13 +171,62 @@ int main(int argc, char **argv)
         assert(simulation_power_scan_count() == 1U);
         assert(simulation_has_last_change());
         printf("Original city regression: P=%lu Jobs=%lu "
-               "growth=%u serviced=%u no-road=%u no-power=%u "
+               "growth=%u serviced=%u no-transport=%u no-power=%u "
                "net-power=%u\n",
                st->residents,
                st->commercial_jobs + st->industrial_jobs,
                st->growth_total, st->lots_ready,
                st->lots_no_road, st->lots_no_power,
                st->powered_tiles);
+
+        /* Happisle is an authentic RAIL-HEAVY Micropolis city, not a
+         * rendering failure: 935 rail squares vs 230 road squares.
+         * Never rewrite rail IDs to road IDs just to enable housing.
+         * A 1x1 residence on empty wooded land touching RAIL and
+         * the powered network must grow with its original art intact.
+         * This is what the artificial road-dominated demo missed.
+         */
+        assert(city_load(argv[1]));
+        zoning_seed_from_city();
+        {
+            unsigned int rx,ry,id, rail=0U, road=0U, tile;
+            const unsigned int lot_x=25U,lot_y=34U;
+            for (rx=0U;rx<CITY_WIDTH;++rx)
+                for (ry=0U;ry<CITY_HEIGHT;++ry) {
+                    id=city_at(rx,ry)&1023U;
+                    if (id>=224U && id<=238U) ++rail;
+                    if (id>=64U && id<=207U) ++road;
+                }
+            assert(rail==935U);
+            assert(road==230U);
+            tile=city_at(lot_x,lot_y)&1023U;
+            assert(tile>=21U && tile<=43U);
+            assert((city_at(lot_x-1U,lot_y)&1023U)>=224U ||
+                   (city_at(lot_x+1U,lot_y)&1023U)>=224U ||
+                   (city_at(lot_x,lot_y-1U)&1023U)>=224U ||
+                   (city_at(lot_x,lot_y+1U)&1023U)>=224U);
+            assert(zoning_at(lot_x,lot_y)==ZONE_NONE);
+            assert(zoning_set(lot_x,lot_y,ZONE_RES));
+            simulation_init();
+            run_months(36U);
+            assert(zoning_development_at(lot_x,lot_y)>0U);
+            assert((city_at(lot_x,lot_y)&1023U)==tile);
+            /* This must not destroy a single original road/rail tile. */
+            {
+                unsigned int after_road=0U,after_rail=0U;
+                for(rx=0U;rx<CITY_WIDTH;++rx)
+                    for(ry=0U;ry<CITY_HEIGHT;++ry) {
+                        id=city_at(rx,ry)&1023U;
+                        if(id>=224U && id<=238U) ++after_rail;
+                        if(id>=64U && id<=207U) ++after_road;
+                    }
+                assert(after_road==road);
+                assert(after_rail==rail);
+            }
+            printf("Happisle rail-adjacent residential growth: "
+                   "stage=%u, roads=%u, railway=%u\n",
+                   zoning_development_at(lot_x,lot_y),road,rail);
+        }
     }
     puts("Phased RCI growth (1x1 / 3x3), demo, clock, taxes and persistence passed");
     return 0;
