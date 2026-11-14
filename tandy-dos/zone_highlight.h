@@ -25,6 +25,16 @@ unsigned int zone_highlight_footprint_edges(unsigned int x,
                                              unsigned int top,
                                              unsigned int span);
 
+/* World-space edges within a continuous SAME-TYPE zone group.
+ * These shared edges get a muted road-asphalt gray in the renderer;
+ * all genuine outer neighborhood edges stay the original zone color.
+ * A 2x2/3x3 building has no internal edges to recolor.
+ * Only mark shared edges when both actual tiles have a complete
+ * facing perimeter, avoiding asymmetric gray lines on damaged art.
+ */
+unsigned int zone_highlight_shared_edges(unsigned int x,unsigned int y,
+                                          unsigned int edges);
+
 /* Same interior stipple as a funded construction preview. */
 unsigned int zone_highlight_hatch_row(unsigned int y);
 

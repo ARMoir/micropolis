@@ -99,3 +99,42 @@ unsigned int zone_highlight_style(unsigned int x,unsigned int y,
     return zone_highlight_footprint_edges(
         x,y,(unsigned int)(cx-1),(unsigned int)(cy-1),3U);
 }
+
+/* A neighborhood's internal 1x1 lot boundaries read more naturally
+ * as narrow local roads. Never imply a transport connection in the
+ * simulation: this is a display-only asphalt-color edge classification.
+ *
+ * Check that the adjoining tile is the SAME zone kind and has its
+ * corresponding opposite outline. Composite multi-tile buildings
+ * only expose their exterior perimeters, so no road-like grid gets
+ * inserted across a complete 2x2/3x3 sprite.
+ *
+ * Each side has at most one neighboring tile lookup; this is used
+ * only while painting a tile already due for redraw.
+ */
+unsigned int zone_highlight_shared_edges(unsigned int x,unsigned int y,
+                                          unsigned int edges)
+{
+    unsigned int kind,shared=0U;
+    if(x>=CITY_WIDTH || y>=CITY_HEIGHT || edges==0U)
+        return 0U;
+    kind=zoning_at(x,y);
+    if(kind==ZONE_NONE)return 0U;
+    if((edges&1U) && y>0U &&
+       zoning_at(x,y-1U)==kind &&
+       (zone_highlight_style(x,y-1U,0)&4U))
+        shared|=1U;
+    if((edges&2U) && x+1U<CITY_WIDTH &&
+       zoning_at(x+1U,y)==kind &&
+       (zone_highlight_style(x+1U,y,0)&8U))
+        shared|=2U;
+    if((edges&4U) && y+1U<CITY_HEIGHT &&
+       zoning_at(x,y+1U)==kind &&
+       (zone_highlight_style(x,y+1U,0)&1U))
+        shared|=4U;
+    if((edges&8U) && x>0U &&
+       zoning_at(x-1U,y)==kind &&
+       (zone_highlight_style(x-1U,y,0)&2U))
+        shared|=8U;
+    return shared;
+}

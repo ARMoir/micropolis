@@ -74,6 +74,129 @@ static void test_classic(unsigned int x,unsigned int y,
     city_set(x+1U,y+1U,(unsigned short)id);
     assert(zone_highlight_style(x,y,&hatch)==0U);
 }
+/* Neighboring same-kind buildings/empty parcels form a district.
+ * Keep exterior R/C/I colored, but turn every SHARED 1x1 lot border
+ * road gray. Original/NewerSource multi-tile building interiors stay
+ * completely unmarked. The facing shared edge is symmetric.
+ */
+static void test_shared_local_roads(void)
+{
+    unsigned int kind,x,y,edges,shared,t,hatched;
+    int hatch;
+    for(kind=ZONE_RES;kind<=ZONE_IND;++kind) {
+        flat_city();
+        x=25U+kind*12U;
+        y=22U;
+        /* A 3x3 square of VACANT 1x1 zoned lots has a road-gray
+         * shared interior grid, but full colored exterior outline.
+         */
+        {
+            unsigned int i,j;
+            for(j=0U;j<3U;++j)
+                for(i=0U;i<3U;++i)
+                    assert(zoning_set(x+i,y+j,kind));
+        }
+        edges=zone_highlight_style(x+1U,y+1U,&hatch);
+        assert(edges==15U && hatch);
+        assert(zone_highlight_shared_edges(x+1U,y+1U,edges)==15U);
+        edges=zone_highlight_style(x,y,&hatch);
+        assert(edges==15U && hatch);
+        assert(zone_highlight_shared_edges(x,y,edges)==6U);
+        edges=zone_highlight_style(x+1U,y,&hatch);
+        assert(zone_highlight_shared_edges(x+1U,y,edges)==14U);
+        edges=zone_highlight_style(x+2U,y+2U,&hatch);
+        assert(zone_highlight_shared_edges(x+2U,y+2U,edges)==9U);
+        /* The actual road next to a district is NOT an internal
+         * zoning border. Its facing zone edge stays R/C/I colored.
+         */
+        city_set(x+1U,y-1U,66U);
+        assert((zone_highlight_shared_edges(x+1U,y,15U)&1U)==0U);
+        assert((zone_highlight_shared_edges(x+1U,y+1U,15U)&1U)!=0U);
+        for(t=0U;t<4U;++t) {
+            /* Both masks transform with the same camera direction. */
+            shared=zone_highlight_shared_edges(x+1U,y,15U);
+            assert((view_rotation_edges(t,shared) &
+                    view_rotation_edges(t,15U))==
+                   view_rotation_edges(t,shared));
+        }
+        /* Development stage changes hatch but not street geometry. */
+        for(hatched=1U;hatched<=3U;++hatched) {
+            assert(zoning_set_development(x+1U,y+1U,hatched));
+            assert(zone_highlight_style(x+1U,y+1U,&hatch)==15U);
+            assert(!hatch);
+            assert(zone_highlight_shared_edges(x+1U,y+1U,15U)==15U);
+        }
+        /* Erase one plot: its four adjoining boundary colors turn
+         * back to exterior zoning. Existing partners must redraw.
+         */
+        assert(zoning_set(x+1U,y,ZONE_NONE));
+        assert((zone_highlight_shared_edges(x+1U,y+1U,15U)&1U)==0U);
+        assert((zone_highlight_shared_edges(x,y,15U)&2U)==0U);
+        assert((zone_highlight_shared_edges(x+2U,y,15U)&8U)==0U);
+        assert(zoning_set(x+1U,y,kind));
+        assert((zone_highlight_shared_edges(x,y,15U)&2U)!=0U);
+    }
+
+    /* A complete NEWER 2x2 or 3x3 never gets inner-road grid lines.
+     * Its exterior edge becomes gray only if a DIFFERENT structure
+     * or independent same-zone lot actually adjoins it.
+     */
+    flat_city();
+    mature(42U,52U,2U,ZONE_IND);
+    assert(newer_lot_try_grow(42U,52U,ZONE_IND,0,0)==2U);
+    assert(zone_highlight_style(42U,52U,0)==9U);
+    assert(zone_highlight_shared_edges(42U,52U,9U)==0U);
+    assert(zone_highlight_style(43U,52U,0)==3U);
+    assert(zone_highlight_shared_edges(43U,52U,3U)==0U);
+    assert(zone_highlight_style(43U,53U,0)==6U);
+    assert(zone_highlight_shared_edges(43U,53U,6U)==0U);
+    assert(zoning_set(44U,52U,ZONE_IND));
+    assert((zone_highlight_shared_edges(43U,52U,3U)&2U)==2U);
+    assert((zone_highlight_shared_edges(44U,52U,15U)&8U)==8U);
+    /* Maturing the right/bottom lots permits the 3x3 upgrade. */
+    {
+        unsigned int i,j;
+        for(j=0U;j<3U;++j)
+            for(i=0U;i<3U;++i)
+                if(zoning_at(42U+i,52U+j)==ZONE_NONE)
+                    assert(zoning_set(42U+i,52U+j,ZONE_IND));
+        for(j=0U;j<3U;++j)
+            for(i=0U;i<3U;++i)
+                assert(zoning_set_development(42U+i,52U+j,3U) ||
+                       zoning_development_at(42U+i,52U+j)==3U);
+    }
+    assert(newer_lot_try_grow(42U,52U,ZONE_IND,0,0)==3U);
+    assert(zone_highlight_style(43U,53U,0)==0U);
+    assert(zone_highlight_shared_edges(43U,53U,0U)==0U);
+    assert(zone_highlight_style(44U,52U,0)==3U);
+    assert(zone_highlight_shared_edges(44U,52U,3U)==0U);
+    assert(zoning_set(45U,52U,ZONE_IND));
+    assert((zone_highlight_shared_edges(44U,52U,3U)&2U)!=0U);
+    assert((zone_highlight_shared_edges(45U,52U,15U)&8U)!=0U);
+    /* Whole-building demolition returns separate vacancy grid. */
+    assert(newer_lot_demolish(43U,53U,0,0)==3U);
+    assert(zone_highlight_style(43U,53U,&hatch)==15U && hatch);
+    assert(zone_highlight_shared_edges(43U,53U,15U)==15U);
+
+    /* The same policy applies to an intact original 3x3 RCI prefab:
+     * no gray roads through its artwork, but gray on an adjoining
+     * separately zoned lot where both perimeters meet.
+     */
+    flat_city();
+    for(y=70U;y<73U;++y)
+        for(x=60U;x<63U;++x) {
+            unsigned int id=612U+(y-70U)*3U+(x-60U);
+            city_set(x,y,(unsigned short)
+                (id|((x==61U&&y==71U)?1024U:0U)));
+        }
+    zoning_seed_from_city();
+    assert(zone_highlight_style(61U,71U,0)==0U);
+    assert(zone_highlight_shared_edges(61U,71U,15U)==0U);
+    assert(zone_highlight_style(62U,71U,0)==2U);
+    assert(zoning_set(63U,71U,ZONE_IND));
+    assert(zone_highlight_shared_edges(62U,71U,2U)==2U);
+    assert(zone_highlight_shared_edges(63U,71U,15U)==8U);
+}
 int main(void)
 {
     unsigned int kind,x,y,j,i,mask,stage,total=0U;
@@ -157,6 +280,8 @@ int main(void)
     assert(zone_highlight_style(0U,0U,&hatch)==0U && !hatch);
     assert(zone_highlight_style(CITY_WIDTH,0U,&hatch)==0U);
     assert(zone_highlight_style(0U,CITY_HEIGHT,&hatch)==0U);
+    test_shared_local_roads();
+    puts("Shared R/C/I lot boundaries become local asphalt-gray lines; district edges and complete buildings preserved"); 
     puts("1x1 hatching, evolving 1x1->2x2->3x3 perimeters, classic 3x3, rotation and demolition passed");
     return 0;
 }

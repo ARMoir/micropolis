@@ -1389,3 +1389,37 @@ and saved-file formats are unchanged. A native-independent C89
 regression validates initial and repeated F2 saves, all three
 sidecars, exact .CTY content, complete NBL ownership reload,
 previous-version backups and corruption detection.
+
+## Road-colored inner lot boundaries
+
+The bright green/blue/yellow grid previously outlined **each 1x1
+parcel with its zone color**, even when several independently zoned
+lots formed a single continuous neighborhood. The Tandy view now
+treats a boundary shared by two **adjacent, same-kind R/C/I lots**
+as a narrow **asphalt-gray line (Tandy palette 8)**. This makes the
+grid read more like small local connecting streets. The genuine
+**outside perimeter of the zone group remains green/blue/yellow**.
+
+The rule is applied to BOTH facing sides of a shared boundary, so
+paving does not turn yellow/gray on alternate sides. At corners
+where a local gray street meets the district exterior, the zone's
+outer border color wins. The placement-style interior hatch is
+retained on vacant lots; developed 1x1 lots keep their artwork.
+
+A single 2x2/3x3 NewerSource building or intact original Micropolis
+3x3 prefab still gets **no internal grid lines at all**. Its own
+outer outline is road-gray only where another independent lot or
+separate building of the **same zone type** touches that perimeter.
+A different R/C/I zone, unzoned land or a real road retains the
+normal colored edge. These decorative local streets are NOT
+functional road tiles; they never change transport, access, power,
+construction costs or saved city files.
+
+All color classification is calculated from nearby tile/footprint
+metadata only for tiles already being drawn. Every 90-degree map
+rotation transforms the gray and outer-colored edges together.
+Painting or removing a zone refreshes its immediate neighbor tiles
+so road-gray inner edges appear or disappear without waiting for
+the simulation to repaint a tile. Empty-zone removal also keeps
+the existing two-tile expanded refresh for 3x3 building demolition.
+This change is display-only and needs no new graphics buffers.

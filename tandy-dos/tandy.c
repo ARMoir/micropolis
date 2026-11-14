@@ -299,58 +299,86 @@ static int world_to_visible(unsigned int wx, unsigned int wy,
     return 1;
 }
 
-/* Zone-color borders evolve with the ACTUAL building footprint:
- * vacant 1x1 plots: four sides plus preview-style nine-pixel hatch;
- * developed 1x1: four sides without hatch;
- * complete 2x2/3x3: only perimeter edges, no internal stripes.
- * Original 3x3 RCI structures use the same footprint rule.
+/* The zone outline now reads as a small neighborhood street grid:
+ *   - exterior district border = original R/C/I color;
+ *   - shared boundary between separate SAME-KIND lots = road gray 8;
+ *   - complete 2x2 / 3x3 building = perimeter only, never an inner
+ *     road across its four/nine original sprite subtiles;
+ *   - vacant 1x1 plots retain their original 9-pixel zone hatch.
  *
- * All geometry is computed in world space and converted to display
- * edges after view rotation. Use packed mode-9 byte/nibble writes
- * rather than expensive pixel() calls on the 7MHz V20.
+ * Compute both world edge sets once, then rotate them together.
+ * Draw at most four packed bytes per scanline, with no buffer or
+ * map changes, and give the outside zoning color priority at corners.
  */
 static void draw_zone_border(unsigned int px, unsigned int py,
                              unsigned int mx, unsigned int my)
 {
-    unsigned int kind=zoning_at(mx,my),edges,row,off,pattern;
+    unsigned int kind=zoning_at(mx,my),edges,shared,row,off,pattern;
     int hatched=0;
-    unsigned char color,hi,lo,packed;
-    if(kind==ZONE_NONE) return;
+    unsigned char zone_color,road_color=8U,color,packed,hi,lo;
+    if(kind==ZONE_NONE)return;
     edges=zone_highlight_style(mx,my,&hatched);
-    if(!edges && !hatched) return;
+    if(!edges && !hatched)return;
+    shared=zone_highlight_shared_edges(mx,my,edges);
     edges=view_rotation_edges(map_turns,edges);
-    color=(unsigned char)(kind==ZONE_RES?10U:
-                          kind==ZONE_COM?9U:14U);
-    hi=(unsigned char)(color<<4U);
-    lo=color;
-    packed=(unsigned char)(hi|lo);
+    shared=view_rotation_edges(map_turns,shared);
+    zone_color=(unsigned char)(kind==ZONE_RES?10U:
+                               kind==ZONE_COM?9U:14U);
+    hi=(unsigned char)(zone_color<<4U);
+    lo=zone_color;
     for(row=0U;row<8U;++row) {
         off=vram_offset(px,py+row);
         if((row==0U && (edges&1U)) ||
            (row==7U && (edges&4U))) {
-            /* Full horizontal edges, even through shared corners. */
+            unsigned int side=row==0U?1U:4U;
+            color=(unsigned char)((shared&side)?road_color:zone_color);
+            packed=(unsigned char)((color<<4U)|color);
             video[off]=packed;
             video[off+1U]=packed;
             video[off+2U]=packed;
             video[off+3U]=packed;
-        } else {
-            /* Only exterior vertical edges of this building piece. */
-            if(edges&8U)
+            /* The exterior district border must remain continuous:
+             * where a gray internal edge meets an outside edge at
+             * a corner, the original zoning color takes priority.
+             */
+            if((edges&8U) && !(shared&8U))
                 video[off]=(unsigned char)((video[off]&15U)|hi);
-            if(edges&2U)
-                video[off+3U]=(unsigned char)((video[off+3U]&240U)|lo);
-            if(!hatched) continue;
+            if((edges&2U) && !(shared&2U))
+                video[off+3U]=(unsigned char)
+                    ((video[off+3U]&240U)|lo);
+        } else {
+            /* Independent sides may be asphalt or an outer border;
+             * only existing footprint edges are painted.
+             */
+            if(edges&8U) {
+                color=(unsigned char)
+                    ((shared&8U)?road_color:zone_color);
+                video[off]=(unsigned char)
+                    ((video[off]&15U)|(color<<4U));
+            }
+            if(edges&2U) {
+                color=(unsigned char)
+                    ((shared&2U)?road_color:zone_color);
+                video[off+3U]=(unsigned char)
+                    ((video[off+3U]&240U)|color);
+            }
+            if(!hatched)continue;
             pattern=zone_highlight_hatch_row(row);
             if(pattern==0x2aU) {
-                /* x=1,3,5 of vacant tile */
+                /* x=1,3,5 stay zone-colored for empty parcels. */
                 video[off]=(unsigned char)((video[off]&240U)|lo);
-                video[off+1U]=(unsigned char)((video[off+1U]&240U)|lo);
-                video[off+2U]=(unsigned char)((video[off+2U]&240U)|lo);
+                video[off+1U]=(unsigned char)
+                    ((video[off+1U]&240U)|lo);
+                video[off+2U]=(unsigned char)
+                    ((video[off+2U]&240U)|lo);
             } else if(pattern==0x54U) {
-                /* x=2,4,6 of vacant tile */
-                video[off+1U]=(unsigned char)((video[off+1U]&15U)|hi);
-                video[off+2U]=(unsigned char)((video[off+2U]&15U)|hi);
-                video[off+3U]=(unsigned char)((video[off+3U]&15U)|hi);
+                /* x=2,4,6 stay zone-colored for empty parcels. */
+                video[off+1U]=(unsigned char)
+                    ((video[off+1U]&15U)|hi);
+                video[off+2U]=(unsigned char)
+                    ((video[off+2U]&15U)|hi);
+                video[off+3U]=(unsigned char)
+                    ((video[off+3U]&15U)|hi);
             }
         }
     }
@@ -1208,20 +1236,25 @@ static void apply_zone_stroke(unsigned int x0, unsigned int y0,
 {
     unsigned int changed = zoning_paint_line(x0, y0, x1, y1, kind);
     if (changed) {
-        if(kind==ZONE_NONE) {
-            /* One unzone can dismantle an entire 3x3 newer structure.
-             * Redraw that small perimeter, never the full viewport.
+        {
+            /* A newly painted (or erased) zone changes the color of
+             * its already-drawn neighbors' shared boundaries too.
+             * Refresh a one-tile margin so gray internal roads and
+             * colored exteriors update immediately, even if the
+             * neighboring zone's actual kind did not change.
+             * Erasure uses two tiles for demolished 3x3 prefabs.
              */
-            unsigned int xlo=(x0<x1?x0:x1);
-            unsigned int ylo=(y0<y1?y0:y1);
-            unsigned int xhi=(x0>x1?x0:x1);
-            unsigned int yhi=(y0>y1?y0:y1);
-            xlo=xlo>2U?xlo-2U:0U;
-            ylo=ylo>2U?ylo-2U:0U;
-            xhi=xhi+2U<CITY_WIDTH?xhi+2U:CITY_WIDTH-1U;
-            yhi=yhi+2U<CITY_HEIGHT?yhi+2U:CITY_HEIGHT-1U;
+            unsigned int margin=kind==ZONE_NONE?2U:1U;
+            unsigned int xlo=x0<x1?x0:x1;
+            unsigned int ylo=y0<y1?y0:y1;
+            unsigned int xhi=x0>x1?x0:x1;
+            unsigned int yhi=y0>y1?y0:y1;
+            xlo=xlo>margin?xlo-margin:0U;
+            ylo=ylo>margin?ylo-margin:0U;
+            xhi=xhi+margin<CITY_WIDTH?xhi+margin:CITY_WIDTH-1U;
+            yhi=yhi+margin<CITY_HEIGHT?yhi+margin:CITY_HEIGHT-1U;
             redraw_zoning_brush(xlo,ylo,xhi,yhi);
-        } else redraw_zoning_brush(x0, y0, x1, y1);
+        }
         last_action = kind == ZONE_NONE ? "UNZONED" : "ZONED";
         if (!zone_minimap_dirty) {
             simulation_mark_lots_dirty(); /* once per eraser stroke */
