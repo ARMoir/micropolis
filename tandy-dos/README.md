@@ -1234,3 +1234,36 @@ rather than calling the pixel offset routine for every border point,
 so there is no new simulation scan, memory allocation, or full-screen
 refresh. Host regression exercises every tile ID and density stage,
 plus all nine hatching positions and full per-cell outlines.
+
+## Adaptive RCI borders that follow building growth
+
+The parcel outline now evolves with actual residential, commercial,
+and industrial **building footprint size**, keeping each zone's
+existing green/blue/yellow color:
+
+- **Vacant 1x1:** All four colored outline edges, plus the persistent
+  nine-pixel placement-style hatch.
+- **Developed 1x1 (density 1-3):** All four outline edges, but NO hatch.
+- **2x2 composite building:** One continuous exterior 2x2 outline;
+  zero internal dividing lines, preserving the four original source
+  art pieces.
+- **3x3 composite building:** The outline grows to the full 3x3
+  perimeter; there are no lines through its center or roofs.
+- **Original Micropolis 3x3 RCI buildings:** Also one exterior
+  perimeter, only when the intact matching ZONEBIT center exists;
+  partial/debris sprites cannot accidentally claim a building border.
+- **Demolition or rezoning:** Removing a composite building resets its
+  1x1 plots to vacant with individual outlines and hatches.
+
+The exact sizes and origins come directly from the sparse .NBL
+owner records. Perimeter edges are transformed with the same map
+orientation (0/90/180/270 degrees) as the displayed sprites, so
+the border always matches the building after a camera rotation.
+Only changed tiles redraw during phased growth and demolition.
+
+Tandy mode 9 uses packed VRAM bytes/nibbles; there is no new
+framebuffer, save-format change, or all-city scan. A dedicated
+host regression checks every zone type through 1x1, 2x2 and 3x3
+growth, classic 3x3 source artwork, every rotation, and full
+demolition back to hatched vacant lots. The original TILES.DAT,
+NEWER1.DAT and NEWERM8.DAT are not modified.
