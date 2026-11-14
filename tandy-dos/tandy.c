@@ -26,6 +26,7 @@
 #include "pointer_policy.h"
 #include "small_lot_art.h"
 #include "newer_lot.h"
+#include "newer_site.h"
 #include "zone_highlight.h"
 #include "badge_flash.h"
 #include "stadium_fx.h"
@@ -392,6 +393,60 @@ static void draw_pending_tile(unsigned int px, unsigned int py,
     }
 }
 
+/* A light 1px drive/access pad visible on the *ground* around
+ * developed NewerSource buildings, not on the building sprite.
+ * The optional NEWER art is already opaque 8x8: painting before it
+ * would be overwritten. Instead, after drawing the unmodified sprite
+ * we replace only pixels which are STILL grass-green (EGA 2).
+ *
+ * Road adjacency is resolved once per affected source tile. The
+ * footprint gets one connected frontage, not four independent roads.
+ * Road-facing edges rotate with the camera; no new offscreen buffer,
+ * sprite copy, bitfield, or changes to .DAT/.CTY/.NBL.
+ */
+static void draw_newer_site_access(unsigned int px,unsigned int py,
+                                   unsigned int wx,unsigned int wy,
+                                   unsigned int left,unsigned int top,
+                                   unsigned int span,unsigned int kind)
+{
+    unsigned int side,part,screen_part,sx,sy,x,y,mark,off;
+    unsigned char source;
+    if(span==0U || span>3U || wx<left || wy<top ||
+       wx-left>=span || wy-top>=span)
+        return;
+    side=newer_site_road_side(left,top,span);
+    if(side==0U)return; /* never paint a fake disconnected road */
+    side=view_rotation_edges(map_turns,side);
+    part=(wy-top)*span+(wx-left);
+    screen_part=view_rotation_upright_part(map_turns,span,part);
+    sx=screen_part%span;
+    sy=screen_part/span;
+    if(!newer_site_front_piece(span,side,sx,sy))return;
+    /* Composite details onto ALL 8x8 source pixels: the middle
+     * of a shared 2x2/3x3 curb can cross a subtile boundary. The
+     * marker policy itself excludes the OUTER building perimeter,
+     * so colored zoning edges remain intact after drawing.
+     * Most candidate pixels reject before any VRAM read.
+     */
+    for(y=0U;y<8U;++y)
+        for(x=0U;x<8U;++x) {
+            mark=newer_site_marker(kind,span,side,
+                                   sx*8U+x,sy*8U+y);
+            if(mark==0U)continue;
+            off=vram_offset(px+x,py+y);
+            source=video[off];
+            if(x&1U) {
+                if((source&15U)==2U)
+                    video[off]=(unsigned char)
+                        ((source&240U)|newer_site_composite(2U,mark));
+            } else {
+                if((source>>4U)==2U)
+                    video[off]=(unsigned char)
+                        ((source&15U)|(newer_site_composite(2U,mark)<<4U));
+            }
+        }
+}
+
 /* All original multi-tile facility art uses the same host-tested
  * view_rotation_building_tile transform, including fire and police.
  */
@@ -412,15 +467,18 @@ static void draw_city_tile(unsigned int px, unsigned int py,
      * compact silhouette if the optional art pack is absent.
      */
     if(newer_lot_at(mx,my)) {
+        unsigned int left=0U,top=0U,span=0U;
+        kind=zoning_at(mx,my);
+        (void)newer_lot_info(mx,my,&left,&top,&span,0,0);
         if(large != NULL) draw_packed_tile(px,py,large);
         else {
-            kind=zoning_at(mx,my);
             solid_tile(px,py,kind==ZONE_RES?8U:
                              kind==ZONE_COM?1U:6U);
             box_pixels(px+1U,py+1U,6U,6U,7U);
             pixel(px+2U,py+2U,15U);
             pixel(px+5U,py+2U,15U);
         }
+        draw_newer_site_access(px,py,mx,my,left,top,span,kind);
         draw_zone_border(px,py,mx,my);
         draw_pending_tile(px,py,mx,my);
         return;
@@ -449,6 +507,7 @@ static void draw_city_tile(unsigned int px, unsigned int py,
                     box_pixels(px+2U,py+4U,4U,2U,4U);
                 }
             }
+            draw_newer_site_access(px,py,mx,my,mx,my,1U,kind);
             draw_zone_border(px,py,mx,my);
             draw_pending_tile(px,py,mx,my);
             return;

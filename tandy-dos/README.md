@@ -1302,3 +1302,46 @@ drags are active, retaining mouse stability on the 7MHz V20.
 The host regression checks timing/phase changes, both original stadium
 states, correct original football sprites in four rotations,
 no-power behavior and that world tiles remain bit-for-bit intact.
+
+## Subtle NewerSource paved access details (display-only)
+
+Developed NEWER commercial and industrial 1x1 lots now get
+subtle, 1-pixel gray concrete/driveway accents on exposed **grass**
+beside the original complete shop/warehouse art. NewerSource 2x2
+and 3x3 buildings receive **one coordinated frontage** across the
+whole footprint rather than an unrelated mini-road per subtile.
+Residential NewerSource 2x2/3x3 buildings get only a tiny walkway;
+original Micropolis residential 1x1 houses and all other original
+Micropolis source art are unchanged.
+
+The access side follows a real adjacent **road or road/rail
+crossing**, choosing the best-connected side of the building,
+with south/east/west/north used only to break ties. Bare railroad,
+water or power conductors do not create fake driveways. When the
+map rotates, the access pad turns with the road-facing side,
+while the existing building sprite continues to face upright in the
+display. Vacant lots keep their standard zoning hatch; no new
+marks appear until development.
+
+Converted 8x8 NEWER art is opaque. Drawing an underlay *before*
+the sprite would hide it completely. The renderer instead draws
+the original sprite unmodified, then replaces **only color 2
+(grass)** in a small candidate access pattern with dark gray 8 or
+light gray 7; it never overpaints roof, glass, walls, windows,
+ornamental art or the surrounding zone outline. There are no
+changes to NEWER1.DAT, NEWERM8.DAT, TILES.DAT, .CTY, .ZON, or
+.NBL files. If the optional commercial/industrial 1x1 art is
+missing, the same rule applies only to exposed green pixels of
+the existing fallback silhouette.
+
+The 8086 implementation has no allocation, animation, extra
+viewport redraw, or city-wide scan. A handful of local road
+checks and direct packed Tandy VRAM nibble writes occur only
+when the affected building tile is already being drawn. Adjacent
+road construction already redraws its immediate neighbor, which
+makes connecting access lines appear after placing a new road.
+Dedicated host tests verify all road directions, priority and
+road/rail exclusions, source-pixel preservation, all four map
+rotations, complete 1x1/2x2/3x3 frontage geometry, and that
+actual converted source sprites contain visible grassy pixels
+under the proposed access marks.
