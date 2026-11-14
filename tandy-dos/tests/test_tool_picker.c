@@ -13,6 +13,14 @@ int main(void)
     assert(!tool_picker_ready(107U,100U));
     assert(tool_picker_ready(108U,100U));
     assert(tool_picker_ready(0U,65528U)); /* 16-bit BIOS tick wraps */
+    /* Important VRAM regression: the Road and civic popup begin
+     * below y=16, the ordinary main-menu origin. Snapshot and restore
+     * must both use these same popup origins, or stale rows survive.
+     */
+    assert(tool_picker_top_y(1U)==24U);
+    assert(tool_picker_top_y(2U)==96U);
+    assert(tool_picker_top_y(1U)!=16U &&
+           tool_picker_top_y(2U)!=16U);
     assert(tool_picker_hit(1U,63U,24U)==-1);
     assert(tool_picker_hit(1U,64U,24U)==0);
     assert(tool_picker_hit(1U,191U,39U)==1);

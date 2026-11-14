@@ -1191,7 +1191,12 @@ static void mouse_pointer_show(void)
  */
 #define MENU_BACK_BYTES (9U * 8U * 64U)
 static unsigned char menu_back[MENU_BACK_BYTES];
-static unsigned int menu_back_origin=0U, menu_back_lines=0U;
+/* Remember the REAL pixel top of this popup, not just the column.
+ * Main menus begin at y=16; long-press tool flyouts begin y=24/96.
+ * Restoring every popup at y=16 left stale flyout stripes on the map.
+ */
+static unsigned int menu_back_origin=0U, menu_back_top_y=0U;
+static unsigned int menu_back_lines=0U;
 static int menu_back_valid=0;
 
 static void menu_overlay_restore(void)
@@ -1201,7 +1206,7 @@ static void menu_overlay_restore(void)
         return;
     mouse_pointer_hide();
     for (row=0U;row<menu_back_lines;++row) {
-        off=vram_offset(menu_back_origin*8U,UI_MAP_Y+row);
+        off=vram_offset(menu_back_origin*8U,menu_back_top_y+row);
         base=row*64U;
         for (n=0U;n<64U;++n)
             video[off+n]=menu_back[base+n];
@@ -1209,23 +1214,34 @@ static void menu_overlay_restore(void)
     menu_back_valid=0;
 }
 
-static void menu_overlay_capture(void)
+/* Shared capture makes menu and flyout restore exactly the rectangle
+ * they covered. All coordinate and size parameters are pixel units
+ * except origin_col, which is an 8-pixel text column. Max: 128x72.
+ */
+static void menu_overlay_capture_rect(unsigned int origin_col,
+                                      unsigned int top_y,
+                                      unsigned int lines)
 {
     unsigned int row,n,off,base;
-    unsigned int lines;
-    if (open_menu==MENU_NONE)
-        return;
     mouse_pointer_hide();
-    lines=ui_menu_count(open_menu)*8U;
-    menu_back_origin=ui_menu_origin(open_menu);
+    menu_back_origin=origin_col;
+    menu_back_top_y=top_y;
     menu_back_lines=lines;
     for(row=0U;row<lines;++row) {
-        off=vram_offset(menu_back_origin*8U,UI_MAP_Y+row);
+        off=vram_offset(origin_col*8U,top_y+row);
         base=row*64U;
         for(n=0U;n<64U;++n)
             menu_back[base+n]=video[off+n];
     }
     menu_back_valid=1;
+}
+
+static void menu_overlay_capture(void)
+{
+    if (open_menu==MENU_NONE)
+        return;
+    menu_overlay_capture_rect(ui_menu_origin(open_menu),UI_MAP_Y,
+                              ui_menu_count(open_menu)*8U);
 }
 
 static void menu_overlay_close(void)
@@ -1796,7 +1812,7 @@ static void run_menu_action(enum ui_action action)
 #define PICKER_PIXELS_X (PICKER_COLUMN*8U)
 static unsigned int picker_top_row(void)
 {
-    return picker_kind==1U?3U:12U;
+    return tool_picker_top_y(picker_kind)/8U;
 }
 static unsigned int picker_count(void)
 {
@@ -1836,20 +1852,17 @@ static void picker_close(void)
 }
 static void picker_open(unsigned int button)
 {
-    unsigned int row,n,off,base,first;
+    unsigned int row;
     if(picker_kind || open_menu!=MENU_NONE) return;
     mouse_pointer_hide();
     picker_kind=button==1U?1U:2U;
     picker_highlight=0U;
-    menu_back_origin=PICKER_COLUMN;
-    menu_back_lines=picker_count()*8U;
-    first=picker_top_row()*8U;
-    for(row=0U;row<menu_back_lines;++row) {
-        off=vram_offset(PICKER_PIXELS_X,first+row);
-        base=row*64U;
-        for(n=0U;n<64U;++n) menu_back[base+n]=video[off+n];
-    }
-    menu_back_valid=1;
+    /* Capture the SAME y=24/96 region picker_row will paint; the
+     * generic restore must not assume a normal main-menu y=16.
+     */
+    menu_overlay_capture_rect(PICKER_COLUMN,
+                              tool_picker_top_y(picker_kind),
+                              picker_count()*8U);
     for(row=0U;row<picker_count();++row) picker_row(row);
     mouse_pointer_show();
 }

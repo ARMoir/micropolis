@@ -1075,3 +1075,20 @@ Civic placement also refreshes only the 3x3 or 4x4 minimap footprint
 instead of redrawing the complete 56x44 overview. The existing
 simplified DOS simulator does not yet implement Police and Fire
 coverage effects; this update fixes placement and appearance.
+
+## Long-press tool flyout now clears immediately
+
+The road/rail and coal/nuclear/police/fire long-press flyouts previously
+saved the correct 128-pixel-wide underlay, but the common restore loop
+always wrote it back starting at screen y=16, the **main menu** origin.
+The two tool flyouts actually draw at y=24 and y=96, respectively.
+Consequently their old menu pixels remained painted on the map until
+an unrelated simulation tile update overwrote them.
+
+Underlay capture and restore now share the identical popup rectangle:
+both its x-column and *screen y* are recorded at capture time. A tool
+choice, Escape, right-click or outside click therefore restores only
+the 128x16 Road/Rail or 128x32 civic-popup pixels immediately. No
+full viewport refresh or simulation-tick delay is needed. These changes
+also preserve the existing 4,608-byte scratch buffer and pointer
+hide/show rules, without adding work to ordinary gameplay.

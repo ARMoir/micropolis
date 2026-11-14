@@ -15,10 +15,17 @@ static int tool_picker_ready(unsigned int now,unsigned int started)
 {
     return (unsigned short)(now-started)>=TOOL_HOLD_TICKS;
 }
+/* Shared pixel origin for hit tests, popup drawing and VRAM restore.
+ * The ordinary top menu starts at y=16; these flyouts do not.
+ */
+static unsigned int tool_picker_top_y(unsigned int kind)
+{
+    return kind==1U?24U:96U;
+}
 static int tool_picker_hit(unsigned int kind,
                            unsigned int x,unsigned int y)
 {
-    unsigned int top=kind==1U?24U:96U;
+    unsigned int top=tool_picker_top_y(kind);
     unsigned int rows=kind==1U?2U:4U;
     if(kind==0U || kind>2U || x<64U || x>=192U ||
        y<top || y>=top+rows*8U) return -1;
