@@ -17,6 +17,15 @@ static unsigned int accepted = 0U, rejected = 0U;
 static unsigned int min_x, min_y, max_x, max_y;
 static long committed_cost = 0L;
 static long limit_funds = 0L;
+/* Only newly touched tiles need repainting during mouse drag.
+ * A 120x100 world has a maximum straight stroke of 120 tiles.
+ * 221 unsigned shorts (442 bytes) is generous and 8086-safe.
+ */
+#define NEW_LIMIT (CITY_WIDTH + CITY_HEIGHT + 1U)
+static unsigned short new_cells[NEW_LIMIT];
+static unsigned int new_count=0U;
+static int last_power_changed=0;
+
 
 static unsigned int state_get(unsigned int i)
 {
@@ -70,6 +79,28 @@ static int can_place(unsigned int x, unsigned int y)
 }
 
 int placement_active(void) { return active; }
+unsigned int placement_new_count(void) { return new_count; }
+void placement_new_cell(unsigned int entry, unsigned int *x,
+                        unsigned int *y)
+{
+    unsigned int index;
+    if (entry >= new_count || x == 0 || y == 0)
+        return;
+    index = new_cells[entry];
+    *x = index / CITY_HEIGHT;
+    *y = index % CITY_HEIGHT;
+}
+/* This reads the existing compact preview grid even after cancel,
+ * before the next begin zeroes it. No second 12,000-cell bitset.
+ */
+unsigned int placement_recent_at(unsigned int x, unsigned int y)
+{
+    if (x >= CITY_WIDTH || y >= CITY_HEIGHT)
+        return PREVIEW_NONE;
+    return state_get(x*CITY_HEIGHT+y);
+}
+int placement_changed_power(void) { return last_power_changed; }
+
 unsigned int placement_at(unsigned int x, unsigned int y)
 {
     if (!active || x >= CITY_WIDTH || y >= CITY_HEIGHT)
@@ -98,6 +129,8 @@ void placement_cancel(void)
     active = 0;
     accepted = rejected = 0U;
     committed_cost = 0L;
+    new_count = 0U;
+    last_power_changed = 0;
 }
 
 void placement_begin(enum edit_tool tool)
@@ -107,6 +140,8 @@ void placement_begin(enum edit_tool tool)
     limit_funds = city_get_funds();
     accepted = rejected = 0U;
     committed_cost = 0L;
+    new_count = 0U;
+    last_power_changed = 0;
     min_x = CITY_WIDTH - 1U;
     min_y = CITY_HEIGHT - 1U;
     max_x = 0U;
@@ -141,6 +176,8 @@ static unsigned int preview_one(unsigned int x, unsigned int y)
     if (state != PREVIEW_FUNDED)
         ++rejected;
     state_put(offset, state);
+    if (new_count < NEW_LIMIT)
+        new_cells[new_count++] = (unsigned short)offset;
     return 1U;
 }
 
@@ -150,6 +187,7 @@ unsigned int placement_extend(unsigned int x0, unsigned int y0,
 {
     int dx, dy, sx, sy, err, twice, x, y;
     unsigned int changes = 0U, steps = 0U;
+    new_count = 0U;
     if (!active || x0 >= CITY_WIDTH || x1 >= CITY_WIDTH ||
         y0 >= CITY_HEIGHT || y1 >= CITY_HEIGHT)
         return 0U;
@@ -180,26 +218,50 @@ unsigned int placement_extend(unsigned int x0, unsigned int y0,
  */
 unsigned int placement_commit(void)
 {
-    unsigned int x, y, done = 0U, kind = zone_type(current_tool);
+    unsigned int x, y, offset, done = 0U;
+    unsigned int kind = zone_type(current_tool);
     long spent = 0L, unit = placement_unit_cost(current_tool);
+    unsigned short before, after;
     if (!active)
         return 0U;
+    last_power_changed=0;
     for (x = min_x; x <= max_x; ++x)
         for (y = min_y; y <= max_y; ++y) {
-            if (state_get(x * CITY_HEIGHT + y) != PREVIEW_FUNDED)
+            offset=x*CITY_HEIGHT+y;
+            if (state_get(offset) != PREVIEW_FUNDED)
                 continue;
             if (kind) {
-                if (zoning_set(x, y, kind)) {
+                if (zoning_set(x,y,kind)) {
                     ++done;
                     spent += unit;
+                } else {
+                    state_put(offset,PREVIEW_BLOCKED);
                 }
-            } else if (edit_place(current_tool, x, y)) {
-                ++done;
-                spent += unit;
+            } else {
+                before=city_at(x,y);
+                if (edit_place(current_tool,x,y)) {
+                    after=city_at(x,y);
+                    /* A road over an existing wire retains its
+                     * CONDBIT, so it does NOT require a global scan.
+                     * A newly placed wire changes it and DOES.
+                     */
+                    if (((before ^ after) & 16384U) != 0U)
+                        last_power_changed=1;
+                    ++done;
+                    spent += unit;
+                } else {
+                    state_put(offset,PREVIEW_BLOCKED);
+                }
             }
         }
     if (spent != 0L)
         (void)city_spend_funds(spent);
-    placement_cancel();
+    /* Preserve the 2-bit preview footprint until the next begin, so
+     * the renderer can clean exactly these tiles on mouse-up.
+     */
+    active=0;
+    accepted=rejected=0U;
+    committed_cost=0L;
+    new_count=0U;
     return done;
 }
