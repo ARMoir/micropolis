@@ -73,7 +73,10 @@ int main(void)
         assert(infrastructure_crossing_id(EDIT_POWER,blocked[x])==0U);
         assert(infrastructure_crossing_id(EDIT_ROAD,blocked[x])==0U);
     }
-    assert(!infrastructure_can_place(EDIT_ROAD,21U,20U)); /* water */
+    /* River next to a roadway is NOW valid original bridge terrain.
+     * Open water without a bank remains blocked (tested below).
+     */
+    assert(infrastructure_can_place(EDIT_ROAD,21U,20U));
     assert(!infrastructure_can_place(EDIT_ROAD,25U,20U)); /* corner */
     assert(!infrastructure_can_place(EDIT_POWER,26U,20U)); /* corner */
     assert(!infrastructure_can_place(EDIT_POWER,28U,20U)); /* 3-way */
