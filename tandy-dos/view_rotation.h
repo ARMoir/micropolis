@@ -13,6 +13,16 @@ void view_rotation_to_world(unsigned int turns, unsigned int vx,
 void view_rotation_from_world(unsigned int turns, unsigned int wx,
                               unsigned int wy, unsigned int *vx,
                               unsigned int *vy);
+/* Pixel area sampled by one world square on a nearest-neighbor
+ * minimap. Ranges are [x0,x1), [y0,y1), and can be empty because
+ * the miniature map has fewer pixels than world tiles.
+ */
+void view_rotation_minimap_bounds(unsigned int turns,
+                                  unsigned int wx,unsigned int wy,
+                                  unsigned int width,unsigned int height,
+                                  unsigned int *x0,unsigned int *y0,
+                                  unsigned int *x1,unsigned int *y1);
+
 void view_rotation_clamp(unsigned int turns, unsigned int width,
                          unsigned int height, unsigned int *left,
                          unsigned int *top);
