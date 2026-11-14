@@ -164,6 +164,41 @@ int main(void)
                     }
             }
     }
+    /* Exact nearest-neighbor minimap region projection: selected tiny
+     * zone edits and long drags must repaint ONLY the pixels sampling
+     * those world squares. Test map edges and 90-degree rotations.
+     */
+    {
+        static const unsigned int rects[8][4]={
+            {0U,0U,0U,0U}, {119U,99U,119U,99U},
+            {25U,34U,25U,34U}, {30U,70U,32U,72U},
+            {4U,8U,116U,8U}, {70U,10U,70U,90U},
+            {14U,20U,108U,81U}, {0U,0U,119U,99U}
+        };
+        unsigned int k,px,py,a,b,c,d,wx,wy;
+        unsigned int px0,py0,px1,py1,has_pixel,inside;
+        for(turn=0U;turn<4U;++turn)
+            for(k=0U;k<8U;++k) {
+                a=rects[k][0]; b=rects[k][1];
+                c=rects[k][2]; d=rects[k][3];
+                view_rotation_minimap_rect(turn,a,b,c,d,56U,44U,
+                                            &px0,&py0,&px1,&py1);
+                assert(px0<=px1 && px1<=56U);
+                assert(py0<=py1 && py1<=44U);
+                for(py=0U;py<44U;++py)
+                    for(px=0U;px<56U;++px) {
+                        view_rotation_to_world(
+                            turn,px*view_rotation_width(turn)/56U,
+                            py*view_rotation_height(turn)/44U,
+                            &wx,&wy);
+                        has_pixel=(px>=px0 && px<px1 &&
+                                   py>=py0 && py<py1);
+                        inside=(wx>=a && wx<=c &&
+                                wy>=b && wy<=d);
+                        assert(has_pixel==inside);
+                    }
+            }
+    }
     puts("120x100 rotation, zone edges, viewport bounds and map integrity passed");
     return 0;
 }
