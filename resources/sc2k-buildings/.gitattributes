@@ -1,0 +1,6 @@
+*.DAT binary
+*.png binary
+*.xpm text eol=lf
+*.json text eol=lf
+*.md text eol=lf
+SHA256SUMS text eol=lf

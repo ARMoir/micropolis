@@ -27,6 +27,11 @@ jobs:
       - name: Check original Micropolis city-file parser
         run: |
           cc -std=c89 -Wall -Wextra -pedantic \
+            -o test-small-lot-art tandy-dos/small_lot_art.c tandy-dos/tests/test_small_lot_art.c
+          ./test-small-lot-art
+          python3 tandy-dos/tests/test_sc2k_converter.py
+          python3 tandy-dos/tests/test_sc2k_resources.py
+          cc -std=c89 -Wall -Wextra -pedantic \
             -o test-city tandy-dos/city.c tandy-dos/tests/test_city.c
           ./test-city micropolis-activity/cities/happisle.cty
           cc -std=c89 -Wall -Wextra -pedantic \
@@ -84,6 +89,7 @@ jobs:
 
       - name: Convert original Micropolis tile art to Tandy format
         run: |
+          cp resources/sc2k-buildings/SC2K.DAT SC2K.DAT
           python3 tandy-dos/tools/convert_tiles.py micropolis-activity/images/tiles.xpm TILES.DAT
           test "$(wc -c < TILES.DAT)" -eq 30720
           python3 tandy-dos/tests/test_tile_palette.py micropolis-activity/images/tiles.xpm TILES.DAT
@@ -129,7 +135,7 @@ jobs:
           wcl -bcl=dos -0 -ml -q -fe=MICROPOL.EXE \
             tandy-dos/tandy.c tandy-dos/city.c tandy-dos/editor.c tandy-dos/connections.c tandy-dos/engine.c \
             tandy-dos/ui.c tandy-dos/mouse.c tandy-dos/zoning.c \
-            tandy-dos/placement.c tandy-dos/simulation.c tandy-dos/video_ops.c tandy-dos/menu_font.c tandy-dos/view_rotation.c tandy-dos/tool_art.c tandy-dos/infrastructure.c
+            tandy-dos/placement.c tandy-dos/simulation.c tandy-dos/video_ops.c tandy-dos/menu_font.c tandy-dos/view_rotation.c tandy-dos/tool_art.c tandy-dos/infrastructure.c tandy-dos/small_lot_art.c
           test -s MICROPOL.EXE
           file MICROPOL.EXE
 
@@ -140,6 +146,7 @@ jobs:
           path: |
             MICROPOL.EXE
             TILES.DAT
+            SC2K.DAT
             HAPPISLE.CTY
             micropolis-activity/COPYING
             tandy-dos/README.md
@@ -173,13 +180,13 @@ jobs:
           test -s micropolis-activity/COPYING
           test -s tandy-dos/README.md
           mkdir -p release/package
-          cp MICROPOL.EXE TILES.DAT HAPPISLE.CTY release/package/
+          cp MICROPOL.EXE TILES.DAT SC2K.DAT HAPPISLE.CTY release/package/
           cp micropolis-activity/COPYING release/package/COPYING
           cp tandy-dos/README.md release/package/README.md
           (
             cd release/package
             zip -q -9 ../MICROPOL-TANDY-DOS.zip \
-              MICROPOL.EXE TILES.DAT HAPPISLE.CTY README.md COPYING
+              MICROPOL.EXE TILES.DAT SC2K.DAT HAPPISLE.CTY README.md COPYING
           )
           unzip -t release/MICROPOL-TANDY-DOS.zip
 
@@ -197,6 +204,7 @@ jobs:
             release/MICROPOL-TANDY-DOS.zip \
             release/package/MICROPOL.EXE \
             release/package/TILES.DAT \
+            release/package/SC2K.DAT \
             release/package/HAPPISLE.CTY \
             --repo "$GITHUB_REPOSITORY" \
             --target "$GITHUB_SHA" \

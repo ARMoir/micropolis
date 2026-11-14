@@ -203,8 +203,9 @@ stages using the existing original 8x8 tiles, while authentic vacant
 3x3 plots and previously developed classic buildings can advance to
 higher authentic density stages using complete original 3x3 artwork.
 Imported input files are not overwritten.
-Commercial and industrial 1x1 buildings reuse center tiles from the
-original artwork; we may refine those sprites after a hardware test.
+Commercial and industrial 1x1 buildings use the optional `SC2K.DAT`
+small-building pack when installed; otherwise they reuse center tiles
+from the original artwork. See the optional-pack instructions below.
 The original traffic, pollution, land-value, policing, disasters,
 historical census and detailed city economics remain to be ported.
 Keep your original saves.
@@ -222,7 +223,9 @@ wcl -bcl=dos -0 -ml -q -fe=MICROPOL.EXE \
   tandy-dos/tandy.c tandy-dos/city.c tandy-dos/editor.c \
   tandy-dos/connections.c tandy-dos/engine.c tandy-dos/ui.c \
   tandy-dos/mouse.c tandy-dos/zoning.c tandy-dos/placement.c \
-  tandy-dos/simulation.c tandy-dos/video_ops.c
+  tandy-dos/simulation.c tandy-dos/video_ops.c tandy-dos/menu_font.c \
+  tandy-dos/view_rotation.c tandy-dos/tool_art.c tandy-dos/infrastructure.c \
+  tandy-dos/small_lot_art.c
 ```
 
 Host-side regression tests for loading/saving cities and editing zones:
@@ -243,6 +246,47 @@ cc -std=c89 -Wall -Wextra -pedantic -o test-zoning tandy-dos/city.c tandy-dos/zo
 ```
 
 ## Remaining simulation-port work
+
+### Optional SC2000 commercial/industrial small-lot art
+
+Build the optional pack from a local Windows 95 Special Edition installation:
+
+```sh
+python3 tandy-dos/tools/convert_sc2k_lots.py /path/to/WIN95/SC2K SC2K.DAT
+```
+
+Place `SC2K.DAT` beside `MICROPOL.EXE` and `TILES.DAT` in the working
+directory. The 392-byte file contains eight commercial and four industrial
+sprites extracted from `DATA/LARGE.DAT` using `BITMAPS/PAL_MSTR.BMP`.
+Conversion fits each sprite inside a 6x6 area of its 8x8 Tandy tile,
+reserving the outer pixels for the existing connected-zone borders.
+This is a direct palette/size conversion; the source perspective is retained.
+
+Only developed custom 1x1 commercial and industrial lots use the pack.
+Three existing density stages choose progressively larger buildings;
+world coordinates supply stable variety without extra save data or RNG use.
+Residential art, vacant lots, authentic 3x3 buildings, CTY/ZON formats,
+growth rules, jobs and power rules are unchanged. Map rotation keeps the
+sprites upright. Removing the pack restores the original fallback art.
+Missing, truncated, oversized or unsupported pack files are ignored safely.
+
+CI tests the converter with synthetic data and the loader with synthetic
+tiles. The optional runtime pack and complete 144-building libraries in
+8×8 and classic 16×16 formats are available in
+[resources/sc2k-buildings](../resources/sc2k-buildings/README.md), with the
+full conversion process, catalog and previews. The runtime pack ships
+alongside the standard art in the Tandy release.
+
+Host checks:
+
+```sh
+python3 tandy-dos/tests/test_sc2k_converter.py
+cc -std=c89 -Wall -Wextra -pedantic -o test-small-lot-art \
+  tandy-dos/small_lot_art.c tandy-dos/tests/test_small_lot_art.c
+./test-small-lot-art
+```
+
+### Simulation work still outstanding
 
 The original implementation under `micropolis-activity/src/sim/s_*.c`
 contains detailed population, growth, traffic, pollution, police/fire,

@@ -1,0 +1,866 @@
+[
+  {
+    "id": 112,
+    "hex": "70",
+    "category": "Residential 1x1",
+    "name": "Lower-class homes (Lower Class Homes 1)"
+  },
+  {
+    "id": 113,
+    "hex": "71",
+    "category": "Residential 1x1",
+    "name": "Lower-class homes (Lower Class Homes 2)"
+  },
+  {
+    "id": 114,
+    "hex": "72",
+    "category": "Residential 1x1",
+    "name": "Lower-class homes (Lower Class Homes 3)"
+  },
+  {
+    "id": 115,
+    "hex": "73",
+    "category": "Residential 1x1",
+    "name": "Lower-class homes (Lower Class Homes 4)"
+  },
+  {
+    "id": 116,
+    "hex": "74",
+    "category": "Residential 1x1",
+    "name": "Middle-class homes (Middle Class Homes 1)"
+  },
+  {
+    "id": 117,
+    "hex": "75",
+    "category": "Residential 1x1",
+    "name": "Middle-class homes (Middle Class Homes 2)"
+  },
+  {
+    "id": 118,
+    "hex": "76",
+    "category": "Residential 1x1",
+    "name": "Middle-class homes (Middle Class Homes 3)"
+  },
+  {
+    "id": 119,
+    "hex": "77",
+    "category": "Residential 1x1",
+    "name": "Middle-class homes (Middle Class Homes 4)"
+  },
+  {
+    "id": 120,
+    "hex": "78",
+    "category": "Residential 1x1",
+    "name": "Luxury Homes (Upper Class Homes 1)"
+  },
+  {
+    "id": 121,
+    "hex": "79",
+    "category": "Residential 1x1",
+    "name": "Luxury Homes (Upper Class Homes 2)"
+  },
+  {
+    "id": 122,
+    "hex": "7A",
+    "category": "Residential 1x1",
+    "name": "Luxury Homes (Upper Class Homes 3)"
+  },
+  {
+    "id": 123,
+    "hex": "7B",
+    "category": "Residential 1x1",
+    "name": "Luxury Homes (Upper Class Homes 4)"
+  },
+  {
+    "id": 124,
+    "hex": "7C",
+    "category": "Commercial 1x1",
+    "name": "Gas Station (Gas Station 1)"
+  },
+  {
+    "id": 125,
+    "hex": "7D",
+    "category": "Commercial 1x1",
+    "name": "Bed & Breakfast Inn (Bed and Breakfast Inn)"
+  },
+  {
+    "id": 126,
+    "hex": "7E",
+    "category": "Commercial 1x1",
+    "name": "Convenience store (Convenience Store)"
+  },
+  {
+    "id": 127,
+    "hex": "7F",
+    "category": "Commercial 1x1",
+    "name": "Gas Station (Gas Station 2)"
+  },
+  {
+    "id": 128,
+    "hex": "80",
+    "category": "Commercial 1x1",
+    "name": "Small office building (Small Office Building 1)"
+  },
+  {
+    "id": 129,
+    "hex": "81",
+    "category": "Commercial 1x1",
+    "name": "Office Building (Small Office Building 2)"
+  },
+  {
+    "id": 130,
+    "hex": "82",
+    "category": "Commercial 1x1",
+    "name": "Warehouse (Warehouse)"
+  },
+  {
+    "id": 131,
+    "hex": "83",
+    "category": "Commercial 1x1",
+    "name": "Cassidy’s Toy Store (Cassidy’s Toy Store)"
+  },
+  {
+    "id": 132,
+    "hex": "84",
+    "category": "Industrial 1x1",
+    "name": "Warehouse (Small WareHouse 1)"
+  },
+  {
+    "id": 133,
+    "hex": "85",
+    "category": "Industrial 1x1",
+    "name": "Chemical Storage (Chemical Storage)"
+  },
+  {
+    "id": 134,
+    "hex": "86",
+    "category": "Industrial 1x1",
+    "name": "Warehouse (Small WareHouse 1)"
+  },
+  {
+    "id": 135,
+    "hex": "87",
+    "category": "Industrial 1x1",
+    "name": "Industrial substation (Industral Substation)"
+  },
+  {
+    "id": 136,
+    "hex": "88",
+    "category": "Misc 1x1",
+    "name": "Construction (Construction 7)"
+  },
+  {
+    "id": 137,
+    "hex": "89",
+    "category": "Misc 1x1",
+    "name": "Construction (Construction 8)"
+  },
+  {
+    "id": 138,
+    "hex": "8A",
+    "category": "Misc 1x1",
+    "name": "Abandoned building (Abandoned Building 1)"
+  },
+  {
+    "id": 139,
+    "hex": "8B",
+    "category": "Misc 1x1",
+    "name": "Abandoned building (Abandoned Building 2)"
+  },
+  {
+    "id": 140,
+    "hex": "8C",
+    "category": "Residential 2x2",
+    "name": "Cheap apartments (Small Apartments 1)"
+  },
+  {
+    "id": 141,
+    "hex": "8D",
+    "category": "Residential 2x2",
+    "name": "Apartments (Small Apartments 2)"
+  },
+  {
+    "id": 142,
+    "hex": "8E",
+    "category": "Residential 2x2",
+    "name": "Apartments (Small Apartments 3)"
+  },
+  {
+    "id": 143,
+    "hex": "8F",
+    "category": "Residential 2x2",
+    "name": "Nice Apartments (Medium Apartments 1)"
+  },
+  {
+    "id": 144,
+    "hex": "90",
+    "category": "Residential 2x2",
+    "name": "Nice Apartments (Medium Apartments 2)"
+  },
+  {
+    "id": 145,
+    "hex": "91",
+    "category": "Residential 2x2",
+    "name": "Condominium (Medium Condominiums 1)"
+  },
+  {
+    "id": 146,
+    "hex": "92",
+    "category": "Residential 2x2",
+    "name": "Condominium (Medium Condominiums 2)"
+  },
+  {
+    "id": 147,
+    "hex": "93",
+    "category": "Residential 2x2",
+    "name": "Condominium (Medium Condominiums 3)"
+  },
+  {
+    "id": 148,
+    "hex": "94",
+    "category": "Commercial 2x2",
+    "name": "Shopping center (Shopping Center)"
+  },
+  {
+    "id": 149,
+    "hex": "95",
+    "category": "Commercial 2x2",
+    "name": "Grocery store (Grocery Store)"
+  },
+  {
+    "id": 150,
+    "hex": "96",
+    "category": "Commercial 2x2",
+    "name": "Office Building (Medium Office Building 1)"
+  },
+  {
+    "id": 151,
+    "hex": "97",
+    "category": "Commercial 2x2",
+    "name": "Resort hotel"
+  },
+  {
+    "id": 152,
+    "hex": "98",
+    "category": "Commercial 2x2",
+    "name": "Office Building (Medium Office Building 2)"
+  },
+  {
+    "id": 153,
+    "hex": "99",
+    "category": "Commercial 2x2",
+    "name": "Office/Retail (Office/Retail)"
+  },
+  {
+    "id": 154,
+    "hex": "9A",
+    "category": "Commercial 2x2",
+    "name": "Office Building (Medium Office Building 3)"
+  },
+  {
+    "id": 155,
+    "hex": "9B",
+    "category": "Commercial 2x2",
+    "name": "Office Building (Medium Office Building 4)"
+  },
+  {
+    "id": 156,
+    "hex": "9C",
+    "category": "Commercial 2x2",
+    "name": "Office Building (Medium Office Building 5)"
+  },
+  {
+    "id": 157,
+    "hex": "9D",
+    "category": "Commercial 2x2",
+    "name": "Office Building (Medium Office Building 6)"
+  },
+  {
+    "id": 158,
+    "hex": "9E",
+    "category": "Industrial 2x2",
+    "name": "Warehouse (Medium Warehouse)"
+  },
+  {
+    "id": 159,
+    "hex": "9F",
+    "category": "Industrial 2x2",
+    "name": "Chemical Processing (Chemical Processing 2)"
+  },
+  {
+    "id": 160,
+    "hex": "A0",
+    "category": "Industrial 2x2",
+    "name": "Factory (Small Factory 1)"
+  },
+  {
+    "id": 161,
+    "hex": "A1",
+    "category": "Industrial 2x2",
+    "name": "Factory (Small Factory 2)"
+  },
+  {
+    "id": 162,
+    "hex": "A2",
+    "category": "Industrial 2x2",
+    "name": "Factory (Small Factory 3)"
+  },
+  {
+    "id": 163,
+    "hex": "A3",
+    "category": "Industrial 2x2",
+    "name": "Factory (Small Factory 4)"
+  },
+  {
+    "id": 164,
+    "hex": "A4",
+    "category": "Industrial 2x2",
+    "name": "Factory (Small Factory 5)"
+  },
+  {
+    "id": 165,
+    "hex": "A5",
+    "category": "Industrial 2x2",
+    "name": "Factory (Small Factory 6)"
+  },
+  {
+    "id": 166,
+    "hex": "A6",
+    "category": "Misc 2x2",
+    "name": "Construction (Construction 3)"
+  },
+  {
+    "id": 167,
+    "hex": "A7",
+    "category": "Misc 2x2",
+    "name": "Construction (Construction 4)"
+  },
+  {
+    "id": 168,
+    "hex": "A8",
+    "category": "Misc 2x2",
+    "name": "Construction (Construction 5)"
+  },
+  {
+    "id": 169,
+    "hex": "A9",
+    "category": "Misc 2x2",
+    "name": "Construction (Construction 6)"
+  },
+  {
+    "id": 170,
+    "hex": "AA",
+    "category": "Misc 2x2",
+    "name": "Abandoned building (Abandoned Building 7)"
+  },
+  {
+    "id": 171,
+    "hex": "AB",
+    "category": "Misc 2x2",
+    "name": "Abandoned building (Abandoned Building 7)"
+  },
+  {
+    "id": 172,
+    "hex": "AC",
+    "category": "Misc 2x2",
+    "name": "Abandoned building (Abandoned Building 7)"
+  },
+  {
+    "id": 173,
+    "hex": "AD",
+    "category": "Misc 2x2",
+    "name": "Abandoned building (Abandoned Building 7)"
+  },
+  {
+    "id": 174,
+    "hex": "AE",
+    "category": "Residential 3x3",
+    "name": "Large apartment building (Large Apartments 1)"
+  },
+  {
+    "id": 175,
+    "hex": "AF",
+    "category": "Residential 3x3",
+    "name": "Large apartment building (Large Apartments 2)"
+  },
+  {
+    "id": 176,
+    "hex": "B0",
+    "category": "Residential 3x3",
+    "name": "Condominium (Large Condominiums 1)"
+  },
+  {
+    "id": 177,
+    "hex": "B1",
+    "category": "Residential 3x3",
+    "name": "Condominium (Large Condominiums 2)"
+  },
+  {
+    "id": 178,
+    "hex": "B2",
+    "category": "Commercial 3x3",
+    "name": "Office park (Office Park)"
+  },
+  {
+    "id": 179,
+    "hex": "B3",
+    "category": "Commercial 3x3",
+    "name": "Office tower (Office Tower 1)"
+  },
+  {
+    "id": 180,
+    "hex": "B4",
+    "category": "Commercial 3x3",
+    "name": "Mini-mall (Mini Mall)"
+  },
+  {
+    "id": 181,
+    "hex": "B5",
+    "category": "Commercial 3x3",
+    "name": "Theater square (Theatre)"
+  },
+  {
+    "id": 182,
+    "hex": "B6",
+    "category": "Commercial 3x3",
+    "name": "Drive-in theater (Drive In)"
+  },
+  {
+    "id": 183,
+    "hex": "B7",
+    "category": "Commercial 3x3",
+    "name": "Office tower (Office Tower 2)"
+  },
+  {
+    "id": 184,
+    "hex": "B8",
+    "category": "Commercial 3x3",
+    "name": "Office tower (Office Tower 3)"
+  },
+  {
+    "id": 185,
+    "hex": "B9",
+    "category": "Commercial 3x3",
+    "name": "Parking lot (Parking Lot)"
+  },
+  {
+    "id": 186,
+    "hex": "BA",
+    "category": "Commercial 3x3",
+    "name": "Historic office building (Historic Office)"
+  },
+  {
+    "id": 187,
+    "hex": "BB",
+    "category": "Commercial 3x3",
+    "name": "Corporate headquarters (Corporate Headquarters)"
+  },
+  {
+    "id": 188,
+    "hex": "BC",
+    "category": "Industrial 3x3",
+    "name": "Chemical processing (Chemical Processing 1)"
+  },
+  {
+    "id": 189,
+    "hex": "BD",
+    "category": "Industrial 3x3",
+    "name": "Large factory (Large Factory)"
+  },
+  {
+    "id": 190,
+    "hex": "BE",
+    "category": "Industrial 3x3",
+    "name": "Industrial thingamajig (Industrial Thingamajig)"
+  },
+  {
+    "id": 191,
+    "hex": "BF",
+    "category": "Industrial 3x3",
+    "name": "Factory (Medium Factory)"
+  },
+  {
+    "id": 192,
+    "hex": "C0",
+    "category": "Industrial 3x3",
+    "name": "Large warehouse (Large Warehouse 1)"
+  },
+  {
+    "id": 193,
+    "hex": "C1",
+    "category": "Industrial 3x3",
+    "name": "Warehouse (Large Warehouse 2)"
+  },
+  {
+    "id": 194,
+    "hex": "C2",
+    "category": "Misc 3x3",
+    "name": "Construction (Construction 1)"
+  },
+  {
+    "id": 195,
+    "hex": "C3",
+    "category": "Misc 3x3",
+    "name": "Construction (Construction 2)"
+  },
+  {
+    "id": 196,
+    "hex": "C4",
+    "category": "Misc 3x3",
+    "name": "Abandoned building (Abandoned Building 7)"
+  },
+  {
+    "id": 197,
+    "hex": "C5",
+    "category": "Misc 3x3",
+    "name": "Abandoned building (Abandoned Building 8)"
+  },
+  {
+    "id": 198,
+    "hex": "C6",
+    "category": "Power Plants",
+    "name": "Hydro Power (Hydroelectric Power Plant 1)"
+  },
+  {
+    "id": 199,
+    "hex": "C7",
+    "category": "Power Plants",
+    "name": "Hydro Power (Hydroelectric Power Plant 2)"
+  },
+  {
+    "id": 200,
+    "hex": "C8",
+    "category": "Power Plants",
+    "name": "Wind Power (Wind Power Plant)"
+  },
+  {
+    "id": 201,
+    "hex": "C9",
+    "category": "Power Plants",
+    "name": "Gas Power (Gas Power Plant)"
+  },
+  {
+    "id": 202,
+    "hex": "CA",
+    "category": "Power Plants",
+    "name": "Oil Power (Oil Power Plant)"
+  },
+  {
+    "id": 203,
+    "hex": "CB",
+    "category": "Power Plants",
+    "name": "Nuclear Power (Nuclear Power Plant)"
+  },
+  {
+    "id": 204,
+    "hex": "CC",
+    "category": "Power Plants",
+    "name": "Solar Power (Solar Power Plant)"
+  },
+  {
+    "id": 205,
+    "hex": "CD",
+    "category": "Power Plants",
+    "name": "Microwave Power (Microwave PowerPlant)"
+  },
+  {
+    "id": 206,
+    "hex": "CE",
+    "category": "Power Plants",
+    "name": "Fusion Power (Fusion Power Plant)"
+  },
+  {
+    "id": 207,
+    "hex": "CF",
+    "category": "Power Plants",
+    "name": "Coal Power (Coal Power Plant)"
+  },
+  {
+    "id": 208,
+    "hex": "D0",
+    "category": "Services",
+    "name": "City Hall"
+  },
+  {
+    "id": 209,
+    "hex": "D1",
+    "category": "Services",
+    "name": "Hospital"
+  },
+  {
+    "id": 210,
+    "hex": "D2",
+    "category": "Services",
+    "name": "Police Station (Police Dept)"
+  },
+  {
+    "id": 211,
+    "hex": "D3",
+    "category": "Services",
+    "name": "Fire Station (Fire Dept)"
+  },
+  {
+    "id": 212,
+    "hex": "D4",
+    "category": "Services",
+    "name": "Museum"
+  },
+  {
+    "id": 213,
+    "hex": "D5",
+    "category": "Services",
+    "name": "SimPark System (Big Park)"
+  },
+  {
+    "id": 214,
+    "hex": "D6",
+    "category": "Services",
+    "name": "School"
+  },
+  {
+    "id": 215,
+    "hex": "D7",
+    "category": "Services",
+    "name": "Stadium"
+  },
+  {
+    "id": 216,
+    "hex": "D8",
+    "category": "Services",
+    "name": "Prison"
+  },
+  {
+    "id": 217,
+    "hex": "D9",
+    "category": "Services",
+    "name": "College"
+  },
+  {
+    "id": 218,
+    "hex": "DA",
+    "category": "Services",
+    "name": "Zoo"
+  },
+  {
+    "id": 219,
+    "hex": "DB",
+    "category": "Services",
+    "name": "Statue"
+  },
+  {
+    "id": 220,
+    "hex": "DC",
+    "category": "Infrastructure (not power plants)",
+    "name": "Water Pump"
+  },
+  {
+    "id": 221,
+    "hex": "DD",
+    "category": "Infrastructure (not power plants)",
+    "name": "runway (straight)"
+  },
+  {
+    "id": 222,
+    "hex": "DE",
+    "category": "Infrastructure (not power plants)",
+    "name": "Runway intersection"
+  },
+  {
+    "id": 223,
+    "hex": "DF",
+    "category": "Infrastructure (not power plants)",
+    "name": "Pier (Game appears to rotate the pier based on the direction the crane is facing.)"
+  },
+  {
+    "id": 224,
+    "hex": "E0",
+    "category": "Infrastructure (not power plants)",
+    "name": "Crane"
+  },
+  {
+    "id": 225,
+    "hex": "E1",
+    "category": "Infrastructure (not power plants)",
+    "name": "Control Tower (Civilian Control Tower)"
+  },
+  {
+    "id": 226,
+    "hex": "E2",
+    "category": "Infrastructure (not power plants)",
+    "name": "Control Tower (Military Control Tower)"
+  },
+  {
+    "id": 227,
+    "hex": "E3",
+    "category": "Infrastructure (not power plants)",
+    "name": "Warehouse"
+  },
+  {
+    "id": 228,
+    "hex": "E4",
+    "category": "Infrastructure (not power plants)",
+    "name": "Building (Building 1)"
+  },
+  {
+    "id": 229,
+    "hex": "E5",
+    "category": "Infrastructure (not power plants)",
+    "name": "Building (Building 2)"
+  },
+  {
+    "id": 230,
+    "hex": "E6",
+    "category": "Infrastructure (not power plants)",
+    "name": "Tarmac"
+  },
+  {
+    "id": 231,
+    "hex": "E7",
+    "category": "Infrastructure (not power plants)",
+    "name": "F-15b"
+  },
+  {
+    "id": 232,
+    "hex": "E8",
+    "category": "Infrastructure (not power plants)",
+    "name": "Hanger (Hangar 1)"
+  },
+  {
+    "id": 233,
+    "hex": "E9",
+    "category": "Infrastructure (not power plants)",
+    "name": "SimSubway (Subway Station)"
+  },
+  {
+    "id": 234,
+    "hex": "EA",
+    "category": "Infrastructure (not power plants)",
+    "name": "Radar (Tarmac)"
+  },
+  {
+    "id": 235,
+    "hex": "EB",
+    "category": "Infrastructure (not power plants)",
+    "name": "Water Tower"
+  },
+  {
+    "id": 236,
+    "hex": "EC",
+    "category": "Infrastructure (not power plants)",
+    "name": "Bus Station"
+  },
+  {
+    "id": 237,
+    "hex": "ED",
+    "category": "Infrastructure (not power plants)",
+    "name": "SimRail System (Rail Station)"
+  },
+  {
+    "id": 238,
+    "hex": "EE",
+    "category": "Infrastructure (not power plants)",
+    "name": "Parking lot (Civilian Parking Lot)"
+  },
+  {
+    "id": 239,
+    "hex": "EF",
+    "category": "Infrastructure (not power plants)",
+    "name": "Parking lot (Military Parking Lot)"
+  },
+  {
+    "id": 240,
+    "hex": "F0",
+    "category": "Infrastructure (not power plants)",
+    "name": "Loading bay (Loading Bay)"
+  },
+  {
+    "id": 241,
+    "hex": "F1",
+    "category": "Infrastructure (not power plants)",
+    "name": "Top Secret"
+  },
+  {
+    "id": 242,
+    "hex": "F2",
+    "category": "Infrastructure (not power plants)",
+    "name": "Cargo yard (Cargo Yard)"
+  },
+  {
+    "id": 243,
+    "hex": "F3",
+    "category": "Infrastructure (not power plants)",
+    "name": "Mayor’s House"
+  },
+  {
+    "id": 244,
+    "hex": "F4",
+    "category": "Infrastructure (not power plants)",
+    "name": "Water Treatment"
+  },
+  {
+    "id": 245,
+    "hex": "F5",
+    "category": "Infrastructure (not power plants)",
+    "name": "Library System (Library)"
+  },
+  {
+    "id": 246,
+    "hex": "F6",
+    "category": "Infrastructure (not power plants)",
+    "name": "Hangar (Hangar 2)"
+  },
+  {
+    "id": 247,
+    "hex": "F7",
+    "category": "Infrastructure (not power plants)",
+    "name": "Church"
+  },
+  {
+    "id": 248,
+    "hex": "F8",
+    "category": "Infrastructure (not power plants)",
+    "name": "Marina"
+  },
+  {
+    "id": 249,
+    "hex": "F9",
+    "category": "Infrastructure (not power plants)",
+    "name": "Missile silo (Missile Silo)"
+  },
+  {
+    "id": 250,
+    "hex": "FA",
+    "category": "Infrastructure (not power plants)",
+    "name": "Desalinization (Desalinization Plant)"
+  },
+  {
+    "id": 251,
+    "hex": "FB",
+    "category": "Arcos",
+    "name": "Plymouth Arco (Plymouth Arcology)"
+  },
+  {
+    "id": 252,
+    "hex": "FC",
+    "category": "Arcos",
+    "name": "Forest Arco (Forest Arcology)"
+  },
+  {
+    "id": 253,
+    "hex": "FD",
+    "category": "Arcos",
+    "name": "Darco (Darco Arcology)"
+  },
+  {
+    "id": 254,
+    "hex": "FE",
+    "category": "Arcos",
+    "name": "Launch Arco (Launch Arcology)"
+  },
+  {
+    "id": 255,
+    "hex": "FF",
+    "category": "Other",
+    "name": "Llama Dome (Braun Llama Dome)"
+  }
+]

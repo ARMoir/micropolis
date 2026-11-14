@@ -1,3 +1,7 @@
 *~
 #*
 .DS_Store
+# Locally extracted optional game art, never required by CI.
+SC2K.DAT
+!resources/sc2k-buildings/SC2K.DAT
+__pycache__/

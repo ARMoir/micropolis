@@ -24,6 +24,7 @@
 #include "tool_art.h"
 #include "tool_picker.h"
 #include "pointer_policy.h"
+#include "small_lot_art.h"
 
 #define SCREEN_W 320U
 #define SCREEN_H 200U
@@ -224,12 +225,12 @@ static int load_original_art(void)
     return 1;
 }
 
-static void draw_original_tile(unsigned int px, unsigned int py, unsigned int tile)
+static void draw_packed_tile(unsigned int px, unsigned int py,
+                             const unsigned char far *data)
 {
-    unsigned int src = tile * 32U;
     unsigned int row, dst;
     const unsigned short far *art =
-        (const unsigned short far *)(art_data + src);
+        (const unsigned short far *)data;
     volatile unsigned short far *out;
     for (row = 0U; row < 8U; ++row) {
         dst = vram_offset(px, py + row);
@@ -241,6 +242,11 @@ static void draw_original_tile(unsigned int px, unsigned int py, unsigned int ti
         out[1] = art[1];
         art += 2;
     }
+}
+
+static void draw_original_tile(unsigned int px, unsigned int py, unsigned int tile)
+{
+    draw_packed_tile(px, py, art_data + tile * 32U);
 }
 
 /* Zoning is a separate, non-destructive overlay on original Micropolis
@@ -342,14 +348,24 @@ static void draw_city_tile(unsigned int px, unsigned int py,
     unsigned char bg = 2;
     unsigned int i;
     int v, h;
+    const unsigned char *small = NULL;
+
+    if (t == 0U || (t >= 21U && t <= 43U))
+        small = small_lot_art_pixels(t,
+            zoning_at(mx,my), zoning_development_at(mx,my), mx,my);
+
+    if (small != NULL) {
+        draw_packed_tile(px,py,small);
+        draw_zone_border(px,py,mx,my);
+        draw_pending_tile(px,py,mx,my);
+        return;
+    }
 
     if (art_data != NULL && t < ART_TILES) {
         unsigned int graphic = t;
-        /* For an empty 1x1 lot, use ORIGINAL Micropolis small tile art.
-         * Residential has actual detached house tiles. Commercial and
-         * industrial use their original empty-zone center symbols until
-         * the new small-building growth rules are implemented.
-         * Never change the underlying .CTY sprite or map tile itself.
+        /* Original art remains the fallback when SC2K.DAT is absent.
+         * Residential uses the original detached houses. Never change
+         * the underlying .CTY sprite or map tile itself.
          */
         if (t == 0U || (t >= 21U && t <= 43U)) {
             unsigned int kind = zoning_at(mx, my);
@@ -2695,6 +2711,7 @@ int main(int argc, char **argv)
     video = (volatile unsigned char far *)MK_FP(0xb800, 0);
     tandy_init_scanlines();
     (void)load_original_art();
+    (void)small_lot_art_load("SC2K.DAT");
     mouse_on = allow_mouse ? mouse_init() : 0;
     if (mouse_on) {
         struct mouse_state state;
