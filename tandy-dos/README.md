@@ -922,3 +922,18 @@ city-selection square only when the active tile changes.
 A host C89 regression verifies boundary transitions and the menu/help
 overlay exception. Open Watcom still compiles the native DOS build;
 visible mouse behavior must be checked on real hardware.
+
+## Click-to-jump minimap and center-pivot view rotation
+
+Left-clicking inside the 56x44 MAP overview now centers the main city
+view on that pixel's world tile. It works at every 90-degree orientation,
+clamps the camera at the world edges, and moves the yellow selection
+square to the picked location. Only the city viewport and camera
+outline are redrawn, never the toolbar.
+
+The r / Shift+R rotation now pivots on the world tile beneath the
+**center of the visible city**, rather than the selected yellow square.
+Rotation redraws the city viewport and rotated minimap, leaving the
+sidebar buttons and top bar untouched. Camera clamping still applies
+near the world boundary. Host regressions cover all 56x44 minimap
+pixels in all four orientations and camera-center stability.

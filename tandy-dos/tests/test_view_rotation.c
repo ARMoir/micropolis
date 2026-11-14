@@ -199,6 +199,42 @@ int main(void)
                     }
             }
     }
+    /* A minimap click samples precisely the pixel's world square
+     * at all four orientations, including the edges and corners.
+     */
+    for(turn=0U;turn<4U;++turn) {
+        unsigned int px,py,mw=view_rotation_width(turn);
+        unsigned int mh=view_rotation_height(turn);
+        for(px=0U;px<56U;++px)
+            for(py=0U;py<44U;++py) {
+                unsigned int wx,wy;
+                view_rotation_to_world(turn,px*mw/56U,py*mh/44U,
+                                       &wx,&wy);
+                assert(view_rotation_minimap_focus(turn,px,py,56U,44U,
+                                                   w,h,&left,&top,&cx,&cy));
+                assert(cx<w && cy<h);
+                view_rotation_to_world(turn,left+cx,top+cy,&rx,&ry);
+                assert(rx==wx && ry==wy);
+                assert(left<=mw-w && top<=mh-h);
+            }
+        left=7U;top=9U;cx=1U;cy=2U;
+        assert(!view_rotation_minimap_focus(turn,56U,10U,56U,44U,
+                                            w,h,&left,&top,&cx,&cy));
+        assert(left==7U && top==9U && cx==1U && cy==2U);
+    }
+    /* The world tile at the viewport center is invariant across
+     * quarter-turns, regardless of the prior selection cursor.
+     */
+    for(turn=0U;turn<4U;++turn) {
+        unsigned int target=(turn+1U)&3U;
+        unsigned int wx,wy;
+        left=29U;top=27U;
+        view_rotation_to_world(turn,left+w/2U,top+h/2U,&wx,&wy);
+        view_rotation_focus(target,wx,wy,w,h,&left,&top,&cx,&cy);
+        assert(cx==w/2U && cy==h/2U);
+        view_rotation_to_world(target,left+cx,top+cy,&rx,&ry);
+        assert(rx==wx && ry==wy);
+    }
     puts("120x100 rotation, zone edges, viewport bounds and map integrity passed");
     return 0;
 }

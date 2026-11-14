@@ -135,6 +135,29 @@ void view_rotation_focus(unsigned int turns, unsigned int wx,
     *cursor_y = vy-*top;
 }
 
+/* Sample the exact tile displayed at a nearest-neighbor minimap pixel.
+ * Recenter without touching saved city data; edge jumps are clamped.
+ */
+int view_rotation_minimap_focus(unsigned int turns,
+                                 unsigned int px,unsigned int py,
+                                 unsigned int minimap_w,
+                                 unsigned int minimap_h,
+                                 unsigned int view_w,unsigned int view_h,
+                                 unsigned int *left,unsigned int *top,
+                                 unsigned int *cursor_x,
+                                 unsigned int *cursor_y)
+{
+    unsigned int vx,vy,wx,wy;
+    if(!minimap_w || !minimap_h || px>=minimap_w || py>=minimap_h)
+        return 0;
+    vx=px*view_rotation_width(turns)/minimap_w;
+    vy=py*view_rotation_height(turns)/minimap_h;
+    view_rotation_to_world(turns,vx,vy,&wx,&wy);
+    view_rotation_focus(turns,wx,wy,view_w,view_h,
+                        left,top,cursor_x,cursor_y);
+    return 1;
+}
+
 unsigned int view_rotation_edges(unsigned int turns, unsigned int edges)
 {
     unsigned int i;

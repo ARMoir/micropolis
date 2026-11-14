@@ -1326,6 +1326,7 @@ static void draw_info_page(void)
 }
 
 static void render_full(void);
+static void redraw_viewport_only(int refresh_minimap);
 
 static void scroll_one_tile(unsigned int previous_x, unsigned int previous_y)
 {
@@ -1439,6 +1440,26 @@ static void draw_top_menu_bar(void)
     draw_menu_caption(10U,"TOOLS");
     draw_menu_caption(18U,"VIEW");
     draw_menu_caption(25U,"HELP");
+}
+
+/* Minimap jumps and quarter-turns need a refreshed city, not a
+ * repeated toolbar/top-bar redraw. Rotation also rebuilds the minimap
+ * pixels; jumps move only the existing camera outline.
+ */
+static void redraw_viewport_only(int refresh_minimap)
+{
+    unsigned int x,y;
+    mouse_pointer_hide();
+    for(y=0U;y<VIEW_H;++y)
+        for(x=0U;x<VIEW_W;++x)
+            draw_display_tile(x,y);
+    if(refresh_minimap) draw_overview();
+    else draw_overview_camera();
+    draw_cursor();
+    draw_status();
+    badge_revision=simulation_power_visual_revision();
+    badge_sweep_pos=VIEW_W*VIEW_H;
+    mouse_pointer_show();
 }
 
 static void render_full(void)
@@ -1688,9 +1709,8 @@ static void apply_selected_tool(void)
     draw_status();
 }
 
-/* Rotate the camera about the selected WORLD square, never the city
- * map itself. Render original TILES.DAT sprites upright in new positions.
- * The 120x100 map becomes a 100x120 virtual map at 90/270 degrees.
+/* Rotate around the world tile in the CENTER of the visible city,
+ * regardless of where the yellow selection cursor happens to be.
  */
 static void rotate_view(int clockwise)
 {
@@ -1698,16 +1718,16 @@ static void rotate_view(int clockwise)
     if (build_drag_active)
         build_preview_cancel(); /* never change view mid-purchase */
     zone_erase_active = 0;
-    display_to_world(cursor_x,cursor_y,&wx,&wy);
+    display_to_world(VIEW_W/2U,VIEW_H/2U,&wx,&wy);
     map_turns = (map_turns + (clockwise ? 1U : 3U)) & 3U;
     view_rotation_focus(map_turns,wx,wy,VIEW_W,VIEW_H,
                         &scroll_x,&scroll_y,&cursor_x,&cursor_y);
     zone_minimap_dirty = 0;
     last_action = clockwise ? "ROT CW" : "ROT CCW";
-    /* An explicit quarter-turn costs one full redraw. Normal panning
-     * still uses the fast one-tile VRAM scrolling branches.
+    /* Rerender the rotated city and overview, not the toolbar.
+     * Ordinary tile-by-tile panning still uses the fast VRAM shifts.
      */
-    render_full();
+    redraw_viewport_only(1);
 }
 
 static void run_menu_action(enum ui_action action)
@@ -1877,6 +1897,22 @@ static void handle_mouse(void)
                 if (toolbar >= 0) {
                     select_tool(ui_toolbar_tool((unsigned int)toolbar));
                     draw_status();
+                } else if (state.x>=UI_MINIMAP_X &&
+                           state.x<UI_MINIMAP_X+UI_MINIMAP_W &&
+                           state.y>=UI_MINIMAP_Y &&
+                           state.y<UI_MINIMAP_Y+UI_MINIMAP_H) {
+                    /* A click in the small MAP panel jumps to that
+                     * tile in the currently rotated world. Keep the
+                     * toolbar intact and redraw only the city view.
+                     */
+                    if(view_rotation_minimap_focus(
+                          map_turns,state.x-UI_MINIMAP_X,
+                          state.y-UI_MINIMAP_Y,
+                          UI_MINIMAP_W,UI_MINIMAP_H,VIEW_W,VIEW_H,
+                          &scroll_x,&scroll_y,&cursor_x,&cursor_y)) {
+                        last_action="MAP JUMP";
+                        redraw_viewport_only(0);
+                    }
                 } else if (inside) {
                     if (selected_zone_kind() != ZONE_NONE ||
                         selected_tool == EDIT_ROAD ||

@@ -42,6 +42,17 @@ void view_rotation_focus(unsigned int turns, unsigned int wx,
                          unsigned int height, unsigned int *left,
                          unsigned int *top, unsigned int *cursor_x,
                          unsigned int *cursor_y);
+/* Return zero for an invalid minimap pixel, leaving outputs unchanged.
+ * Otherwise focus the exact world tile represented by that pixel.
+ */
+int view_rotation_minimap_focus(unsigned int turns,
+                                 unsigned int px,unsigned int py,
+                                 unsigned int minimap_w,
+                                 unsigned int minimap_h,
+                                 unsigned int view_w,unsigned int view_h,
+                                 unsigned int *left,unsigned int *top,
+                                 unsigned int *cursor_x,
+                                 unsigned int *cursor_y);
 /* World top/right/bottom/left border bits 1/2/4/8 to screen edges. */
 unsigned int view_rotation_edges(unsigned int turns, unsigned int edges);
 /* Keep an assembled 3x3 or 4x4 building graphic upright on screen,
