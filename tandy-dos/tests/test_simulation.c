@@ -190,6 +190,7 @@ int main(int argc, char **argv)
         zoning_seed_from_city();
         {
             unsigned int rx,ry,id, rail=0U, road=0U, tile;
+            unsigned int near[4], near_rail=0U;
             const unsigned int lot_x=25U,lot_y=34U;
             for (rx=0U;rx<CITY_WIDTH;++rx)
                 for (ry=0U;ry<CITY_HEIGHT;++ry) {
@@ -201,14 +202,24 @@ int main(int argc, char **argv)
             assert(road==230U);
             tile=city_at(lot_x,lot_y)&1023U;
             assert(tile>=21U && tile<=43U);
-            assert((city_at(lot_x-1U,lot_y)&1023U)>=224U ||
-                   (city_at(lot_x+1U,lot_y)&1023U)>=224U ||
-                   (city_at(lot_x,lot_y-1U)&1023U)>=224U ||
-                   (city_at(lot_x,lot_y+1U)&1023U)>=224U);
+            near[0]=city_at(lot_x-1U,lot_y)&1023U;
+            near[1]=city_at(lot_x+1U,lot_y)&1023U;
+            near[2]=city_at(lot_x,lot_y-1U)&1023U;
+            near[3]=city_at(lot_x,lot_y+1U)&1023U;
+            for (rx=0U;rx<4U;++rx) {
+                assert(near[rx]<64U || near[rx]>207U);
+                if(near[rx]>=224U && near[rx]<=238U)
+                    near_rail=1U;
+            }
+            assert(near_rail); /* railway ONLY; never a road neighbor */
             assert(zoning_at(lot_x,lot_y)==ZONE_NONE);
             assert(zoning_set(lot_x,lot_y,ZONE_RES));
             simulation_init();
             run_months(36U);
+            assert(simulation_lot_service(lot_x,lot_y) ==
+                   (SIM_SERVICE_TRANSPORT | SIM_SERVICE_POWER));
+            assert(simulation_lot_service(CITY_WIDTH,lot_y)==0U);
+            assert(simulation_lot_service(lot_x,CITY_HEIGHT)==0U);
             assert(zoning_development_at(lot_x,lot_y)>0U);
             assert((city_at(lot_x,lot_y)&1023U)==tile);
             /* This must not destroy a single original road/rail tile. */
