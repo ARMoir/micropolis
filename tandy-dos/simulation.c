@@ -281,7 +281,7 @@ static int process_zone(unsigned int x, unsigned int y,
      */
     if(next!=0U && power)
         set_lot_power(x,y,1);
-    else if(stage!=0U && next==0U && lot_is_powered(x,y))
+    else if(stage!=0U && next==0U)
         clear_lot_power();
     if (kind == ZONE_RES)
         pop_res += zone_developed_population(kind,next);
