@@ -91,6 +91,21 @@ static int has_power(unsigned int x, unsigned int y)
     if (y+1U < CITY_HEIGHT && engine_is_powered(x,y+1U)) return 1;
     return 0;
 }
+/* O(1) local tile/neighborhood check, used only by the magnifying glass.
+ * It doesn't trigger or wait for the full electricity BFS.
+ */
+unsigned int simulation_lot_service(unsigned int x, unsigned int y)
+{
+    unsigned int result = 0U;
+    if (x >= CITY_WIDTH || y >= CITY_HEIGHT)
+        return 0U;
+    if (transport_access(x,y))
+        result |= SIM_SERVICE_TRANSPORT;
+    if (has_power(x,y))
+        result |= SIM_SERVICE_POWER;
+    return result;
+}
+
 static unsigned int zone_developed_population(unsigned int kind,
                                                unsigned int stage)
 {
