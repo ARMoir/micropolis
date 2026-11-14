@@ -1496,9 +1496,15 @@ static void show_menu(enum ui_menu menu)
 {
     if (build_drag_active)
         build_preview_cancel();
-    open_menu = menu;
-    menu_highlight = 0U;
-    render_full();
+    /* A change of menus restores just the old 128-pixel-wide popup,
+     * not the city, toolbox, or minimap.
+     */
+    menu_overlay_restore();
+    open_menu=menu;
+    menu_highlight=0U;
+    menu_overlay_capture();
+    draw_menu_popup();
+    mouse_pointer_show();
 }
 
 /* Mouse movement paints no pixels besides a tiny 8x8 arrow, unless it
@@ -1561,8 +1567,7 @@ static void handle_mouse(void)
         } else if (open_menu != MENU_NONE) {
             item = ui_dropdown_hit(open_menu, state.x, state.y);
             if (item >= 0 && (unsigned int)item != menu_highlight) {
-                menu_highlight = (unsigned int)item;
-                draw_menu_popup();
+                menu_set_highlight((unsigned int)item);
             }
         }
         /* Pointer coordinates are diagnostics, not city statistics.
@@ -1582,8 +1587,7 @@ static void handle_mouse(void)
             menu = ui_header_hit(state.x, state.y);
             if (menu != MENU_NONE) {
                 if (menu == open_menu) {
-                    open_menu = MENU_NONE;
-                    render_full();
+                    menu_overlay_close();
                 } else
                     show_menu((enum ui_menu)menu);
             } else {
@@ -1591,12 +1595,17 @@ static void handle_mouse(void)
                 if (item >= 0) {
                     enum ui_action command =
                         ui_menu_command(open_menu, (unsigned int)item);
-                    open_menu = MENU_NONE;
+                    menu_overlay_close();
                     run_menu_action(command);
-                } else
-                    open_menu = MENU_NONE;
-                if (!exit_requested)
-                    render_full();
+                    if (info_page != 0)
+                        draw_info_page();
+                    else if (!exit_requested &&
+                             command != UI_ROTATE_CW &&
+                             command != UI_ROTATE_CCW)
+                        draw_status();
+                } else {
+                    menu_overlay_close();
+                }
             }
         } else {
             menu = ui_header_hit(state.x, state.y);
@@ -1637,8 +1646,7 @@ static void handle_mouse(void)
             apply_zone_stroke(zone_drag_x, zone_drag_y,
                               zone_drag_x, zone_drag_y, ZONE_NONE);
         } else if (open_menu == MENU_TOOLS) {
-            open_menu = MENU_NONE;
-            render_full();
+            menu_overlay_close();
         } else if (!build_drag_active) {
             show_menu(MENU_TOOLS);
         }
@@ -1743,23 +1751,24 @@ static void keyboard_loop(void)
         if (open_menu != MENU_NONE) {
             next_menu = open_menu;
             if (ascii == 27U) {
-                open_menu = MENU_NONE;
-                render_full();
+                menu_overlay_close();
             } else if (ascii == 13U || ascii == ' ') {
                 enum ui_action command =
                     ui_menu_command(open_menu, menu_highlight);
-                open_menu = MENU_NONE;
+                menu_overlay_close();
                 run_menu_action(command);
-                if (!exit_requested)
-                    render_full();
+                if (info_page != 0)
+                    draw_info_page();
+                else if (!exit_requested &&
+                         command != UI_ROTATE_CW &&
+                         command != UI_ROTATE_CCW)
+                    draw_status();
             } else if (scan == 0x48U) {
                 if (menu_highlight > 0U)
-                    --menu_highlight;
-                draw_menu_popup();
+                    menu_set_highlight(menu_highlight-1U);
             } else if (scan == 0x50U) {
                 if (menu_highlight + 1U < ui_menu_count(open_menu))
-                    ++menu_highlight;
-                draw_menu_popup();
+                    menu_set_highlight(menu_highlight+1U);
             } else if (scan == 0x4bU) {
                 next_menu = (enum ui_menu)
                     ((open_menu + 3) % 4);
