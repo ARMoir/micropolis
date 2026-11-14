@@ -989,23 +989,92 @@ static void mouse_pointer_show(void)
     mouse_drawn = 1;
 }
 
-/* Draw a 16-character popup over the map. It is rebuilt only on menu
- * selection changes, leaving the VRAM-shift scrolling path untouched.
+/* The entire dropdown is only 128 pixels wide. Remember the 64 bytes
+ * underneath each scanline so hiding or switching a menu restores
+ * exactly those city pixels, not 672 tiles + 8 buttons + the minimap.
+ * Max 9 rows * 8 pixels * 64 packed bytes = 4608 bytes of DOS RAM.
+ * Popup origins are entirely in the map viewport, never the toolbox.
  */
+#define MENU_BACK_BYTES (9U * 8U * 64U)
+static unsigned char menu_back[MENU_BACK_BYTES];
+static unsigned int menu_back_origin=0U, menu_back_lines=0U;
+static int menu_back_valid=0;
+
+static void menu_overlay_restore(void)
+{
+    unsigned int row,n,off,base;
+    if (!menu_back_valid)
+        return;
+    mouse_pointer_hide();
+    for (row=0U;row<menu_back_lines;++row) {
+        off=vram_offset(menu_back_origin*8U,UI_MAP_Y+row);
+        base=row*64U;
+        for (n=0U;n<64U;++n)
+            video[off+n]=menu_back[base+n];
+    }
+    menu_back_valid=0;
+}
+
+static void menu_overlay_capture(void)
+{
+    unsigned int row,n,off,base;
+    unsigned int lines;
+    if (open_menu==MENU_NONE)
+        return;
+    mouse_pointer_hide();
+    lines=ui_menu_count(open_menu)*8U;
+    menu_back_origin=ui_menu_origin(open_menu);
+    menu_back_lines=lines;
+    for(row=0U;row<lines;++row) {
+        off=vram_offset(menu_back_origin*8U,UI_MAP_Y+row);
+        base=row*64U;
+        for(n=0U;n<64U;++n)
+            menu_back[base+n]=video[off+n];
+    }
+    menu_back_valid=1;
+}
+
+static void menu_overlay_close(void)
+{
+    menu_overlay_restore();
+    open_menu=MENU_NONE;
+}
+
+static void draw_menu_row(unsigned int j)
+{
+    unsigned int col,origin;
+    if(open_menu==MENU_NONE || j>=ui_menu_count(open_menu))
+        return;
+    origin=ui_menu_origin(open_menu);
+    for(col=0U;col<16U;++col)
+        solid_tile((origin+col)*8U,(2U+j)*8U,
+                   (unsigned char)(j==menu_highlight?5U:1U));
+    bios_text(2U+j,origin+1U,ui_menu_item(open_menu,j),
+              (unsigned char)(j==menu_highlight?15U:14U));
+}
+
 static void draw_menu_popup(void)
 {
-    unsigned int i, j, col, origin, count;
-    if (open_menu == MENU_NONE)
+    unsigned int j;
+    if (open_menu==MENU_NONE)
         return;
-    origin = ui_menu_origin(open_menu);
-    count = ui_menu_count(open_menu);
-    for (j = 0U; j < count; ++j) {
-        for (col = 0U; col < 16U; ++col)
-            solid_tile((origin + col) * 8U, (2U + j) * 8U,
-                       (unsigned char)(j == menu_highlight ? 5U : 1U));
-        bios_text(2U + j, origin + 1U, ui_menu_item(open_menu, j),
-                  (unsigned char)(j == menu_highlight ? 15U : 14U));
-    }
+    for(j=0U;j<ui_menu_count(open_menu);++j)
+        draw_menu_row(j);
+}
+
+/* Recolor only the two menu entries which changed, rather than
+ * rebuilding every row of a nine-item TOOLS dropdown on mouse motion.
+ */
+static void menu_set_highlight(unsigned int next)
+{
+    unsigned int old;
+    if (open_menu==MENU_NONE || next==menu_highlight ||
+        next>=ui_menu_count(open_menu))
+        return;
+    old=menu_highlight;
+    menu_highlight=next;
+    draw_menu_row(old);
+    draw_menu_row(next);
 }
 
 static void draw_info_page(void)
