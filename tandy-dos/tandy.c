@@ -617,29 +617,65 @@ static void draw_overview(void)
  * Inverted nearest-neighbor coordinate ranges are exact, including at
  * 90/270-degree rotated views; leave the yellow viewport outline intact.
  */
+static void draw_overview_pixel(unsigned int px, unsigned int py)
+{
+    unsigned char color=overview_color(px,py);
+    if (overview_valid &&
+        px>=overview_old_x &&
+        px<overview_old_x+overview_old_w &&
+        py>=overview_old_y &&
+        py<overview_old_y+overview_old_h &&
+        (px==overview_old_x ||
+         px==overview_old_x+overview_old_w-1U ||
+         py==overview_old_y ||
+         py==overview_old_y+overview_old_h-1U))
+        color=14U;
+    pixel(UI_MINIMAP_X+px,UI_MINIMAP_Y+py,color);
+}
+
 static void draw_overview_world_tile(unsigned int wx, unsigned int wy)
 {
     unsigned int px,py,x0,x1,y0,y1;
-    unsigned char color;
     if (wx>=CITY_WIDTH || wy>=CITY_HEIGHT)
         return;
     view_rotation_minimap_bounds(map_turns,wx,wy,
                                  UI_MINIMAP_W,UI_MINIMAP_H,
                                  &x0,&y0,&x1,&y1);
     for(py=y0;py<y1;++py)
-        for(px=x0;px<x1;++px) {
-            color=overview_color(px,py);
-            if (overview_valid &&
-                px>=overview_old_x &&
-                px<overview_old_x+overview_old_w &&
-                py>=overview_old_y &&
-                py<overview_old_y+overview_old_h &&
-                (px==overview_old_x ||
-                 px==overview_old_x+overview_old_w-1U ||
-                 py==overview_old_y ||
-                 py==overview_old_y+overview_old_h-1U))
-                color=14U;
-            pixel(UI_MINIMAP_X+px,UI_MINIMAP_Y+py,color);
+        for(px=x0;px<x1;++px)
+            draw_overview_pixel(px,py);
+}
+
+/* Refresh only the minimap pixels that sample a changed world region.
+ * Full 56x44 redraw remains reserved for first load or view rotation.
+ * During construction, refresh only successfully funded locations
+ * from the retained 2-bit preview map, not blocked candidate squares.
+ */
+static void draw_overview_world_rect(unsigned int x0,unsigned int y0,
+                                     unsigned int x1,unsigned int y1,
+                                     int funded_only)
+{
+    unsigned int left,top,right,bottom,px0,py0,px1,py1;
+    unsigned int px,py,mx,my,mw,mh;
+    left=x0<x1?x0:x1;
+    right=x0>x1?x0:x1;
+    top=y0<y1?y0:y1;
+    bottom=y0>y1?y0:y1;
+    if(right>=CITY_WIDTH)right=CITY_WIDTH-1U;
+    if(bottom>=CITY_HEIGHT)bottom=CITY_HEIGHT-1U;
+    view_rotation_minimap_rect(map_turns,left,top,right,bottom,
+                               UI_MINIMAP_W,UI_MINIMAP_H,
+                               &px0,&py0,&px1,&py1);
+    mw=view_rotation_width(map_turns);
+    mh=view_rotation_height(map_turns);
+    for(py=py0;py<py1;++py)
+        for(px=px0;px<px1;++px) {
+            view_rotation_to_world(map_turns,
+                                   px*mw/UI_MINIMAP_W,
+                                   py*mh/UI_MINIMAP_H,&mx,&my);
+            if(!funded_only ||
+               placement_recent_at(mx,my)==PREVIEW_FUNDED)
+                draw_overview_pixel(px,py);
         }
 }
 
