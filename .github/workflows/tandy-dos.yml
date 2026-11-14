@@ -30,11 +30,17 @@ jobs:
             -o test-city tandy-dos/city.c tandy-dos/tests/test_city.c
           ./test-city micropolis-activity/cities/happisle.cty
           cc -std=c89 -Wall -Wextra -pedantic \
-            -o test-editor tandy-dos/city.c tandy-dos/editor.c tandy-dos/connections.c tandy-dos/tests/test_editor.c
+            -o test-editor tandy-dos/city.c tandy-dos/editor.c tandy-dos/connections.c tandy-dos/infrastructure.c tandy-dos/tests/test_editor.c
           ./test-editor
           cc -std=c89 -Wall -Wextra -pedantic \
-            -o test-connections tandy-dos/city.c tandy-dos/editor.c tandy-dos/connections.c tandy-dos/tests/test_connections.c
+            -o test-connections tandy-dos/city.c tandy-dos/editor.c tandy-dos/connections.c tandy-dos/infrastructure.c tandy-dos/tests/test_connections.c
           ./test-connections
+          cc -std=c89 -Wall -Wextra -pedantic \
+            -o test-crossings tandy-dos/city.c tandy-dos/editor.c \
+            tandy-dos/connections.c tandy-dos/infrastructure.c \
+            tandy-dos/placement.c tandy-dos/zoning.c tandy-dos/engine.c \
+            tandy-dos/tests/test_crossings.c
+          ./test-crossings
           cc -std=c89 -Wall -Wextra -pedantic \
             -o test-engine tandy-dos/city.c tandy-dos/engine.c tandy-dos/tests/test_engine.c
           ./test-engine
@@ -61,7 +67,7 @@ jobs:
           cc -std=c89 -Wall -Wextra -pedantic \
             -o test-placement tandy-dos/city.c tandy-dos/zoning.c \
             tandy-dos/editor.c tandy-dos/connections.c \
-            tandy-dos/placement.c tandy-dos/tests/test_placement.c
+            tandy-dos/placement.c tandy-dos/infrastructure.c tandy-dos/tests/test_placement.c
           ./test-placement
           cc -std=c89 -Wall -Wextra -pedantic \
             -o test-simulation tandy-dos/city.c tandy-dos/zoning.c \
@@ -109,7 +115,7 @@ jobs:
           wcl -bcl=dos -0 -ml -q -fe=MICROPOL.EXE \
             tandy-dos/tandy.c tandy-dos/city.c tandy-dos/editor.c tandy-dos/connections.c tandy-dos/engine.c \
             tandy-dos/ui.c tandy-dos/mouse.c tandy-dos/zoning.c \
-            tandy-dos/placement.c tandy-dos/simulation.c tandy-dos/video_ops.c tandy-dos/menu_font.c tandy-dos/view_rotation.c tandy-dos/tool_art.c
+            tandy-dos/placement.c tandy-dos/simulation.c tandy-dos/video_ops.c tandy-dos/menu_font.c tandy-dos/view_rotation.c tandy-dos/tool_art.c tandy-dos/infrastructure.c
           test -s MICROPOL.EXE
           file MICROPOL.EXE
 
