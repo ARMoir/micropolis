@@ -35,3 +35,52 @@ for line in (root/'SHA256SUMS').read_text().splitlines():
     sha,name=line.split('  ')
     assert hashlib.sha256((root/name).read_bytes()).hexdigest()==sha,name
 print('144 IDs: DAT/XPM pixel parity, offsets, borders, nonempty sprites, runtime subset and hashes passed')
+
+from convert_sc2k_footprints import split_tiles
+
+def assemble(tiles, span, size):
+    return b''.join(b''.join(tiles[ty*span+tx][y*size//2:(y+1)*size//2]
+                           for tx in range(span))
+                    for ty in range(span) for y in range(size))
+
+# Coordinate-varying synthetic canvas proves ordering and seam continuity.
+for span in (1,2,3,4):
+    for size in (8,16):
+        width=span*size
+        canvas=bytes(((x+y*3)&15)<<4 | ((x+1+y*3)&15)
+                     for y in range(width) for x in range(0,width,2))
+        assert assemble(split_tiles(canvas,span,size),span,size)==canvas
+
+multi=json.loads((root/'footprints.json').read_text())
+assert [r['id'] for r in multi['records']]==list(range(0x70,0x100))
+assert multi['tile_count']==797
+assert {s:sum(r['footprint_width']==s for r in multi['records'])
+        for s in range(1,5)}=={1:47,2:47,3:34,4:16}
+for size in (8,16):
+    stride=size*size//2
+    data=(root/f'SC2KM{size}.DAT').read_bytes()
+    assert len(data)==797*stride
+    xpm=re.findall(r'^"([^"\n]*)"',(root/f'sc2k-multi-{size}.xpm').read_text(),re.M)
+    assert xpm[0]==f'{size} {size*797} 16 1'
+    assert len(xpm)==17+size*797
+    assert [int(p,16) for row in xpm[17:] for p in row]==unpack(data)
+    cursor=0
+    for r in multi['records']:
+        span=r['footprint_width']
+        assert r['footprint_height']==span and r['tile_count']==span*span
+        assert r['tile_start']==cursor and r[f'offset_{size}']==cursor*stride
+        assert r[f'byte_count_{size}']==span*span*stride
+        tiles=[data[(cursor+i)*stride:(cursor+i+1)*stride] for i in range(span*span)]
+        pix=unpack(assemble(tiles,span,size)); width=span*size
+        assert any(p!=2 for p in pix)
+        assert all(pix[y*width+x]==2 for y in range(width) for x in range(width)
+                   if x in (0,width-1) or y in (0,width-1))
+        if span==1:
+            old=(root/f'SC2K{size}.DAT').read_bytes()
+            assert tiles[0]==old[(r['id']-0x70)*stride:(r['id']-0x70+1)*stride]
+        cursor+=span*span
+    assert cursor==797
+for line in (root/'SHA256SUMS-FOOTPRINTS').read_text().splitlines():
+    sha,name=line.split('  ')
+    assert hashlib.sha256((root/name).read_bytes()).hexdigest()==sha,name
+print('797 tiles: split/reassembly, footprint coverage, offsets, XPM parity, 1x1 compatibility and hashes passed')

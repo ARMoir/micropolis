@@ -85,7 +85,7 @@ def reduce_tile(pixels, palette, size=8, inset=1):
     samples. A minimum coverage suppresses isolated subpixel speckles.
     Transparency becomes ordinary Micropolis green ground (index 2).
     """
-    if size not in (8,16) or inset < 0 or 2*inset >= size:
+    if size not in (8,16,24,32,48,64) or inset < 0 or 2*inset >= size:
         raise ValueError('Unsupported tile size/inset')
     h, w = len(pixels), len(pixels[0])
     extent = size - 2*inset

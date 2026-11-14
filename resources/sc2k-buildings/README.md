@@ -8,6 +8,54 @@ Terrain, roads, bridges and separate animation frames are outside this catalog.
 
 ## Downloads and formats
 
+### Footprint-sized libraries (recommended)
+
+The full-size exports preserve proposed square footprints: **47 at 1×1,
+47 at 2×2, 34 at 3×3 and 16 at 4×4**. Original sprite widths of 32, 64,
+96 and 128 pixels supply the footprint classification. This matches the
+RCI category sizes and gives large power plants, stadiums and arcologies
+4×4 target lots. These are artwork footprints, not new simulation registrations.
+
+| File | Contents | Bytes |
+|---|---|---:|
+| [SC2KM8.DAT](SC2KM8.DAT) | 797 packed 8×8 tiles across 144 buildings | 25,504 |
+| [SC2KM16.DAT](SC2KM16.DAT) | 797 packed 16×16 tiles across 144 buildings | 102,016 |
+| [sc2k-multi-16.xpm](sc2k-multi-16.xpm) | Classic 16×12752 vertical tile strip | text |
+| [sc2k-multi-8.xpm](sc2k-multi-8.xpm) | Tandy 8×6376 vertical tile strip | text |
+| [footprints.json](footprints.json) | Footprints, first tile, tile count, byte offsets and lengths | JSON |
+| [FOOTPRINTS.md](FOOTPRINTS.md) | Human-readable footprint index | Markdown |
+
+For example a 3×3 factory uses a 24×24 Tandy or 48×48 classic canvas,
+split into nine tiles. A 4×4 facility gets 32×32 or 64×64 pixels.
+Buildings appear in ascending SC2000 ID order; tiles within a building
+are ordered left-to-right, then top-to-bottom. Pixels within each tile
+remain row-major, 4bpp, high nibble first. Find the first tile and offsets
+in `footprints.json`; **do not use `(ID-0x70)*stride`** for these libraries.
+Subtile `(x,y)` starts at `offset + (y*footprint_width+x)*tile_bytes`.
+
+The complete building is resized once, then split. Only the outer canvas
+gets a one-pixel margin; internal tile edges have no padding or zone borders.
+To reconstruct, place the pieces into their metadata-defined square footprint.
+The 16px DAT exceeds 64KB: a future 16-bit consumer must use file seeks or
+banked buffers and 32-bit offsets rather than a single 16-bit-sized allocation.
+Checksums are in `SHA256SUMS-FOOTPRINTS`.
+
+These packs do not replace `TILES.DAT` or the 12-building `SC2K.DAT`.
+Placement, growth, bulldozing, anchor selection and gameplay tile IDs for
+new multi-tile buildings are future work. The existing 1×1 C/I integration
+and its pack remain byte-for-byte unchanged.
+
+![Footprint-sized classic buildings](preview-multi-16.png)
+
+The sheet uses equal 4×4-lot cells to show relative sizes; buildings are
+bottom-left aligned, in ascending ID order. Empty space around smaller lots
+belongs only to the contact sheet, not to their stored tile records.
+
+### Legacy 1×1 thumbnails and runtime pack
+
+The initial all-building thumbnail libraries remain available for previews
+and existing consumers. Use the multi-tile libraries above for larger art.
+
 | File | Contents | Bytes |
 |---|---|---:|
 | [SC2K8.DAT](SC2K8.DAT) | 144 raw 8×8 tiles, 32 bytes each | 4,608 |
@@ -26,7 +74,7 @@ Record `i` represents SC2000 ID `0x70 + i`; byte offsets are `i*32` and
 `catalog.json` and embedded in the XPMs. SHA256SUMS verifies generated files.
 
 **The full libraries are not replacements for the original TILES.DAT.**
-Their IDs and counts differ from Micropolis's 960-tile atlas. The 16×16 XPM
+Their IDs and counts differ from Micropolis's 960-tile atlas. The legacy 16×16 XPM
 is a classic-size artwork library, not a plug-and-play SimCity Classic game
 file: assigning gameplay IDs and composing larger footprints remains future
 integration work. Each source building is fitted into one icon, including
@@ -64,10 +112,12 @@ python3 tandy-dos/tests/test_sc2k_resources.py
    pixel runs, odd-run padding and sprite terminators. Reject invalid
    offsets, dimensions and runs before reading outside the sprite.
 3. Read the BMP's BGR palette and map colours to the nearest Tandy RGB value.
-4. Preserve aspect ratio and fit inside 6×6 or 14×14 pixels. Reserve a
+4. Preserve aspect ratio and fit inside the footprint-sized canvas minus
+   a one-pixel outer margin (6×6 or 14×14 for a 1×1). Reserve a
    one-pixel border, bottom-align, and vote among opaque target-palette
    colours within each source area. Require at least 25% opaque coverage.
-5. Fill transparency with green ground (palette index 2), pack the pixels,
+5. Fill transparency with green ground (palette index 2), split each larger
+   canvas into row-major map tiles, pack the pixels,
    and emit raw DAT files, XPM strips, contact sheets, catalog and hashes.
 
 The process is deterministic. Source-file hashes are recorded in the catalog;

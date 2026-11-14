@@ -91,6 +91,9 @@ def main():
     args=parser.parse_args()
     records=export((args.game/'DATA/LARGE.DAT').read_bytes(),
                    (args.game/'BITMAPS/PAL_MSTR.BMP').read_bytes(),args.destination)
+    from convert_sc2k_footprints import export_footprints
+    export_footprints((args.game/'DATA/LARGE.DAT').read_bytes(),
+                      (args.game/'BITMAPS/PAL_MSTR.BMP').read_bytes(),args.destination)
     print(f'Exported {len(records)} buildings at 8x8 and 16x16, plus the 12-building runtime pack')
 
 
