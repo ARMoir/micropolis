@@ -79,7 +79,7 @@ TILES.DAT
 HAPPISLE.CTY
 ```
 
-Then launch either the built-in test map or an authentic Micropolis city:
+Then launch either the built-in test map or the road-converted Happisle city:
 
 ```dos
 MICROPOL
@@ -89,7 +89,7 @@ MICROPOL HAPPISLE.CTY
 The first command opens the built-in **powered starter neighborhood**
 with an original 4x4 coal plant, connected power lines, roads, and empty
 residential/commercial/industrial lots ready to grow. The second loads
-the included **original Micropolis city map** and automatically focuses
+the included **road-converted Happisle city map** and automatically focuses
 on the most developed residential neighborhood, rather than its mostly
 empty northwest ocean. Its buildings can develop from vacant and
 already occupied original 3x3 plots. The input city file is never
@@ -699,12 +699,13 @@ separately by the Open Watcom build.
 
 ## Happisle railway access and imported-city growth fix
 
-HAPPISLE.CTY is a genuine **railway-heavy** original Micropolis city:
-its original map contains **935 railway tiles (IDs 224..238)** but
-only **230 road tiles (IDs 64..207)**. They are *not* being converted
-into train tracks by the DOS renderer. In contrast, our built-in
-demo is intentionally road-heavy. Preserve original city and art IDs;
-do not replace railway tiles with roads to hide this difference.
+The **upstream original** `micropolis-activity/cities/happisle.cty`
+is a genuine railway-heavy Micropolis city: it has 935 railway tiles,
+64 rail/power crossings, and 230 roads. The Tandy **release copy**
+`HAPPISLE.CTY` now deliberately converts all 999 rail-related tiles
+to their appropriate road equivalents at packaging time, as requested.
+The upstream original stays unchanged for historical preservation and
+for the imported-city simulation regression tests.
 
 The first simplified 1x1 and classic 3x3 RCI growth rules required a
 road beside each developable lot. This prevented residential growth
@@ -853,3 +854,29 @@ compilation and host regression correctness; actual wall-clock menu
 speed and bulldozer responsiveness still need to be tried on the
 Tandy itself. Use `MICROPOL /TIMEDEMO` to separately measure actual
 viewport scrolling and city+HUD performance, without changing saves.
+
+## Bundled Happisle: railways converted to roads
+
+The current Tandy release deliberately includes a **road-only Happisle**
+scenario, generated with `tandy-dos/tools/convert_happisle_rails.py`.
+It does **not** overwrite the original upstream Micropolis sample.
+The same 27,120-byte CTY format, map, buildings, terrain, date, tax,
+funds and tile flags are retained. Only these transportation sprites
+are substituted:
+
+- 224..236 (rail bridges, straight tracks, corners and junctions)
+  become the corresponding road sprites 64..76.
+- 237/238 (road/rail crossings) become the four-way road crossing 76.
+- 221/222 (railway/power crossings) become road/power crossings 77/78,
+  preserving their conductivity flags.
+
+Exactly **935 railway tiles and 64 conductive rail/power crossings**
+are converted, leaving **1,229 road-family tiles** and no railway
+tiles in the release copy. The original Micropolis source city still
+has the full railway network. Automated release validation compares
+each of all 12,000 map tile words and ensures non-transport sprites,
+flags, city histories and other metadata remain identical.
+
+Copy the newly released `HAPPISLE.CTY` to your DOS CompactFlash card
+alongside `MICROPOL.EXE` and `TILES.DAT`. Existing previously
+saved `CITYnnnn.CTY` files are not modified automatically.
