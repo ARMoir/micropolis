@@ -1423,3 +1423,49 @@ so road-gray inner edges appear or disappear without waiting for
 the simulation to repaint a tile. Empty-zone removal also keeps
 the existing two-tile expanded refresh for 3x3 building demolition.
 This change is display-only and needs no new graphics buffers.
+
+## Detailed Inspect tool: four pages per city tile
+
+With the magnifying-glass tool selected (keyboard **0**, or the toolbar
+button), **click any world tile** or move the yellow cursor with
+**I/J/K/L** and press **Space**. A large, readable 38-column inspector
+panel replaces the old one-word bottom status message. It captures all
+facts at selection time rather than repeatedly scanning the city.
+
+- **Identity (1/4):** Exact world X/Y, source tile ID in decimal/hex,
+  actual tile type (terrain, water, woods, fire, roads/rail/bridges,
+  power, original zones, hospitals, airports, power plants, stadiums,
+  NewerSource structures, source animations), zoning kind,
+  original versus NewerSource art, complete building footprint,
+  top-left anchor, and tile's section within that footprint.
+- **Services (2/4):** Power-network scan state, actual electricity
+  flag, conductive flag, six-tile road/rail-access check, nearby
+  electricity, no-power warning status, cardinally adjacent roads,
+  rails and power lines. The inspector explicitly notes that the
+  simplified DOS model does not yet calculate crime or pollution.
+- **Development (3/4):** Actual zoning, custom-lot 0–3 growth stage
+  (or original building instead), vacant versus developed status,
+  exact 1x1/2x2/3x3 NewerSource footprint or valid original prefab,
+  anchor/section, source design ID, current service availability, and
+  *clearly labeled* simplified 1x1 residents/jobs estimates.
+- **Raw data (4/4):** Original 16-bit .CTY word, tile ID, exact
+  PWR/COND/BURN/BULL/ANIM/ZONE flag states, and raw IDs of all
+  four neighbors. Neighbor ID 1024 means outside the 120x100 map.
+
+A source-accurate group detector recognizes original 3x3 RCI/civic
+and hospital/church buildings, 4x4 ports/power plants/stadiums and 6x6
+airports when their actual original ZONEBIT center exists. It never
+claims an isolated fragment is a complete building. NewerSource
+footprints use the recorded .NBL coordinates and design IDs. Every
+one of the 1,024 possible original tile-ID values has a safe
+classification, including reserved/unknown graphic IDs.
+
+**Navigation:** Right/Down, Tab, Enter, Space or left click advance
+to the next inspector page. Left/Up go backward; Esc, right-click or
+another key closes. This is a **read-only pause while inspecting**,
+not a continuous expensive background scan. The original HUD,
+toolbox, minimap, camera, road access, growth, .CTY/.ZON/.NBL files
+and artwork remain unchanged. Unit tests cover all 1024 possible IDs,
+four pages of bounded 40-column text, complete original and NewerSource
+building footprints, stage changes, tile flags, neighboring terrain,
+map boundaries and non-mutating reads.

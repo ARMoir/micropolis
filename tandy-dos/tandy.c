@@ -26,6 +26,7 @@
 #include "pointer_policy.h"
 #include "small_lot_art.h"
 #include "newer_lot.h"
+#include "tile_inspect.h"
 #include "game_save.h"
 #include "newer_site.h"
 #include "zone_highlight.h"
@@ -72,7 +73,11 @@ static char power_message[12];
  */
 static enum ui_menu open_menu = MENU_NONE;
 static unsigned int menu_highlight = 0U;
+/* Help pages are 1..3. Inspector panels are 4..7 (four pages).
+ * Collect tile facts ONCE at the click, not once per BIOS glyph.
+ */
 static int info_page = 0;
+static struct tile_inspect inspected_tile;
 static int exit_requested = 0;
 static int mouse_on = 0;
 static unsigned int mouse_x = 160U, mouse_y = 100U;
@@ -1533,6 +1538,17 @@ static void draw_info_page(void)
         for (i = 1U; i < 39U; ++i)
             solid_tile(i * 8U, j * 8U, 1U);
 
+    if(info_page>=4 && info_page<8) {
+        char line[TILE_INSPECT_LINE+1U];
+        unsigned int page=(unsigned int)(info_page-4);
+        for(i=0U;i<TILE_INSPECT_ROWS;++i) {
+            tile_inspect_line(&inspected_tile,page,i,line);
+            bios_text(6U+i,2U,line,(unsigned char)(i==0U?15U:14U));
+        }
+        bios_text(16U,2U,"ARROWS / TAB / CLICK: NEXT",11U);
+        bios_text(17U,2U,"ESC / RIGHT CLICK: CLOSE",15U);
+        return;
+    }
     if (info_page == 1) {
         bios_text(6U, 3U, "KEYBOARD CONTROLS", 15U);
         bios_text(8U, 3U, "ARROWS / WASD  PAN CITY", 14U);
@@ -1922,33 +1938,15 @@ static void apply_selected_tool(void)
         build_preview_finish();
         return;
     }
-    if (selected_tool == EDIT_INSPECT) {
-        /* Original Happisle has many more rails than roads. Identify
-         * what the player actually clicked instead of treating the
-         * railway graphics as a failed road render. For new custom
-         * 1x1 RCI lots, explain why residents may not yet move in.
+    if(selected_tool==EDIT_INSPECT) {
+        /* Four detailed pages are populated from one bounded local
+         * snapshot. Do not force a city-wide power recalculation,
+         * and never change original map/zone/save data on inspection.
          */
-        unsigned int tile = city_at(mx,my) & 1023U;
-        unsigned int zone = zoning_at(mx,my);
-        unsigned int services;
-        if (tile >= 64U && tile <= 207U) {
-            last_action = "ROAD TILE";
-        } else if (tile >= 224U && tile <= 238U) {
-            last_action = "RAIL TILE";
-        } else if (tile >= 208U && tile <= 223U) {
-            last_action = "POWER LINE";
-        } else if (zone != ZONE_NONE &&
-                   (tile == 0U || (tile >= 21U && tile <= 43U))) {
-            services = simulation_lot_service(mx,my);
-            if (!(services & SIM_SERVICE_TRANSPORT))
-                last_action = "NEED ROAD/RAIL";
-            else if (!(services & SIM_SERVICE_POWER))
-                last_action = "NEED POWER";
-            else
-                last_action = "LOT SERVICED";
-        } else {
-            last_action = "INSPECT";
-        }
+        tile_inspect_collect(mx,my,&inspected_tile);
+        info_page=4;
+        last_action="INSPECT TILE";
+        draw_info_page();
     } else {
         unsigned int larger=0U,bx=0U,by=0U;
         previous_tile=city_at(mx,my);
@@ -2262,6 +2260,13 @@ static void handle_mouse(void)
             item=picker_hit(state.x,state.y);
             if(item>=0) picker_choose((unsigned int)item);
             else picker_close();
+        } else if (info_page >= 4 && info_page < 8) {
+            /* Each left click advances through Identity / Services /
+             * Development / Raw, without returning to the map.
+             * A right click or Escape closes the inspector.
+             */
+            info_page=4+((info_page-3)%4);
+            draw_info_page();
         } else if (info_page != 0) {
             info_page = 0;
             render_full();
@@ -2628,8 +2633,22 @@ static void keyboard_loop(void)
         mouse_pointer_hide();
 
         if (info_page != 0) {
-            info_page = 0;
-            render_full();
+            if(info_page>=4 && info_page<8 &&
+               (scan==0x4dU || scan==0x50U || ascii==9U ||
+                ascii==13U || ascii==' ')) {
+                /* Right/down/Tab/Enter = next inspector page. */
+                info_page=4+((info_page-3)%4);
+                draw_info_page();
+            } else if(info_page>=4 && info_page<8 &&
+                      (scan==0x4bU || scan==0x48U)) {
+                /* Left/up = previous inspector page. */
+                info_page=4+((info_page-1)%4);
+                draw_info_page();
+            } else {
+                info_page=0;
+                render_full();
+            }
+            mouse_pointer_show();
             continue;
         }
 
