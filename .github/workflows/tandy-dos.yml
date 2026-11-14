@@ -101,7 +101,13 @@ jobs:
           assert tile(67) == tile(83), "vertical road fix must remain intact"
           print("Horizontal and vertical traffic tile regression tests passed")
           PY
-          cp micropolis-activity/cities/happisle.cty HAPPISLE.CTY
+          # Bundle the Tandy road-based edition of Happisle, not the
+          # original railway-heavy Micropolis sample. The original is
+          # kept intact for upstream-compatible city/simulation tests.
+          python3 tandy-dos/tools/convert_happisle_rails.py \
+            micropolis-activity/cities/happisle.cty HAPPISLE.CTY
+          python3 tandy-dos/tests/test_happisle_road_conversion.py \
+            micropolis-activity/cities/happisle.cty HAPPISLE.CTY
           test "$(wc -c < HAPPISLE.CTY)" -eq 27120
 
       - name: Set up Open Watcom (16-bit DOS)
