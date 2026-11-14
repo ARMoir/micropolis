@@ -46,17 +46,30 @@ int edit_place(enum edit_tool tool, unsigned int x, unsigned int y)
     if (tool == EDIT_BULLDOZE) {
         if (tile == 0U || (tile >= 1U && tile <= 20U))
             return 0; /* don't delete waterways */
-        city_set(x, y, 0U);
+        /* Removing a bridge uncovers the river, not a dirt tile.
+         * BRWH/BRWV are original animated bridge variants.
+         */
+        if(tile==64U || tile==65U || tile==79U || tile==95U)
+            city_set(x,y,2U);
+        else
+            city_set(x,y,0U);
         connections_fix_cross(x, y);
         return 1;
     }
     if (tool == EDIT_ROAD || tool == EDIT_POWER) {
-        unsigned int crossing;
+        unsigned int crossing, bridge=0U;
         unsigned short placed;
         if (!infrastructure_can_place(tool,x,y))
             return 0;
+        if(tool==EDIT_ROAD && infrastructure_is_water(tile))
+            bridge=infrastructure_road_bridge_id(x,y);
         crossing = infrastructure_crossing_id(tool,tile);
-        if (crossing != 0U) {
+        if(bridge!=0U) {
+            /* Preserve the river: a bridge deck is bulldozable, but
+             * it must not acquire conductor/flammability flags.
+             */
+            placed=(unsigned short)(bridge|BULLBIT);
+        } else if (crossing != 0U) {
             /* Original _LayRoad/_LayWire perpendicular crossings:
              * retain both transport geometries and electrical
              * conductivity where the completed tile contains wire.

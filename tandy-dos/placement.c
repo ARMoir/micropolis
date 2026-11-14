@@ -61,6 +61,32 @@ long placement_unit_cost(enum edit_tool tool)
     }
 }
 
+/* Unlike a land road, one bridge segment costs the original
+ * Micropolis $50. Use the same value for budget preview and debit.
+ */
+static long cell_cost(unsigned int x,unsigned int y)
+{
+    if(current_tool==EDIT_ROAD &&
+       infrastructure_is_water(city_at(x,y)&1023U))
+        return 50L;
+    return placement_unit_cost(current_tool);
+}
+
+static int planned_road_neighbor(unsigned int x,unsigned int y)
+{
+    /* Allow the next tile of a drag across water to extend from a
+     * funded bank road or funded earlier bridge in the SAME preview.
+     * An unanchored click in the middle of a lake stays blocked.
+     */
+    if(x>0U && state_get((x-1U)*CITY_HEIGHT+y)==PREVIEW_FUNDED) return 1;
+    if(x+1U<CITY_WIDTH &&
+       state_get((x+1U)*CITY_HEIGHT+y)==PREVIEW_FUNDED) return 1;
+    if(y>0U && state_get(x*CITY_HEIGHT+y-1U)==PREVIEW_FUNDED) return 1;
+    if(y+1U<CITY_HEIGHT &&
+       state_get(x*CITY_HEIGHT+y+1U)==PREVIEW_FUNDED) return 1;
+    return 0;
+}
+
 static int can_place(unsigned int x, unsigned int y)
 {
     unsigned int kind = zone_type(current_tool);
@@ -75,7 +101,11 @@ static int can_place(unsigned int x, unsigned int y)
      * Otherwise a valid road-over-rail or wire-over-road crossing
      * gets rejected before mouse-up despite having original art.
      */
-    return infrastructure_can_place(current_tool,x,y);
+    if(infrastructure_can_place(current_tool,x,y)) return 1;
+    if(current_tool==EDIT_ROAD &&
+       infrastructure_is_water(city_at(x,y)&1023U))
+        return planned_road_neighbor(x,y);
+    return 0;
 }
 
 int placement_active(void) { return active; }
@@ -154,7 +184,7 @@ void placement_begin(enum edit_tool tool)
 static unsigned int preview_one(unsigned int x, unsigned int y)
 {
     unsigned int offset, state;
-    long price = placement_unit_cost(current_tool);
+    long price = cell_cost(x,y);
     if (!active || x >= CITY_WIDTH || y >= CITY_HEIGHT)
         return 0U;
     offset = x * CITY_HEIGHT + y;
@@ -216,49 +246,80 @@ unsigned int placement_extend(unsigned int x0, unsigned int y0,
 /* The map must be unchanged until commit; emit all funded cells in one
  * transaction, then debit only actual successfully applied cells.
  */
+/* Commit dry land first, then grow bridge spans from their bank roads.
+ * The preview's 2-bit grid stores the entire drag; no new 12K array.
+ * Only spans actually placed are charged to the treasury.
+ */
 unsigned int placement_commit(void)
 {
-    unsigned int x, y, offset, done = 0U;
-    unsigned int kind = zone_type(current_tool);
-    long spent = 0L, unit = placement_unit_cost(current_tool);
-    unsigned short before, after;
-    if (!active)
-        return 0U;
+    unsigned int x,y,offset,done=0U,made;
+    unsigned int kind=zone_type(current_tool);
+    long spent=0L;
+    unsigned short before,after;
+    if(!active) return 0U;
     last_power_changed=0;
-    for (x = min_x; x <= max_x; ++x)
-        for (y = min_y; y <= max_y; ++y) {
+
+    for(x=min_x;x<=max_x;++x)
+        for(y=min_y;y<=max_y;++y) {
             offset=x*CITY_HEIGHT+y;
-            if (state_get(offset) != PREVIEW_FUNDED)
+            if(state_get(offset)!=PREVIEW_FUNDED) continue;
+            if(kind) {
+                if(zoning_set(x,y,kind)) {
+                    ++done;
+                    spent+=cell_cost(x,y);
+                } else {
+                    state_put(offset,PREVIEW_BLOCKED);
+                }
                 continue;
-            if (kind) {
-                if (zoning_set(x,y,kind)) {
-                    ++done;
-                    spent += unit;
-                } else {
-                    state_put(offset,PREVIEW_BLOCKED);
-                }
+            }
+            before=city_at(x,y);
+            /* Bridges may not yet have a real road as their neighbor.
+             * All land roads are committed first, then spans grow.
+             */
+            if(current_tool==EDIT_ROAD &&
+               infrastructure_is_water(before&1023U))
+                continue;
+            if(edit_place(current_tool,x,y)) {
+                after=city_at(x,y);
+                if(((before^after)&16384U)!=0U)
+                    last_power_changed=1;
+                ++done;
+                spent+=cell_cost(x,y);
             } else {
-                before=city_at(x,y);
-                if (edit_place(current_tool,x,y)) {
-                    after=city_at(x,y);
-                    /* A road over an existing wire retains its
-                     * CONDBIT, so it does NOT require a global scan.
-                     * A newly placed wire changes it and DOES.
-                     */
-                    if (((before ^ after) & 16384U) != 0U)
-                        last_power_changed=1;
-                    ++done;
-                    spent += unit;
-                } else {
-                    state_put(offset,PREVIEW_BLOCKED);
-                }
+                state_put(offset,PREVIEW_BLOCKED);
             }
         }
-    if (spent != 0L)
+
+    if(current_tool==EDIT_ROAD) {
+        do {
+            made=0U;
+            for(x=min_x;x<=max_x;++x)
+                for(y=min_y;y<=max_y;++y) {
+                    offset=x*CITY_HEIGHT+y;
+                    if(state_get(offset)!=PREVIEW_FUNDED ||
+                       !infrastructure_is_water(city_at(x,y)&1023U))
+                        continue;
+                    if(edit_place(EDIT_ROAD,x,y)) {
+                        ++made;
+                        ++done;
+                        spent+=50L;
+                    }
+                }
+        } while(made!=0U);
+        /* Unsupported dangling spans must not be charged or remain
+         * drawn as successfully built once the preview is erased.
+         */
+        for(x=min_x;x<=max_x;++x)
+            for(y=min_y;y<=max_y;++y) {
+                offset=x*CITY_HEIGHT+y;
+                if(state_get(offset)==PREVIEW_FUNDED &&
+                   infrastructure_is_water(city_at(x,y)&1023U))
+                    state_put(offset,PREVIEW_BLOCKED);
+            }
+    }
+
+    if(spent!=0L)
         (void)city_spend_funds(spent);
-    /* Preserve the 2-bit preview footprint until the next begin, so
-     * the renderer can clean exactly these tiles on mouse-up.
-     */
     active=0;
     accepted=rejected=0U;
     committed_cost=0L;

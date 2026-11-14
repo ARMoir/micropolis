@@ -155,6 +155,85 @@ int main(void)
         assert(engine_is_powered(60U,y));
     engine_shutdown();
 
+    /* Authentic original H/V bridge sprites over river, river edge
+     * and channel. An isolated water tile remains unbuildable.
+     */
+    clear_map();
+    city_set(20U,20U,2U);
+    assert(!infrastructure_can_place(EDIT_ROAD,20U,20U));
+    assert(!edit_place(EDIT_ROAD,20U,20U));
+    assert(!infrastructure_can_place(EDIT_POWER,20U,20U));
+    city_set(19U,20U,66U|4096U|8192U);
+    assert(infrastructure_can_place(EDIT_ROAD,20U,20U));
+    assert(infrastructure_road_bridge_id(20U,20U)==64U);
+    assert(edit_place(EDIT_ROAD,20U,20U));
+    assert(TILE(20U,20U)==64U);
+    assert((city_at(20U,20U)&4096U)!=0U);
+    assert((city_at(20U,20U)&16384U)==0U);
+    assert(edit_place(EDIT_BULLDOZE,20U,20U));
+    assert(TILE(20U,20U)==2U);
+    clear_map();
+    city_set(20U,19U,67U|4096U|8192U);
+    city_set(20U,20U,3U);
+    city_set(20U,21U,4U);
+    assert(infrastructure_road_bridge_id(20U,20U)==65U);
+    assert(edit_place(EDIT_ROAD,20U,20U));
+    assert(edit_place(EDIT_ROAD,20U,21U));
+    assert(TILE(20U,20U)==65U && TILE(20U,21U)==65U);
+    assert(TILE(20U,19U)==67U);
+
+    /* Drag over four river tiles: $50 per bridge plus $10 dry land.
+     * The preview must accept water tiles following already funded
+     * bridge previews, even when the city map hasn't changed yet.
+     */
+    clear_map();
+    city_set(20U,20U,66U|4096U|8192U);
+    for(x=21U;x<=24U;++x) city_set(x,20U,2U);
+    city_set_funds(210L);
+    placement_begin(EDIT_ROAD);
+    assert(placement_extend(20U,20U,25U,20U)==6U);
+    assert(placement_at(20U,20U)==PREVIEW_BLOCKED);
+    for(x=21U;x<=25U;++x)
+        assert(placement_at(x,20U)==PREVIEW_FUNDED);
+    assert(placement_cost()==210L);
+    assert(placement_commit()==5U);
+    for(x=21U;x<=24U;++x) assert(TILE(x,20U)==64U);
+    assert(TILE(25U,20U)==66U);
+    assert(city_get_funds()==0L);
+    assert(city_save_as("bridge.tmp"));
+    assert(city_load("bridge.tmp"));
+    assert(TILE(23U,20U)==64U);
+    assert(remove("bridge.tmp")==0);
+
+    /* Not enough money: the unpurchased bridge remains as water. */
+    clear_map();
+    city_set(20U,20U,66U|4096U|8192U);
+    for(x=21U;x<=23U;++x) city_set(x,20U,2U);
+    city_set_funds(100L);
+    placement_begin(EDIT_ROAD);
+    (void)placement_extend(20U,20U,23U,20U);
+    assert(placement_at(21U,20U)==PREVIEW_FUNDED);
+    assert(placement_at(22U,20U)==PREVIEW_FUNDED);
+    assert(placement_at(23U,20U)==PREVIEW_NO_FUNDS);
+    assert(placement_commit()==2U);
+    assert(TILE(21U,20U)==64U && TILE(22U,20U)==64U);
+    assert(TILE(23U,20U)==2U);
+    assert(city_get_funds()==0L);
+
+    /* Commit must also support drag right-to-left. The first water
+     * square in x-major order is farthest from the right-hand shore.
+     */
+    clear_map();
+    city_set(25U,20U,66U|4096U|8192U);
+    for(x=21U;x<=24U;++x) city_set(x,20U,2U);
+    city_set_funds(200L);
+    placement_begin(EDIT_ROAD);
+    (void)placement_extend(25U,20U,21U,20U);
+    assert(placement_cost()==200L);
+    assert(placement_commit()==4U);
+    for(x=21U;x<=24U;++x) assert(TILE(x,20U)==64U);
+    assert(city_get_funds()==0L);
+
     /* No road or rail identity changes in the original HAPPISLE map
      * are required by this edit path. The combined intersection IDs
      * survive a normal 27120-byte city save and load.

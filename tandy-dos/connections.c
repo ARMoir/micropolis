@@ -52,12 +52,12 @@ static int neighbor_road(unsigned int x, unsigned int y, int ns)
      * The earlier editor treated neither as a road neighbor, so newly
      * built roads appeared to terminate before the crossings.
      */
-    if (ns) {
-        if (id == 237U) return 1;
-        return id >= 64U && id <= 78U && id != 64U && id != 77U;
+    if(ns) {
+        if(id==237U || id==65U || id==95U) return 1;
+        return id>=66U && id<=78U && id!=77U;
     }
-    if (id == 238U) return 1;
-    return id >= 64U && id <= 78U && id != 65U && id != 78U;
+    if(id==238U || id==64U || id==79U) return 1;
+    return id>=66U && id<=78U && id!=78U;
 }
 
 static int neighbor_wire(unsigned int x, unsigned int y, int ns)

@@ -937,3 +937,22 @@ Rotation redraws the city viewport and rotated minimap, leaving the
 sidebar buttons and top bar untouched. Camera clamping still applies
 near the world boundary. Host regressions cover all 56x44 minimap
 pixels in all four orientations and camera-center stability.
+
+## Original road bridge construction
+
+The road brush can now bridge the original Micropolis water tiles 2
+(RIVER), 3 (REDGE) and 4 (CHANNEL), using the original 8x8-scaled
+HBRIDGE/VBRIDGE graphics (IDs 64/65). Begin at a shoreline road (or
+an already connected bridge) and drag across the river. Isolated
+open-water placement remains blocked. The preview reserves the source
+SimCity costs of **$50 per water bridge tile**, compared with **$10 per
+ordinary land road tile**; insufficient funds are shown as rejected
+preview tiles and never charged.
+
+Final placement lays the dry shoreline road first, then walks outward
+through any approved bridge spans, so left-to-right and right-to-left
+mouse drags both work. Bridge road connections are repaired at both
+ends, and bulldozing restores river water instead of dirt. No additional
+rendering or simulation scans run continuously. C89 host regressions
+cover horizontal/vertical bridge art, preview costs, money limits,
+reverse-direction drags and CTY save/load persistence.
