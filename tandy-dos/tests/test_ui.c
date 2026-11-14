@@ -42,6 +42,18 @@ int main(void)
     assert(ui_toolbar_hit(64U, 106U) == -1);
     assert(ui_toolbar_hit(42U, 120U) == -1);
     assert(ui_toolbar_hit(10U, 140U) == -1);
+    /* All dropdowns render entirely over the city rather than
+     * touching the left-side tool buttons. */
+    {
+        unsigned int m;
+        for (m=MENU_FILE; m<=MENU_HELP; ++m) {
+            unsigned int left=ui_menu_origin((enum ui_menu)m)*8U;
+            assert(left>=UI_MAP_X);
+            assert(left+128U<=320U);
+            assert(UI_MAP_Y+ui_menu_count((enum ui_menu)m)*8U<=UI_FOOTER_Y);
+        }
+        assert(ui_menu_origin(MENU_FILE)==8U);
+    }
     assert(ui_menu_count(MENU_TOOLS) == 9U);
     assert(ui_dropdown_hit(MENU_TOOLS, 10U * 8U, 3U * 8U) == 1);
     assert(ui_dropdown_hit(MENU_TOOLS, 10U * 8U, 11U * 8U) == -1);
