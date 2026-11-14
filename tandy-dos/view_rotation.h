@@ -23,6 +23,17 @@ void view_rotation_minimap_bounds(unsigned int turns,
                                   unsigned int *x0,unsigned int *y0,
                                   unsigned int *x1,unsigned int *y1);
 
+/* The exact minimap pixel rectangle sampling an inclusive world
+ * rectangle, for all 0/90/180/270 degree view orientations.
+ * Pixel bounds are half-open and clipped to minimap dimensions.
+ */
+void view_rotation_minimap_rect(unsigned int turns,
+                                unsigned int left,unsigned int top,
+                                unsigned int right,unsigned int bottom,
+                                unsigned int width,unsigned int height,
+                                unsigned int *px0,unsigned int *py0,
+                                unsigned int *px1,unsigned int *py1);
+
 void view_rotation_clamp(unsigned int turns, unsigned int width,
                          unsigned int height, unsigned int *left,
                          unsigned int *top);
