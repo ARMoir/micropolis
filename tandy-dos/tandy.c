@@ -1418,13 +1418,12 @@ static void select_tool(unsigned int number)
     }
 }
 
-static void preview_refresh(unsigned int x0, unsigned int y0,
-                            unsigned int x1, unsigned int y1)
+static void preview_refresh(void)
 {
-    /* Repaint only stroke neighborhood; the translucent preview is
-     * composited by draw_city_tile and never edits the map.
+    /* The planner already knows which squares were NEW on this mouse
+     * movement. Repaint only those sprites, never the bounding box.
      */
-    redraw_zoning_brush(x0, y0, x1, y1);
+    redraw_new_preview();
     draw_status();
 }
 
@@ -1437,7 +1436,7 @@ static void build_preview_start(unsigned int x, unsigned int y)
     build_drag_x = x;
     build_drag_y = y;
     (void)placement_extend(x, y, x, y);
-    preview_refresh(x, y, x, y);
+    preview_refresh();
 }
 
 static void build_preview_move(unsigned int x, unsigned int y)
@@ -1450,7 +1449,7 @@ static void build_preview_move(unsigned int x, unsigned int y)
     (void)placement_extend(prev_x, prev_y, x, y);
     build_drag_x = x;
     build_drag_y = y;
-    preview_refresh(prev_x, prev_y, x, y);
+    preview_refresh();
 }
 
 static void build_preview_finish(void)
@@ -1462,18 +1461,18 @@ static void build_preview_finish(void)
     applied = placement_commit();
     build_drag_active = 0;
     last_action = applied ? "BUILT" : "BLOCKED";
-    redraw_zoning_brush(x0, y0, x1, y1);
+    redraw_recent_preview();
     if (applied != 0U) {
-        /* Zoning-only edits cannot alter conductor flags. Only actual
-         * roads/wires (or the legacy bulldoze/coal path) invalidate the
-         * expensive full-city electricity map.
+        /* Only a changed CONDBIT invalidates the power graph.
+         * Roads laid over wires keep conductivity and are scan-free.
+         * New electric wires/crossings still request a scan.
          */
-        if (selected_tool == EDIT_ROAD || selected_tool == EDIT_POWER)
+        if (placement_changed_power())
             simulation_mark_power_dirty();
-        /* Static minimap and sidebar funds are only repainted once
-         * per completed drag, not on each V20 mouse polling event.
+        /* The 56x44 minimap is sampled from world tile coordinates;
+         * update only its pixels corresponding to funded edits.
          */
-        draw_overview();
+        draw_overview_world_rect(x0,y0,x1,y1,1);
         draw_city_stats();
     }
     draw_status();
@@ -1487,7 +1486,7 @@ static void build_preview_cancel(void)
     placement_bounds(&x0, &y0, &x1, &y1);
     placement_cancel();
     build_drag_active = 0;
-    redraw_zoning_brush(x0, y0, x1, y1);
+    redraw_recent_preview();
     last_action = "CANCELLED";
     draw_status();
 }
