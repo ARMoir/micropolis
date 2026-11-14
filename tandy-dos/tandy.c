@@ -605,6 +605,46 @@ static void draw_overview(void)
     draw_overview_camera();
 }
 
+/* A single bulldozed square changes at most one sampled minimap pixel
+ * at 56x44 resolution (many original 120x100 map squares are smaller
+ * than one minimap pixel). Avoid repainting all 2464 pixels for every
+ * mouse movement while dragging the bulldozer.
+ *
+ * Inverted nearest-neighbor coordinate ranges are exact, including at
+ * 90/270-degree rotated views; leave the yellow viewport outline intact.
+ */
+static void draw_overview_world_tile(unsigned int wx, unsigned int wy)
+{
+    unsigned int vx,vy,world_w,world_h,px,py,x0,x1,y0,y1;
+    unsigned char color;
+    if (wx>=CITY_WIDTH || wy>=CITY_HEIGHT)
+        return;
+    view_rotation_from_world(map_turns,wx,wy,&vx,&vy);
+    world_w=view_rotation_width(map_turns);
+    world_h=view_rotation_height(map_turns);
+    x0=(vx*UI_MINIMAP_W+world_w-1U)/world_w;
+    x1=((vx+1U)*UI_MINIMAP_W+world_w-1U)/world_w;
+    y0=(vy*UI_MINIMAP_H+world_h-1U)/world_h;
+    y1=((vy+1U)*UI_MINIMAP_H+world_h-1U)/world_h;
+    if (x1>UI_MINIMAP_W) x1=UI_MINIMAP_W;
+    if (y1>UI_MINIMAP_H) y1=UI_MINIMAP_H;
+    for(py=y0;py<y1;++py)
+        for(px=x0;px<x1;++px) {
+            color=overview_color(px,py);
+            if (overview_valid &&
+                px>=overview_old_x &&
+                px<overview_old_x+overview_old_w &&
+                py>=overview_old_y &&
+                py<overview_old_y+overview_old_h &&
+                (px==overview_old_x ||
+                 px==overview_old_x+overview_old_w-1U ||
+                 py==overview_old_y ||
+                 py==overview_old_y+overview_old_h-1U))
+                color=14U;
+            pixel(UI_MINIMAP_X+px,UI_MINIMAP_Y+py,color);
+        }
+}
+
 /* Only the selected tool's TWO affected buttons need repainting.
  * A drag commit never repaints the 64-pixel-wide sidebar controls;
  * it updates the minimap and top treasury figures only.
