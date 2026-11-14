@@ -45,6 +45,10 @@ static void mature_region(unsigned int x,unsigned int y)
     unsigned int i,j;
     for(j=0U;j<2U;++j)
         for(i=0U;i<2U;++i) {
+            /* Demo city includes original RCI buildings at x=70,y=70.
+             * Clear the test rectangle before placing NEWER overlays.
+             */
+            city_set(x+i,y+j,0U);
             assert(zoning_set(x+i,y+j,ZONE_IND));
             assert(zoning_set_development(x+i,y+j,3U));
         }
