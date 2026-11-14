@@ -80,6 +80,34 @@ void view_rotation_minimap_bounds(unsigned int turns,
     if (*y1>height) *y1=height;
 }
 
+void view_rotation_minimap_rect(unsigned int turns,
+                                unsigned int left,unsigned int top,
+                                unsigned int right,unsigned int bottom,
+                                unsigned int width,unsigned int height,
+                                unsigned int *px0,unsigned int *py0,
+                                unsigned int *px1,unsigned int *py1)
+{
+    unsigned int vx,vy,minx,maxx,miny,maxy,mw,mh,i,wx,wy;
+    mw=view_rotation_width(turns);
+    mh=view_rotation_height(turns);
+    minx=mw; maxx=0U; miny=mh; maxy=0U;
+    for(i=0U;i<4U;++i) {
+        wx=(i&1U)?right:left;
+        wy=(i&2U)?bottom:top;
+        view_rotation_from_world(turns,wx,wy,&vx,&vy);
+        if(vx<minx)minx=vx;
+        if(vx>maxx)maxx=vx;
+        if(vy<miny)miny=vy;
+        if(vy>maxy)maxy=vy;
+    }
+    *px0=(minx*width+mw-1U)/mw;
+    *py0=(miny*height+mh-1U)/mh;
+    *px1=((maxx+1U)*width+mw-1U)/mw;
+    *py1=((maxy+1U)*height+mh-1U)/mh;
+    if(*px1>width)*px1=width;
+    if(*py1>height)*py1=height;
+}
+
 void view_rotation_clamp(unsigned int turns, unsigned int width,
                          unsigned int height, unsigned int *left,
                          unsigned int *top)
