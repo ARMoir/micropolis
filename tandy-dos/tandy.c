@@ -958,6 +958,48 @@ static void apply_zone_stroke(unsigned int x0, unsigned int y0,
     draw_status();
 }
 
+/* A drag preview changes the pixels of ONLY its newly touched cells.
+ * The placement module gives us a compact list for the most recent
+ * Bresenham segment; repeated mouse polling of the same square emits
+ * no work. Road/zone neighbors are repaired after the actual commit.
+ */
+static void redraw_new_preview(void)
+{
+    unsigned int i,mx,my,sx,sy;
+    for(i=0U;i<placement_new_count();++i) {
+        placement_new_cell(i,&mx,&my);
+        if(world_to_visible(mx,my,&sx,&sy))
+            draw_display_tile(sx,sy);
+    }
+    if(placement_new_count()!=0U)
+        draw_cursor();
+}
+
+/* The existing packed 3KB placement grid survives until the next
+ * preview begins. Walk only 32x21 visible screen squares after mouse-up,
+ * rather than traversing an enormous diagonal drag's world bounding box.
+ * Its changed squares plus direct neighbors cover zone border and
+ * road/wire adjacency changes; canceled previews need only their own
+ * modified pixels restored, but one-neighbor restoration is harmless.
+ */
+static void redraw_recent_preview(void)
+{
+    unsigned int sx,sy,mx,my;
+    for(sy=0U;sy<VIEW_H;++sy)
+        for(sx=0U;sx<VIEW_W;++sx) {
+            display_to_world(sx,sy,&mx,&my);
+            if(placement_recent_at(mx,my)!=PREVIEW_NONE ||
+               (mx>0U && placement_recent_at(mx-1U,my)!=PREVIEW_NONE) ||
+               (mx+1U<CITY_WIDTH &&
+                placement_recent_at(mx+1U,my)!=PREVIEW_NONE) ||
+               (my>0U && placement_recent_at(mx,my-1U)!=PREVIEW_NONE) ||
+               (my+1U<CITY_HEIGHT &&
+                placement_recent_at(mx,my+1U)!=PREVIEW_NONE))
+                draw_display_tile(sx,sy);
+        }
+    draw_cursor();
+}
+
 /* Bottom row 23 is input/debug state, row 24 is the latest action,
  * simulation diagnostic or the live construction preview. Statistics
  * (date, population, employment and funds) never appear here.
