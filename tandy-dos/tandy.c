@@ -63,6 +63,10 @@ static int zone_drag_active = 0;
 static int zone_erase_active = 0;
 static unsigned int zone_drag_x = 0U, zone_drag_y = 0U;
 static int zone_minimap_dirty = 0;
+/* Accumulate only the touched world rectangle while right-dragging a
+ * zoning eraser; flush those sampled minimap pixels on release.
+ */
+static unsigned int zone_dirty_x0,zone_dirty_y0,zone_dirty_x1,zone_dirty_y1;
 static int build_drag_active = 0;
 /* Do not run a whole-city power scan in the middle of a mouse-held
  * bulldozer stroke. A single dirty flag is processed after release.
@@ -987,7 +991,20 @@ static void apply_zone_stroke(unsigned int x0, unsigned int y0,
     if (changed) {
         redraw_zoning_brush(x0, y0, x1, y1);
         last_action = kind == ZONE_NONE ? "UNZONED" : "ZONED";
-        zone_minimap_dirty = 1;
+        if (!zone_minimap_dirty) {
+            zone_dirty_x0=x0<x1?x0:x1;
+            zone_dirty_y0=y0<y1?y0:y1;
+            zone_dirty_x1=x0>x1?x0:x1;
+            zone_dirty_y1=y0>y1?y0:y1;
+        } else {
+            unsigned int lo=x0<x1?x0:x1, hi=x0>x1?x0:x1;
+            unsigned int ly=y0<y1?y0:y1, hy=y0>y1?y0:y1;
+            if(lo<zone_dirty_x0)zone_dirty_x0=lo;
+            if(ly<zone_dirty_y0)zone_dirty_y0=ly;
+            if(hi>zone_dirty_x1)zone_dirty_x1=hi;
+            if(hy>zone_dirty_y1)zone_dirty_y1=hy;
+        }
+        zone_minimap_dirty=1;
     } else {
         last_action = "BLOCKED";
     }
@@ -1806,7 +1823,8 @@ static void handle_mouse(void)
         zone_erase_active = 0;
     if (right_release && zone_minimap_dirty) {
         mouse_pointer_hide();
-        draw_overview();
+        draw_overview_world_rect(zone_dirty_x0,zone_dirty_y0,
+                                 zone_dirty_x1,zone_dirty_y1,0);
         mouse_pointer_show();
         zone_minimap_dirty = 0;
     }
@@ -2038,7 +2056,8 @@ static void keyboard_loop(void)
         else if (ascii == ' ') {
             apply_selected_tool();
             if (zone_minimap_dirty) {
-                draw_overview();
+                draw_overview_world_rect(zone_dirty_x0,zone_dirty_y0,
+                                         zone_dirty_x1,zone_dirty_y1,0);
                 zone_minimap_dirty = 0;
             }
         }
