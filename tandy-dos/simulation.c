@@ -22,6 +22,11 @@
 #define ZONE_BIT 1024U
 #define PWR_BIT 32768U
 #define SIM_CHUNK_LIMIT 320U
+/* Three blocks to the nearest road/rail is a reasonable walk from a
+ * small 1x1 home. The old rule required a directly adjacent road.
+ */
+#define TRANSPORT_RADIUS 3
+#define LOT_POWER_BYTES ((CITY_TILES + 7U) / 8U)
 
 static struct sim_statistics stats;
 static unsigned int cursor = 0U;
@@ -43,6 +48,41 @@ static unsigned int lots_res, lots_com, lots_ind;
 static unsigned int roads, wires, plants;
 static unsigned int growth_this_month = 0U, ready_month = 0U;
 static unsigned int no_road_month = 0U, no_power_month = 0U;
+/* 1500 bytes: which occupied small lots are connected to a source?
+ * A developed house/shop/factory can relay electricity to an ADJACENT
+ * developed lot. Empty/undeveloped squares never carry power.
+ * Unlike adding CONDBIT to city tiles, this never mutates the original
+ * CTY file or triggers a city-wide BFS when a house grows.
+ */
+static unsigned char lot_power[LOT_POWER_BYTES];
+static void clear_lot_power(void)
+{
+    unsigned int i;
+    for(i=0U;i<LOT_POWER_BYTES;++i)
+        lot_power[i]=0U;
+}
+static unsigned int lot_power_index(unsigned int x,unsigned int y)
+{
+    return x*CITY_HEIGHT+y;
+}
+static int lot_is_powered(unsigned int x,unsigned int y)
+{
+    unsigned int pos;
+    if(x>=CITY_WIDTH || y>=CITY_HEIGHT ||
+       zoning_at(x,y)==ZONE_NONE ||
+       zoning_development_at(x,y)==0U)
+        return 0;
+    pos=lot_power_index(x,y);
+    return (lot_power[pos>>3] & (1U<<(pos&7U)))!=0U;
+}
+static void set_lot_power(unsigned int x,unsigned int y,int enabled)
+{
+    unsigned int pos=lot_power_index(x,y);
+    unsigned char mask=(unsigned char)(1U<<(pos&7U));
+    if(enabled) lot_power[pos>>3] |= mask;
+    else lot_power[pos>>3] &= (unsigned char)~mask;
+}
+
 
 /* Avoid signed integer overflow on both 8086 and native test hosts. */
 static unsigned int random16(void)
@@ -72,23 +112,55 @@ static int wire_tile(unsigned int id)
 {
     return id >= 208U && id <= 223U;
 }
-static int transport_access(unsigned int x, unsigned int y)
+/* A plot may be up to three Manhattan-distance squares from a
+ * transport line. This is bounded by 24 nearby cells, but short
+ * circuits on the first match. It is evaluated only for zoned lots
+ * and does not require any city-wide transport rescan after roads.
+ */
+static int transport_access(unsigned int x,unsigned int y)
 {
-    if (x > 0U && transport_tile(city_at(x-1U,y) & TILE_MASK)) return 1;
-    if (x+1U < CITY_WIDTH &&
-        transport_tile(city_at(x+1U,y) & TILE_MASK)) return 1;
-    if (y > 0U && transport_tile(city_at(x,y-1U) & TILE_MASK)) return 1;
-    if (y+1U < CITY_HEIGHT &&
-        transport_tile(city_at(x,y+1U) & TILE_MASK)) return 1;
+    int d,dx,dy,nx,ny;
+    if(x>=CITY_WIDTH || y>=CITY_HEIGHT)return 0;
+    for(d=1;d<=TRANSPORT_RADIUS;++d)
+        for(dx=-d;dx<=d;++dx) {
+            dy=d-(dx<0?-dx:dx);
+            nx=(int)x+dx;
+            if(nx<0 || nx>=CITY_WIDTH)continue;
+            ny=(int)y+dy;
+            if(ny>=0 && ny<CITY_HEIGHT &&
+               transport_tile(city_at((unsigned int)nx,
+                                      (unsigned int)ny)&TILE_MASK))
+                return 1;
+            if(dy && (ny=(int)y-dy)>=0 && ny<CITY_HEIGHT &&
+               transport_tile(city_at((unsigned int)nx,
+                                      (unsigned int)ny)&TILE_MASK))
+                return 1;
+        }
     return 0;
 }
-static int has_power(unsigned int x, unsigned int y)
+
+/* A source powers its own square and its direct neighbors. Occupied
+ * independently zoned squares can then pass that power to adjacent
+ * OCCUPIED squares. This single-pass frontier progresses during the
+ * normal 80..320-square simulation chunks; no extra full-map walk.
+ * Cached relays reset immediately whenever conductors or zoning
+ * change, so abandoned islands cannot continue supplying electricity.
+ */
+static int has_power(unsigned int x,unsigned int y)
 {
-    if (engine_is_powered(x,y)) return 1;
-    if (x > 0U && engine_is_powered(x-1U,y)) return 1;
-    if (x+1U < CITY_WIDTH && engine_is_powered(x+1U,y)) return 1;
-    if (y > 0U && engine_is_powered(x,y-1U)) return 1;
-    if (y+1U < CITY_HEIGHT && engine_is_powered(x,y+1U)) return 1;
+    if (engine_is_powered(x,y) || lot_is_powered(x,y)) return 1;
+    if (x>0U &&
+        (engine_is_powered(x-1U,y) || lot_is_powered(x-1U,y)))
+        return 1;
+    if (x+1U<CITY_WIDTH &&
+        (engine_is_powered(x+1U,y) || lot_is_powered(x+1U,y)))
+        return 1;
+    if (y>0U &&
+        (engine_is_powered(x,y-1U) || lot_is_powered(x,y-1U)))
+        return 1;
+    if (y+1U<CITY_HEIGHT &&
+        (engine_is_powered(x,y+1U) || lot_is_powered(x,y+1U)))
+        return 1;
     return 0;
 }
 /* O(1) local tile/neighborhood check, used only by the magnifying glass.
@@ -202,6 +274,15 @@ static int process_zone(unsigned int x, unsigned int y,
         last_radius = 0U;
         last_change_valid = 1U;
     }
+    /* Newly developed houses can carry electricity to adjoining
+     * developed small lots. Never mark an empty zone as a conductor.
+     * If a previously powered lot becomes vacant, clear the 1500-byte
+     * relay cache (not the expensive original-city electrical BFS).
+     */
+    if(next!=0U && power)
+        set_lot_power(x,y,1);
+    else if(stage!=0U && next==0U && lot_is_powered(x,y))
+        clear_lot_power();
     if (kind == ZONE_RES)
         pop_res += zone_developed_population(kind,next);
     else if (kind == ZONE_COM)
@@ -219,24 +300,13 @@ static int process_zone(unsigned int x, unsigned int y,
  * nine original sprite IDs before changing anything so edited cities,
  * roads and utilities are never overwritten.
  */
-static int original_zone_transport(unsigned int x, unsigned int y)
+static int original_zone_transport(unsigned int x,unsigned int y)
 {
-    int k, xx, yy;
-    for (k = -1; k <= 1; ++k) {
-        xx = (int)x + k;
-        yy = (int)y + k;
-        if (x >= 2U && transport_tile(city_at(x-2U,(unsigned int)yy) & TILE_MASK))
-            return 1;
-        if (x + 2U < CITY_WIDTH &&
-            transport_tile(city_at(x+2U,(unsigned int)yy) & TILE_MASK))
-            return 1;
-        if (y >= 2U && transport_tile(city_at((unsigned int)xx,y-2U) & TILE_MASK))
-            return 1;
-        if (y + 2U < CITY_HEIGHT &&
-            transport_tile(city_at((unsigned int)xx,y+2U) & TILE_MASK))
-            return 1;
-    }
-    return 0;
+    /* A 3x3 zone footprint extends 1 square from its center; the same
+     * three-square walk includes the original frontage and the first
+     * additional block beyond it.
+     */
+    return transport_access(x,y);
 }
 
 static int process_original_zone(unsigned int x, unsigned int y,
@@ -430,6 +500,7 @@ void simulation_init(void)
     scan_x = scan_y = 0U;
     changed = 0U;
     power_dirty = 1U;
+    clear_lot_power();
     power_scan_count = 0U;
     last_change_valid = 0U;
     last_home_valid = 0U;
@@ -453,7 +524,18 @@ void simulation_init(void)
     stats.wire_tiles = stats.plants = 0U;
     update_date();
 }
-void simulation_mark_power_dirty(void) { power_dirty = 1U; }
+void simulation_mark_power_dirty(void)
+{
+    power_dirty=1U;
+    clear_lot_power();
+}
+void simulation_mark_lots_dirty(void)
+{
+    /* Changing/removing 1x1 zone plots is not an electrical network
+     * edit. Clear cached lot relays only (1500 bytes), NOT 12K BFS.
+     */
+    clear_lot_power();
+}
 const struct sim_statistics *simulation_stats(void) { return &stats; }
 void simulation_last_change(unsigned int *x, unsigned int *y)
 {
