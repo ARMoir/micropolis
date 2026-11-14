@@ -9,6 +9,12 @@
 #define SIM_EVENT_TILE  1U
 #define SIM_EVENT_MONTH 2U
 
+/* Quick inspection flags for an independently zoned 1x1 lot.
+ * Transport accepts either authentic roads or railway tracks.
+ */
+#define SIM_SERVICE_TRANSPORT 1U
+#define SIM_SERVICE_POWER     2U
+
 struct sim_statistics {
     unsigned long residents;
     unsigned long commercial_jobs;
@@ -44,6 +50,7 @@ unsigned int simulation_progress(void);
 /* Debug/profiling: full power-network scans only for network edits, not
  * ordinary building density growth. */
 unsigned int simulation_power_scan_count(void);
+unsigned int simulation_lot_service(unsigned int x, unsigned int y);
 /* The coordinates of the most recent visible growth event remain valid
  * until the next city is loaded and simulation_init() is called.
  */
