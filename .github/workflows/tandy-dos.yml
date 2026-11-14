@@ -48,6 +48,9 @@ jobs:
             -o test-ui tandy-dos/ui.c tandy-dos/tests/test_ui.c
           ./test-ui
           cc -std=c89 -Wall -Wextra -pedantic \
+            -o test-pointer-policy tandy-dos/tests/test_pointer_policy.c
+          ./test-pointer-policy
+          cc -std=c89 -Wall -Wextra -pedantic \
             -o test-tool-art tandy-dos/tool_art.c tandy-dos/ui.c \
             tandy-dos/tests/test_tool_art.c
           ./test-tool-art

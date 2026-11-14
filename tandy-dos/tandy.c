@@ -22,6 +22,7 @@
 #include "menu_font.h"
 #include "view_rotation.h"
 #include "tool_art.h"
+#include "pointer_policy.h"
 
 #define SCREEN_W 320U
 #define SCREEN_H 200U
@@ -1151,7 +1152,10 @@ static void draw_status(void)
     draw_status_text(24U,status,status_shadow,&status_valid,11U);
 }
 
-/* The eight-pixel software pointer is much smaller than repainting a tile. */
+/* The eight-pixel software arrow is only needed for UI navigation.
+ * Over the playable city, the solid yellow tile-selection square is
+ * already the pointer: do not draw a second, flickering arrow there.
+ */
 static void mouse_pointer_hide(void)
 {
     unsigned int row, n, dst;
@@ -1172,7 +1176,9 @@ static void mouse_pointer_show(void)
         "X       ", "XX      ", "X.X     ", "X..X    ",
         "X...X   ", "X....X  ", "X.....X ", "XXXXXXXX"
     };
-    if (!mouse_on || mouse_drawn)
+    if (!mouse_on || mouse_drawn ||
+        !pointer_should_show(mouse_x,mouse_y,
+                             open_menu!=MENU_NONE,info_page!=0))
         return;
     px = (mouse_x > 311U ? 312U : mouse_x) & ~1U;
     py = mouse_y > 192U ? 192U : mouse_y;
@@ -1761,9 +1767,10 @@ static void show_menu(enum ui_menu menu)
     mouse_pointer_show();
 }
 
-/* Mouse movement paints no pixels besides a tiny 8x8 arrow, unless it
- * crosses into a new map tile. Dragging only edits single-tile tools,
- * preventing accidental 3x3/4x4 buildings during a mouse stroke.
+/* Mouse movement paints only the solid tile-selection square in the city.
+ * The software arrow appears only over menus, toolbox and non-city UI.
+ * Dragging only edits single-tile tools, preventing accidental 3x3/4x4
+ * buildings during a mouse stroke.
  */
 /* Roads, wires and RCI zones now share the mouse preview transaction;
  * bulldoze continues as immediate single-cell erasing.
@@ -1937,6 +1944,7 @@ static void update_power_badges(void)
 {
     unsigned int revision=simulation_power_visual_revision();
     unsigned int checked=0U;
+    int redrawn=0;
     if(revision!=badge_revision) {
         badge_revision=revision;
         badge_sweep_pos=0U;
@@ -1950,10 +1958,17 @@ static void update_power_badges(void)
         display_to_world(sx,sy,&wx,&wy);
         warning=simulation_needs_power_warning(wx,wy);
         if(warning!=badge_shadow_get(index)) {
+            /* Usually only an offscreen cursor is showing, but the
+             * arrow can straddle the city/sidebar border. Protect its
+             * saved background only when an actual badge changes.
+             */
+            mouse_pointer_hide();
+            redrawn=1;
             draw_display_tile(sx,sy);
             if(sx==cursor_x && sy==cursor_y) draw_cursor();
         }
     }
+    if(redrawn) mouse_pointer_show();
 }
 
 /* BIOS time-of-day ticks are ~18.2 Hz and wrap at 16-bit CX:DX.
@@ -1982,8 +1997,13 @@ static void simulation_idle(void)
         doze_mouse_active)
         return;
     amount = 80U * simulation_speed();
-    mouse_pointer_hide();
     event = simulation_advance(amount);
+    /* The old unconditional hide/show blinked the arrow ~9 times/sec
+     * even when the simulation did not redraw a single pixel.
+     * Only interrupt the arrow for real tile/status rendering.
+     */
+    if (event & (SIM_EVENT_TILE | SIM_EVENT_MONTH))
+        mouse_pointer_hide();
     if (event & SIM_EVENT_TILE) {
         simulation_last_change(&tx, &ty);
         if (simulation_last_change_radius() != 0U) {
@@ -2005,7 +2025,8 @@ static void simulation_idle(void)
         draw_status();
     }
     update_power_badges();
-    mouse_pointer_show();
+    if (event & (SIM_EVENT_TILE | SIM_EVENT_MONTH))
+        mouse_pointer_show();
 }
 
 static void keyboard_loop(void)

@@ -903,3 +903,22 @@ repaints **only badges that change**. Normal one-tile scrolling shifts the
 shadow alongside existing VRAM pixels, without redrawing the whole city.
 Tests cover six-versus-seven-step transport reach for roads and rails,
 unpowered empty lots, original 3x3 centers and power restoration.
+
+## Non-blinking mouse pointer and city selection
+
+The city's **solid yellow 8x8 tile cursor** is now the only pointer
+shown while the mouse is over the 32x21 city viewport. The software
+arrow is suppressed there. Outside the map it remains available over
+the toolbar, top menus, footer and help/menu overlays, so pixel-accurate
+clickable controls remain easy to use.
+
+Previously the simulation tick unconditionally hid and redrew the
+software arrow even when nothing had changed, causing persistent
+flashing on the NEC V20. It now leaves the arrow untouched on idle
+simulation steps, interrupting it only for actual changes to city
+sprites, status or power badges. Mouse movement also updates the
+city-selection square only when the active tile changes.
+
+A host C89 regression verifies boundary transitions and the menu/help
+overlay exception. Open Watcom still compiles the native DOS build;
+visible mouse behavior must be checked on real hardware.
