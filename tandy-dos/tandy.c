@@ -76,6 +76,28 @@ static unsigned int build_drag_x = 0U, build_drag_y = 0U;
 static unsigned int sim_last_clock = 0U;
 static int sim_clock_started = 0;
 
+/* One bit per visible 8x8 tile (84 bytes for the 32x21 viewport).
+ * The badge is STATIC; a power-state change triggers a budgeted scan
+ * and only tiles whose badge changes are repainted.
+ */
+#define BADGE_ROW_BYTES (VIEW_W / 8U)
+#define BADGE_CACHE_BYTES (BADGE_ROW_BYTES * VIEW_H)
+#define BADGE_CHECKS_PER_TICK 24U
+static unsigned char badge_shadow[BADGE_CACHE_BYTES];
+static unsigned int badge_revision = 0U;
+static unsigned int badge_sweep_pos = VIEW_W * VIEW_H;
+
+static int badge_shadow_get(unsigned int position)
+{
+    return (badge_shadow[position>>3] & (1U<<(position&7U)))!=0U;
+}
+static void badge_shadow_set(unsigned int position, int warning)
+{
+    unsigned char mask=(unsigned char)(1U<<(position&7U));
+    if(warning) badge_shadow[position>>3] |= mask;
+    else badge_shadow[position>>3] &= (unsigned char)~mask;
+}
+
 /* Software 8x8 mouse pointer. Driver hardware cursor is never shown:
  * standard mouse drivers may not support Tandy 320x200 mode 9.
  * Saving 32 packed VRAM bytes allows exact recovery of original art.
@@ -474,11 +496,31 @@ static void draw_city_tile(unsigned int px, unsigned int py,
  * AH=09h writes ONE glyph at a fixed cursor without auto-advancing.
  * Explicit positioning also guarantees no accidental screen scroll.
  */
+/* Red bolt with a dark silhouette, placed on the 8x8 zone center.
+ * This is a one-time overlay when a tile is drawn, never blinking.
+ */
+static void draw_no_power_badge(unsigned int px, unsigned int py)
+{
+    box_pixels(px+3U,py,5U,7U,0U);
+    pixel(px+5U,py+1U,12U);
+    pixel(px+4U,py+2U,12U);
+    pixel(px+3U,py+3U,12U);
+    pixel(px+6U,py+3U,12U);
+    pixel(px+5U,py+4U,12U);
+    pixel(px+4U,py+5U,12U);
+    pixel(px+3U,py+6U,12U);
+}
+
 static void draw_display_tile(unsigned int sx, unsigned int sy)
 {
     unsigned int wx,wy;
+    int warning;
     display_to_world(sx,sy,&wx,&wy);
     draw_city_tile(VIEW_X+sx*8U,VIEW_Y+sy*8U,wx,wy);
+    warning=simulation_needs_power_warning(wx,wy);
+    badge_shadow_set(sy*VIEW_W+sx,warning);
+    if(warning)
+        draw_no_power_badge(VIEW_X+sx*8U,VIEW_Y+sy*8U);
 }
 
 static void bios_text(unsigned int row, unsigned int column,
@@ -1284,6 +1326,18 @@ static void scroll_one_tile(unsigned int previous_x, unsigned int previous_y)
     unsigned int x, y, dst, src;
 
     if (scroll_y == previous_y && scroll_x == previous_x + 1U) {
+        /* Shift the 84-byte badge shadow with the image, not with the
+         * world; only the newly exposed edge needs a fresh lookup.
+         */
+        for(y=0U;y<VIEW_H;++y) {
+            unsigned int row=y*BADGE_ROW_BYTES;
+            for(x=0U;x<BADGE_ROW_BYTES;++x) {
+                unsigned char carry=(x+1U<BADGE_ROW_BYTES) ?
+                    (unsigned char)(badge_shadow[row+x+1U]<<7U) : 0U;
+                badge_shadow[row+x]=(unsigned char)
+                    ((badge_shadow[row+x]>>1U)|carry);
+            }
+        }
         /* Camera right, image left. Source and destination overlap,
          * so always copy forward from left to right.
          */
@@ -1296,6 +1350,16 @@ static void scroll_one_tile(unsigned int previous_x, unsigned int previous_y)
             draw_display_tile(VIEW_W-1U,y);
 
     } else if (scroll_y == previous_y && previous_x == scroll_x + 1U) {
+        for(y=0U;y<VIEW_H;++y) {
+            unsigned int row=y*BADGE_ROW_BYTES;
+            for(x=BADGE_ROW_BYTES;x>0U;--x) {
+                unsigned int i=x-1U;
+                unsigned char carry=i>0U ?
+                    (unsigned char)(badge_shadow[row+i-1U]>>7U) : 0U;
+                badge_shadow[row+i]=(unsigned char)
+                    ((badge_shadow[row+i]<<1U)|carry);
+            }
+        }
         /* Camera left, image right: copy backward to retain overlapping
          * source bytes; original bytewise result is preserved exactly.
          */
@@ -1308,6 +1372,8 @@ static void scroll_one_tile(unsigned int previous_x, unsigned int previous_y)
             draw_display_tile(0U,y);
 
     } else if (scroll_x == previous_x && scroll_y == previous_y + 1U) {
+        memmove(badge_shadow,badge_shadow+BADGE_ROW_BYTES,
+                BADGE_CACHE_BYTES-BADGE_ROW_BYTES);
         /* Camera down, image up: each four-bank scanline is 128 bytes
          * wide. Copy full rows in existing top-to-bottom order.
          */
@@ -1320,6 +1386,8 @@ static void scroll_one_tile(unsigned int previous_x, unsigned int previous_y)
             draw_display_tile(x,VIEW_H-1U);
 
     } else if (scroll_x == previous_x && previous_y == scroll_y + 1U) {
+        memmove(badge_shadow+BADGE_ROW_BYTES,badge_shadow,
+                BADGE_CACHE_BYTES-BADGE_ROW_BYTES);
         /* Camera up, image down: work bottom-to-top. */
         for (y = VIEW_Y+VIEW_H*8U-1U; y >= VIEW_Y+8U; --y) {
             dst = vram_offset(VIEW_X,y);
@@ -1394,6 +1462,8 @@ static void render_full(void)
     else
         draw_cursor();
 
+    badge_revision=simulation_power_visual_revision();
+    badge_sweep_pos=VIEW_W*VIEW_H;
     mouse_pointer_show();
 }
 
@@ -1859,6 +1929,33 @@ static void handle_mouse(void)
 }
 
 
+/* Check a small fraction of the visible city only after real changes
+ * to the electrical network or adjacent-lot power relays. Draw only
+ * changed 8x8 tiles, leaving the toolbar and rest of the city intact.
+ */
+static void update_power_badges(void)
+{
+    unsigned int revision=simulation_power_visual_revision();
+    unsigned int checked=0U;
+    if(revision!=badge_revision) {
+        badge_revision=revision;
+        badge_sweep_pos=0U;
+    }
+    while(badge_sweep_pos<VIEW_W*VIEW_H &&
+          checked++<BADGE_CHECKS_PER_TICK) {
+        unsigned int index=badge_sweep_pos++;
+        unsigned int sx=index%VIEW_W,sy=index/VIEW_W;
+        unsigned int wx,wy;
+        int warning;
+        display_to_world(sx,sy,&wx,&wy);
+        warning=simulation_needs_power_warning(wx,wy);
+        if(warning!=badge_shadow_get(index)) {
+            draw_display_tile(sx,sy);
+            if(sx==cursor_x && sy==cursor_y) draw_cursor();
+        }
+    }
+}
+
 /* BIOS time-of-day ticks are ~18.2 Hz and wrap at 16-bit CX:DX.
  * Work is limited to 80..320 cells per tick, keeping keyboard and serial
  * mouse handling responsive on the 7 MHz V20. Never process during a
@@ -1907,6 +2004,7 @@ static void simulation_idle(void)
         draw_city_stats();
         draw_status();
     }
+    update_power_badges();
     mouse_pointer_show();
 }
 

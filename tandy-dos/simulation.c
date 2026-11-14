@@ -22,10 +22,10 @@
 #define ZONE_BIT 1024U
 #define PWR_BIT 32768U
 #define SIM_CHUNK_LIMIT 320U
-/* Three blocks to the nearest road/rail is a reasonable walk from a
- * small 1x1 home. The old rule required a directly adjacent road.
+/* Six Manhattan-distance steps to the nearest road OR rail.
+ * Both small lots and original 3x3 zones use the same access test.
  */
-#define TRANSPORT_RADIUS 3
+#define TRANSPORT_RADIUS 6
 #define LOT_POWER_BYTES ((CITY_TILES + 7U) / 8U)
 
 static struct sim_statistics stats;
@@ -55,11 +55,16 @@ static unsigned int no_road_month = 0U, no_power_month = 0U;
  * CTY file or triggers a city-wide BFS when a house grows.
  */
 static unsigned char lot_power[LOT_POWER_BYTES];
+/* Changes only when effective electrical service may change. The GUI
+ * checks visible badges in small chunks, never on an animation timer.
+ */
+static unsigned int power_visual_revision = 0U;
 static void clear_lot_power(void)
 {
     unsigned int i;
     for(i=0U;i<LOT_POWER_BYTES;++i)
         lot_power[i]=0U;
+    ++power_visual_revision;
 }
 static unsigned int lot_power_index(unsigned int x,unsigned int y)
 {
@@ -79,8 +84,10 @@ static void set_lot_power(unsigned int x,unsigned int y,int enabled)
 {
     unsigned int pos=lot_power_index(x,y);
     unsigned char mask=(unsigned char)(1U<<(pos&7U));
+    unsigned char old=lot_power[pos>>3];
     if(enabled) lot_power[pos>>3] |= mask;
     else lot_power[pos>>3] &= (unsigned char)~mask;
+    if(old!=lot_power[pos>>3]) ++power_visual_revision;
 }
 
 
@@ -112,10 +119,9 @@ static int wire_tile(unsigned int id)
 {
     return id >= 208U && id <= 223U;
 }
-/* A plot may be up to three Manhattan-distance squares from a
- * transport line. This is bounded by 24 nearby cells, but short
- * circuits on the first match. It is evaluated only for zoned lots
- * and does not require any city-wide transport rescan after roads.
+/* A plot may be up to six Manhattan-distance steps from a road/rail.
+ * The bounded local search short-circuits on the first match; edits
+ * require no city-wide road/rail scan.
  */
 static int transport_access(unsigned int x,unsigned int y)
 {
@@ -163,6 +169,28 @@ static int has_power(unsigned int x,unsigned int y)
         return 1;
     return 0;
 }
+/* Determine whether a zone needs a static no-power badge. The original
+ * 3x3 buildings have one ZONE_BIT center; custom 1x1 zoning may be
+ * empty or developed and must also warn before an unpowered lot grows.
+ * Ordinary roads, rails, terrain and unzoned lots never show badges.
+ */
+int simulation_needs_power_warning(unsigned int x, unsigned int y)
+{
+    unsigned short tile;
+    unsigned int id;
+    if(x>=CITY_WIDTH || y>=CITY_HEIGHT) return 0;
+    tile=city_at(x,y);
+    id=tile&TILE_MASK;
+    if(!(((tile&ZONE_BIT)!=0U && id>=240U) ||
+         ((id==0U || (id>=21U && id<=43U)) &&
+          zoning_at(x,y)!=ZONE_NONE))) return 0;
+    return !has_power(x,y);
+}
+unsigned int simulation_power_visual_revision(void)
+{
+    return power_visual_revision;
+}
+
 /* O(1) local tile/neighborhood check, used only by the magnifying glass.
  * It doesn't trigger or wait for the full electricity BFS.
  */
@@ -573,6 +601,7 @@ unsigned int simulation_advance(unsigned int max_tiles)
         stats.powered_tiles = engine_power_scan();
         ++power_scan_count;
         power_dirty = 0U;
+        ++power_visual_revision; /* electrical graph just changed */
     }
     changed = 0U;
     while (steps < max_tiles && cursor < CITY_TILES) {

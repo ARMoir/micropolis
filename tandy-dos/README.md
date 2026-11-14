@@ -880,3 +880,26 @@ flags, city histories and other metadata remain identical.
 Copy the newly released `HAPPISLE.CTY` to your DOS CompactFlash card
 alongside `MICROPOL.EXE` and `TILES.DAT`. Existing previously
 saved `CITYnnnn.CTY` files are not modified automatically.
+
+## Six-tile transport access and static no-power badges
+
+The Tandy 1x1 and original 3x3 zone service checks now accept either a
+road or a railway within **six Manhattan-distance tile steps** (formerly
+three). Roads and railways remain visually and structurally distinct.
+A local short-circuiting lookup is used rather than a city-wide traffic
+recalculation; the area is a diamond, not a six-tile square.
+
+A small **solid red lightning bolt** is shown on unpowered zone tiles:
+one badge on each original multi-tile zone center, or on each custom 1x1
+zoned lot. Vacant parcels also warn, so missing electricity is visible
+before move-in. A powered zone has no badge. Electricity can still be
+inherited through directly adjacent occupied 1x1 buildings, as before.
+
+There is no blinking, periodic full-screen refresh, or extra electrical
+flood fill. The 32x21 viewport maintains an 84-byte badge shadow. After
+a change to the power graph or the adjacent-lot power relay, the display
+checks up to 24 visible squares per normal simulation interval and
+repaints **only badges that change**. Normal one-tile scrolling shifts the
+shadow alongside existing VRAM pixels, without redrawing the whole city.
+Tests cover six-versus-seven-step transport reach for roads and rails,
+unpowered empty lots, original 3x3 centers and power restoration.

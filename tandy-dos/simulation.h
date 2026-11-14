@@ -55,6 +55,11 @@ unsigned int simulation_progress(void);
  * ordinary building density growth. */
 unsigned int simulation_power_scan_count(void);
 unsigned int simulation_lot_service(unsigned int x, unsigned int y);
+/* Draw-only service information; neither API starts a full power scan.
+ * Revision advances on conductive scans and adjacent-lot relay changes.
+ */
+int simulation_needs_power_warning(unsigned int x, unsigned int y);
+unsigned int simulation_power_visual_revision(void);
 /* The coordinates of the most recent visible growth event remain valid
  * until the next city is loaded and simulation_init() is called.
  */

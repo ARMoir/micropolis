@@ -239,6 +239,42 @@ int main(int argc, char **argv)
                    zoning_development_at(lot_x,lot_y),road,rail);
         }
     }
+    /* Both roads and rails serve six Manhattan steps, not seven.
+     * Unpowered zoning gets a static badge before development. */
+    city_make_demo();
+    for (x=0U; x<CITY_WIDTH; ++x)
+        for (y=0U; y<CITY_HEIGHT; ++y)
+            city_set(x,y,0U);
+    zoning_clear();
+    assert(zoning_set(40U,40U,ZONE_RES));
+    assert(zoning_set(39U,40U,ZONE_RES));
+    city_set(46U,40U,66U);
+    simulation_init();
+    assert(simulation_lot_service(40U,40U)&SIM_SERVICE_TRANSPORT);
+    assert(!(simulation_lot_service(39U,40U)&SIM_SERVICE_TRANSPORT));
+    assert(simulation_needs_power_warning(40U,40U));
+    assert(!simulation_needs_power_warning(40U,41U));
+    city_set(46U,40U,224U);
+    assert(simulation_lot_service(40U,40U)&SIM_SERVICE_TRANSPORT);
+    assert(!(simulation_lot_service(39U,40U)&SIM_SERVICE_TRANSPORT));
+    city_set(46U,40U,0U);
+    assert(!(simulation_lot_service(40U,40U)&SIM_SERVICE_TRANSPORT));
+    /* Neighboring live wire/zone electricity removes the badge;
+     * direct service queries never initiate a 12K power scan. */
+    city_set(41U,40U,208U|16384U|32768U);
+    assert(!simulation_needs_power_warning(40U,40U));
+    city_set(41U,40U,0U);
+    assert(simulation_needs_power_warning(40U,40U));
+    city_set(50U,50U,244U|1024U); /* original 3x3 zone center */
+    assert(simulation_needs_power_warning(50U,50U));
+    assert(!simulation_needs_power_warning(50U,51U));
+    {
+        unsigned int revision=simulation_power_visual_revision();
+        simulation_mark_lots_dirty();
+        assert(simulation_power_visual_revision()!=revision);
+    }
+    assert(simulation_power_scan_count()==0U);
+    puts("Six-tile road/rail reach and static power-warning checks passed");
     puts("Phased RCI growth (1x1 / 3x3), demo, clock, taxes and persistence passed");
     return 0;
 }
