@@ -731,3 +731,83 @@ the new residence develops, the original terrain artwork remains
 unchanged, and every original rail/road tile stays in its own family.
 The new transport checks add only a handful of local tile lookups,
 suitable for the NEC V20 at 7 MHz.
+
+## Original road/rail/power intersection construction
+
+The existing **Road** and **Power** tools can now cross compatible
+straight infrastructure instead of rejecting the square. These are the
+actual original Micropolis intersection sprites from `w_con.c`, not
+custom road/rail pixels or a replacement for Happisle's transport:
+
+| Operation | Original tile | Completed crossing |
+| --- | --- | --- |
+| Road across horizontal railway | 226 | 237 |
+| Road across vertical railway | 227 | 238 |
+| Road across horizontal power | 210 | 78 |
+| Road across vertical power | 211 | 77 |
+| Power across horizontal road | 66 (and straight traffic variants) | 77 |
+| Power across vertical road | 67 (and straight traffic variants) | 78 |
+| Power across horizontal railway | 226 | 221 |
+| Power across vertical railway | 227 | 222 |
+
+Both networks remain intact: road neighbors connect through 237/238,
+and crossings 77/78/221/222 retain the original power-conducting flag
+used by the BFS electricity scan. A road still costs $10 per square;
+power still costs $5. Drag previews display affordable crossings
+without modifying anything until mouse-up; cancellation leaves original
+roads and tracks unchanged. Completed crossings survive the standard
+27,120-byte .CTY save/load round trip.
+
+Rail corners, junctions, three-way combinations and unsupported bridges
+are blocked rather than silently destroying infrastructure. There is
+no rail-construction tool yet; this feature lets the existing road and
+power tools cross **original imported railways**.
+
+The `test-crossings` GitHub Actions regression covers all eight
+crossings, traffic variants, road adjacency, charged drag commit and
+cancel, save/reload, and live power transmission through successive
+road/power and rail/power crossings.
+
+## Rendering ideas from WolfensteinCGA v1.0
+
+The original [WolfensteinCGA v1.0](https://github.com/jhhoward/WolfensteinCGA/releases/tag/v1.0)
+was an 8088-capable CGA port with an *experimental 160x200 Tandy mode*,
+preconverted VGA assets (`cgaify.exe`), packed graphics, lookup
+tables, drawing-specific assembler loops, a CGA back buffer and a
+repeatable gameplay `timedemo`. Micropolis keeps its sharper
+**320x200x16 native Tandy mode 9** and does not adopt Wolfenstein's
+raycasting-specific generated scale functions.
+
+Already applied in this port: offline packed TILES.DAT conversion,
+precomputed interlaced video-scanline addresses, 16-bit word tile
+stores and overlapping VRAM scrolls, sparse HUD/toolbox redraw and
+explicit tile-art regressions. Full-frame RAM backbuffer copying, CGA
+mode switching and raster dithering are **not** enabled by default
+because they consume memory/bandwidth or impair sharp original tiles
+on a 7 MHz V20. The original source textures are converted at build
+time, never at Tandy runtime.
+
+The one additional safe improvement from v1.0 is a reproducible
+**end-to-end camera timedemo**. Run either of these at DOS:
+
+```dos
+MICROPOL /TIMEDEMO
+MICROPOL HAPPISLE.CTY /TIMEDEMO
+```
+
+This deliberately displays real city scrolling through a fixed 80-step
+route (12 right, 8 down, 12 left, 8 up, repeated twice). It benchmarks
+the exact existing VRAM scroll and edge redraw path with and without
+normal status/minimap updates, returning to DOS afterward and printing
+BIOS clock ticks, approximate milliseconds, and pan updates per second.
+The two trials each start from an identical centered camera. This
+reveals whether apparent pauses originate in VRAM rendering or the
+HUD. It never runs the simulation, saves files, changes zoning or
+requires a mouse. Its display changes **only during the benchmark**;
+ordinary gameplay is unchanged.
+
+This does not replace the existing `/BENCH`, which deliberately uses
+an isolated blank viewport to compare raw VRAM byte-vs-word copy speed.
+The new `/TIMEDEMO` intentionally renders real tiles and real camera
+motion, like Wolfenstein's gameplay benchmark. Neither benchmark
+result claims a performance increase until tested on real hardware.
