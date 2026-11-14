@@ -73,9 +73,9 @@ unsigned int newer_site_marker(unsigned int kind,unsigned int span,
      */
     switch(side) {
     case 1U: u=width-1U-x;v=width-1U-y;break;
-    case 2U: u=y;v=width-1U-x;break;
+    case 2U: u=width-1U-y;v=x;break; /* east */
     case 4U: u=x;v=y;break;
-    case 8U: u=width-1U-y;v=x;break;
+    case 8U: u=y;v=width-1U-x;break; /* west */
     default:return 0U;
     }
     mid=width/2U;

@@ -121,7 +121,7 @@ static unsigned int read_color(const unsigned char *data,
 static unsigned int verify_art(FILE *f,unsigned long start,
                                 unsigned int kind,unsigned int span)
 {
-    unsigned int x,y,tx,ty,localx,localy,site_color,base,changed=0U;
+    unsigned int x,y,tx,ty,site_color,base,changed=0U;
     unsigned char bytes[32];
     for(ty=0U;ty<span;++ty)
         for(tx=0U;tx<span;++tx) {
