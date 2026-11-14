@@ -42,6 +42,10 @@ struct sim_statistics {
 void simulation_seed_demo(void);
 void simulation_init(void);
 void simulation_mark_power_dirty(void);
+/* Changes to individual 1x1 lots invalidate only the compact
+ * adjacent-building electricity cache, not the main power network.
+ */
+void simulation_mark_lots_dirty(void);
 unsigned int simulation_advance(unsigned int max_tiles);
 const struct sim_statistics *simulation_stats(void);
 void simulation_last_change(unsigned int *x, unsigned int *y);
