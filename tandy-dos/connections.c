@@ -47,8 +47,16 @@ static int neighbor_road(unsigned int x, unsigned int y, int ns)
     if (x >= CITY_WIDTH || y >= CITY_HEIGHT)
         return 0;
     id = neutral_road(city_at(x, y));
-    if (ns)
+    /* Authentic HRAILROAD 237 carries a N/S roadway over E/W rail;
+     * VRAILROAD 238 carries an E/W roadway over N/S rail.
+     * The earlier editor treated neither as a road neighbor, so newly
+     * built roads appeared to terminate before the crossings.
+     */
+    if (ns) {
+        if (id == 237U) return 1;
         return id >= 64U && id <= 78U && id != 64U && id != 77U;
+    }
+    if (id == 238U) return 1;
     return id >= 64U && id <= 78U && id != 65U && id != 78U;
 }
 
