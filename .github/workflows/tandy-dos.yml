@@ -173,6 +173,14 @@ jobs:
             micropolis-activity/cities/happisle.cty HAPPISLE.CTY
           test "$(wc -c < HAPPISLE.CTY)" -eq 27120
 
+      - name: Build and validate VGA-specific source artwork
+        run: |
+          python3 tandy-dos/tools/convert_vga.py
+          cc -std=c89 -Wall -Wextra -pedantic \
+            -o test-vga-art tandy-dos/vga_art.c tandy-dos/video_ops.c \
+            tandy-dos/tests/test_vga_art.c
+          ./test-vga-art
+
       - name: Set up Open Watcom (16-bit DOS)
         uses: open-watcom/setup-watcom@v1
         with:
@@ -182,7 +190,7 @@ jobs:
       - name: Build native 8086-compatible DOS executable
         run: |
           wcl -bcl=dos -0 -ml -q -fe=MICROPOL.EXE \
-             tandy-dos/tandy.c tandy-dos/ground.c tandy-dos/city.c tandy-dos/game_save.c tandy-dos/tile_inspect.c tandy-dos/editor.c tandy-dos/connections.c tandy-dos/engine.c \
+             tandy-dos/tandy.c tandy-dos/vga_art.c tandy-dos/ground.c tandy-dos/city.c tandy-dos/game_save.c tandy-dos/tile_inspect.c tandy-dos/editor.c tandy-dos/connections.c tandy-dos/engine.c \
              tandy-dos/ui.c tandy-dos/mouse.c tandy-dos/zoning.c tandy-dos/newer_lot.c tandy-dos/newer_site.c tandy-dos/zone_highlight.c \
             tandy-dos/placement.c tandy-dos/simulation.c tandy-dos/stadium_fx.c tandy-dos/video_ops.c tandy-dos/menu_font.c tandy-dos/view_rotation.c tandy-dos/tool_art.c tandy-dos/infrastructure.c tandy-dos/small_lot_art.c
           test -s MICROPOL.EXE
@@ -193,7 +201,7 @@ jobs:
           sudo apt-get update -qq
           sudo apt-get install -y dosbox xvfb
           mkdir -p /tmp/micropol-smoke
-          cp MICROPOL.EXE TILES.DAT NEWER1.DAT NEWERM8.DAT /tmp/micropol-smoke/
+          cp MICROPOL.EXE TILES.DAT NEWER1.DAT NEWERM8.DAT VGATILES.DAT VGANEWER.DAT VGA.PAL /tmp/micropol-smoke/
           for machine in vgaonly tandy; do
             printf '[dosbox]\nmachine=%s\n[cpu]\ncycles=max\n[sdl]\noutput=surface\n' "$machine" > /tmp/micropol-smoke.conf
             SDL_AUDIODRIVER=dummy timeout 90s xvfb-run -a dosbox \
@@ -206,6 +214,10 @@ jobs:
             if [ "$machine" = vgaonly ]; then expected=VGA; else expected=Tandy; fi
             grep -q "Video: $expected 320x200" /tmp/micropol-smoke/AUTO.TXT
             grep -q "Video: $expected 320x200" /tmp/micropol-smoke/FORCE.TXT
+            if [ "$machine" = vgaonly ]; then
+              grep -q 'VGA artwork: 256-color source pack' /tmp/micropol-smoke/AUTO.TXT
+              grep -q 'VGA artwork: 256-color source pack' /tmp/micropol-smoke/FORCE.TXT
+            fi
             grep -q 'City pan rate' /tmp/micropol-smoke/AUTO.TXT
             rm /tmp/micropol-smoke/AUTO.TXT /tmp/micropol-smoke/FORCE.TXT
           done
@@ -219,6 +231,9 @@ jobs:
             TILES.DAT
             NEWER1.DAT
             NEWERM8.DAT
+            VGATILES.DAT
+            VGANEWER.DAT
+            VGA.PAL
             HAPPISLE.CTY
             micropolis-activity/COPYING
             tandy-dos/README.md
@@ -252,14 +267,14 @@ jobs:
           test -s micropolis-activity/COPYING
           test -s tandy-dos/README.md
           mkdir -p release/package
-          cp MICROPOL.EXE TILES.DAT NEWER1.DAT NEWERM8.DAT HAPPISLE.CTY release/package/
+          cp MICROPOL.EXE TILES.DAT NEWER1.DAT NEWERM8.DAT VGATILES.DAT VGANEWER.DAT VGA.PAL HAPPISLE.CTY release/package/
           test ! -e release/package/SC2K.DAT
           cp micropolis-activity/COPYING release/package/COPYING
           cp tandy-dos/README.md release/package/README.md
           (
             cd release/package
             zip -q -9 ../MICROPOL-TANDY-DOS.zip \
-              MICROPOL.EXE TILES.DAT NEWER1.DAT NEWERM8.DAT HAPPISLE.CTY README.md COPYING
+              MICROPOL.EXE TILES.DAT NEWER1.DAT NEWERM8.DAT VGATILES.DAT VGANEWER.DAT VGA.PAL HAPPISLE.CTY README.md COPYING
           )
           unzip -t release/MICROPOL-TANDY-DOS.zip
           # Regression guard: legacy art filename must never ship.
@@ -286,6 +301,9 @@ jobs:
             release/package/TILES.DAT \
             release/package/NEWER1.DAT \
             release/package/NEWERM8.DAT \
+            release/package/VGATILES.DAT \
+            release/package/VGANEWER.DAT \
+            release/package/VGA.PAL \
             release/package/HAPPISLE.CTY \
             --repo "$GITHUB_REPOSITORY" \
             --target "$GITHUB_SHA" \

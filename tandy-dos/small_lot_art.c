@@ -48,3 +48,8 @@ const unsigned char *small_lot_art_pixels(unsigned int tile,
     else return NULL;
     return pixels + index * 32U;
 }
+
+unsigned int small_lot_art_index(const unsigned char *p)
+{
+    return loaded && p ? 12U+(unsigned int)((p-pixels)/32U) : 797U;
+}

@@ -672,3 +672,8 @@ int newer_lot_load(const char *path)
     normalize_square_art();
     return 1;
 }
+
+unsigned int newer_lot_art_index(const unsigned char NEWER_FAR *p)
+{
+    return art && p ? (unsigned int)((p-art)/PACK_TILE_BYTES) : 797U;
+}

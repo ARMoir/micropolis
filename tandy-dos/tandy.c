@@ -12,6 +12,7 @@
 #include <conio.h>
 #include "city.h"
 #include "ground.h"
+#include "vga_art.h"
 #include "editor.h"
 #include "engine.h"
 #include "ui.h"
@@ -54,6 +55,7 @@ static unsigned int scroll_x = 0, scroll_y = 0;
 static unsigned int map_turns = 0U;
 static unsigned char old_mode;
 static int use_vga;
+static int enhanced_vga,detail_capture;
 static unsigned char far *vga_buffer;
 static const unsigned char far *vga_font;
 static unsigned char vga_dirty[200];
@@ -196,9 +198,17 @@ static void pixel(unsigned int x, unsigned int y, unsigned char color)
 /* VGA retains the packed renderer in RAM; only dirty rows are expanded. */
 static void present_video(void)
 {
-    if (use_vga)
-        vga_present_rows(video,
-            (volatile unsigned char far *)MK_FP(0xa000,0),vga_dirty);
+    if (use_vga) {
+        if(enhanced_vga) {
+            if(vga_art_active(open_menu==MENU_NONE && info_page==0 &&
+                              picker_kind==0U))
+                memset(vga_dirty,1,sizeof(vga_dirty));
+            vga_present_detail_rows(video,
+                (volatile unsigned char far *)MK_FP(0xa000,0),vga_dirty);
+        } else
+            vga_present_rows(video,
+                (volatile unsigned char far *)MK_FP(0xa000,0),vga_dirty);
+    }
 }
 
 static int detect_vga(void)
@@ -214,6 +224,7 @@ static void init_vga_palette_font(void)
 {
     union REGPACK font_regs;
     unsigned int i;
+    const unsigned char *extended=vga_art_palette();
     static const unsigned char rgb[16][3] = {
         {0,0,0},{0,0,42},{0,42,0},{0,42,42},
         {42,0,0},{42,0,42},{42,21,0},{42,42,42},
@@ -221,7 +232,9 @@ static void init_vga_palette_font(void)
         {63,21,21},{63,21,63},{63,63,21},{63,63,63}
     };
     outp(0x3c8,0);
-    for(i=0U;i<16U;++i) {
+    if(extended) {
+        for(i=0U;i<768U;++i)outp(0x3c9,extended[i]);
+    } else for(i=0U;i<16U;++i) {
         outp(0x3c9,rgb[i][0]);
         outp(0x3c9,rgb[i][1]);
         outp(0x3c9,rgb[i][2]);
@@ -326,6 +339,7 @@ static void draw_packed_tile(unsigned int px, unsigned int py,
 static void draw_original_tile(unsigned int px, unsigned int py, unsigned int tile)
 {
     draw_packed_tile(px, py, art_data + tile * 32U);
+    if(detail_capture)vga_art_stamp(px,py,0,tile);
 }
 
 /* Zoning overlay stays visual-only and never modifies the original
@@ -570,6 +584,8 @@ static void draw_city_tile_art(unsigned int px, unsigned int py,
             else solid_tile(px,py,2U);
         } else if(large != NULL) {
             draw_packed_tile(px,py,large);
+            if(detail_capture)
+                vga_art_stamp(px,py,1,newer_lot_art_index(large));
             draw_newer_site_access(px,py,mx,my,left,top,span,kind);
         } else {
             /* No partial source sprites even if an optional pack
@@ -599,7 +615,11 @@ static void draw_city_tile_art(unsigned int px, unsigned int py,
          * 8x8 office/factory silhouette instead.
          */
         if((kind==ZONE_COM || kind==ZONE_IND) && stage!=0U) {
-            if(small != NULL) draw_packed_tile(px,py,small);
+            if(small != NULL) {
+                draw_packed_tile(px,py,small);
+                if(detail_capture)
+                    vga_art_stamp(px,py,1,small_lot_art_index(small));
+            }
             else {
                 unsigned char shade=(unsigned char)
                     (kind==ZONE_COM?8U:6U);
@@ -620,6 +640,9 @@ static void draw_city_tile_art(unsigned int px, unsigned int py,
 
     if (small != NULL) {
         draw_packed_tile(px,py,small);
+        if(detail_capture)vga_art_stamp(px,py,1,
+            kind==ZONE_RES?newer_lot_art_index(small):
+                           small_lot_art_index(small));
         return;
     }
 
@@ -744,6 +767,8 @@ static void draw_city_tile(unsigned int px,unsigned int py,
     unsigned char before,after;
     int green=ground_keep_green(mx,my);
     int clear=ground_is_clear(mx,my);
+    detail_capture=enhanced_vga;
+    if(detail_capture)vga_art_begin(px,py,!green,clear);
     if(clear) {
         if(green)solid_tile(px,py,2U);
         else {
@@ -764,6 +789,7 @@ static void draw_city_tile(unsigned int px,unsigned int py,
             }
         }
     }
+    detail_capture=0;
     draw_zone_border(px,py,mx,my);
     draw_pending_tile(px,py,mx,my);
 }
@@ -1892,6 +1918,16 @@ static void scroll_one_tile(unsigned int previous_x, unsigned int previous_y)
 {
     unsigned int x, y, dst, src;
 
+    if(enhanced_vga) {
+        if(scroll_y==previous_y && scroll_x==previous_x+1U)
+            vga_art_scroll(-8,0);
+        else if(scroll_y==previous_y && previous_x==scroll_x+1U)
+            vga_art_scroll(8,0);
+        else if(scroll_x==previous_x && scroll_y==previous_y+1U)
+            vga_art_scroll(0,-8);
+        else if(scroll_x==previous_x && previous_y==scroll_y+1U)
+            vga_art_scroll(0,8);
+    }
     if (scroll_y == previous_y && scroll_x == previous_x + 1U) {
         /* Shift the 84-byte badge shadow with the image, not with the
          * world; only the newly exposed edge needs a fresh lookup.
@@ -3370,11 +3406,15 @@ int main(int argc, char **argv)
 {
     int i, have_city = 0, allow_mouse = 1, bench_mode = 0;
     int timedemo_mode = 0;
+    int request_detail=1;
     int requested_video = 0; /* 0 auto, 1 VGA, 2 Tandy */
     char sidecar[256];
     newer_lot_clear();
     for (i = 1; i < argc; ++i) {
-        if (dos_option_is(argv[i], "VGA")) {
+        if (dos_option_is(argv[i], "VGA16")) {
+            requested_video=1;
+            request_detail=0;
+        } else if (dos_option_is(argv[i], "VGA")) {
             requested_video=1;
         } else if (dos_option_is(argv[i], "TANDY")) {
             requested_video=2;
@@ -3463,7 +3503,7 @@ int main(int argc, char **argv)
             (volatile unsigned char far *)MK_FP(0xb800, 0);
     tandy_init_scanlines();
     ground_init();
-    if(use_vga) init_vga_palette_font();
+
     (void)load_original_art();
     /* Canonical neutral filenames. The unchanged first-generation
      * 1x1 byte pack remains accepted for existing installations.
@@ -3471,6 +3511,10 @@ int main(int argc, char **argv)
     if(!small_lot_art_load("NEWER1.DAT"))
         (void)small_lot_art_load("SC2K.DAT");
     (void)newer_lot_load_art("NEWERM8.DAT");
+    if(use_vga) {
+        enhanced_vga=request_detail?vga_art_load():0;
+        init_vga_palette_font();
+    }
     mouse_on = allow_mouse ? mouse_init() : 0;
     if (mouse_on) {
         struct mouse_state state;
@@ -3495,6 +3539,10 @@ int main(int argc, char **argv)
     newer_lot_free_art();
     set_video_mode(old_mode);
     free(vga_buffer);
+    vga_art_free();
+    if(use_vga)puts(enhanced_vga ?
+        "VGA artwork: 256-color source pack" :
+        "VGA artwork: 16-color compatibility (pack unavailable or /VGA16)");
     printf("Video: %s\n",use_vga?"VGA 320x200":"Tandy 320x200");
     if (art_data != NULL)
         free(art_data); /* art buffer used only in graphics mode */

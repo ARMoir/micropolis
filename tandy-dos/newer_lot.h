@@ -60,4 +60,5 @@ int newer_lot_load(const char *path);
 unsigned int newer_lot_count(void);
 /* Height of the occupied rectangle; 3-wide NEWER sprites may be 2-high. */
 unsigned int newer_lot_height(unsigned int x,unsigned int y);
+unsigned int newer_lot_art_index(const unsigned char NEWER_FAR *p);
 #endif

@@ -13,4 +13,5 @@ int small_lot_art_load(const char *path);
 const unsigned char *small_lot_art_pixels(unsigned int tile,
     unsigned int kind, unsigned int stage, unsigned int x, unsigned int y);
 
+unsigned int small_lot_art_index(const unsigned char *p);
 #endif

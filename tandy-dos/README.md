@@ -1,3 +1,26 @@
+## Enhanced VGA: source-derived 256-color artwork
+
+Automatic VGA and `/VGA` now load `VGATILES.DAT`, `VGANEWER.DAT` and
+`VGA.PAL`. Keep all three files beside MICROPOL.EXE. The build generates
+VGA-only shading from the original full-color 16x16 Micropolis tiles and
+the higher-detail 16x16 NEWER library, preserving fine color mixtures
+lost in the 16-color conversion. The resolution remains 320x200.
+VGA ground uses smooth tan shades instead of the Tandy checker.
+
+`/VGA16` selects the previous compatibility output for comparison.
+Missing assets or insufficient conventional memory fall back to that
+output. The exit summary identifies which renderer actually ran.
+Enhanced VGA needs about 173 KB more conventional memory for its two
+art packs and 64 KB detail buffer. Tandy allocates none of these buffers
+and continues to use its existing artwork and palette.
+
+The low nibble of every VGA art pixel retains its exact legacy color
+key. Cursor, zone borders and construction ink override differing keys;
+driveways and forest-edge ground rules remain shared. Menus and inspector
+pages temporarily use compatibility colors so no hidden art leaks through
+opaque text backgrounds. Scrolling moves the detail buffer with the map.
+City formats, building selection and rectangular NEWER rules are unchanged.
+
 ## Light-brown ground and forest-edge grass
 
 Clear ground now uses a fine brown/light-gray checker for a lighter tan
