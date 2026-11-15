@@ -15,6 +15,29 @@
 #define MAX_RECORD_BYTES (NEWER_LOT_MAX * 5U)
 #define BLD_VERSION 1U
 #define PACK_TILE_BYTES 32U
+#define CROP_FIRST 0xc6U
+#define CROP_LAST 0xd9U
+#define SOURCE_FIRST 0xaeU
+/* Encode a newly cropped 3x2 variant in previously unused source IDs.
+ * Legacy 0xae..0xc1 records remain authentic 3x3 across saves.
+ */
+static unsigned char cropped[20];
+static unsigned int unpack_source_id(unsigned int id)
+{
+    return id>=CROP_FIRST && id<=CROP_LAST ?
+        SOURCE_FIRST+id-CROP_FIRST : id;
+}
+static unsigned int lot_height(unsigned int span,unsigned int id)
+{
+    return span==3U && id>=CROP_FIRST && id<=CROP_LAST?2U:span;
+}
+static int art_top_green(const unsigned char NEWER_FAR *bytes)
+{
+    unsigned int i;
+    for(i=0U;i<3U*PACK_TILE_BYTES;++i)
+        if(bytes[i]!=0x22U)return 0;
+    return 1;
+}
 /* 3x3 built-in Micropolis styles encoded in the formerly unused
  * low SOURCE-ID range of the existing 5-byte NBL records. No
  * save-format change or additional per-record RAM is needed.
@@ -61,6 +84,13 @@ static int terrain_usable(unsigned int x,unsigned int y,
 static int source_valid(unsigned int kind,unsigned int span,
                         unsigned int id)
 {
+    if(span==3U && id>=CROP_FIRST && id<=CROP_LAST) {
+        unsigned int base=unpack_source_id(id);
+        if(kind==ZONE_RES)return base>=0xaeU && base<=0xb1U;
+        if(kind==ZONE_COM)return base>=0xb2U && base<=0xbbU;
+        if(kind==ZONE_IND)return base>=0xbcU && base<=0xc1U;
+        return 0;
+    }
     if(span==3U && id>=ORIGINAL_STYLE_FIRST &&
        id<=ORIGINAL_STYLE_LAST &&
        kind>=ZONE_RES && kind<=ZONE_IND)return 1;
@@ -124,6 +154,7 @@ static unsigned int original_prefab_base(unsigned int left,
 }
 static unsigned int source_start(unsigned int id)
 {
+    id=unpack_source_id(id);
     if(id<0x8cU) return id-BASE_ID;
     if(id<0xaeU) return 28U+4U*(id-0x8cU);
     if(id<0xc6U) return 164U+9U*(id-0xaeU);
@@ -143,13 +174,21 @@ static unsigned int select_id(unsigned int kind,unsigned int span,
     choice=(x*17U+y*29U+x*y+span*7U)%(last-first+1U);
     return first+choice;
 }
+static unsigned int chosen_building_id(unsigned int kind,
+                                       unsigned int x,unsigned int y)
+{
+    unsigned int id=select_id(kind,3U,x,y);
+    return id>=SOURCE_FIRST && id<=0xc1U &&
+           cropped[id-SOURCE_FIRST] ? CROP_FIRST+id-SOURCE_FIRST : id;
+}
 static int valid_rect(unsigned int x,unsigned int y,
-                      unsigned int kind,unsigned int span,
-                      unsigned int existing_slot,unsigned int threshold)
+                      unsigned int kind,unsigned int width,
+                      unsigned int height,unsigned int existing_slot,
+                      unsigned int threshold)
 {
     unsigned int i,j,slot;
-    if(x+span>CITY_WIDTH || y+span>CITY_HEIGHT) return 0;
-    for(j=0U;j<span;++j) for(i=0U;i<span;++i) {
+    if(x+width>CITY_WIDTH || y+height>CITY_HEIGHT) return 0;
+    for(j=0U;j<height;++j) for(i=0U;i<width;++i) {
         unsigned int px=x+i,py=y+j;
         if(!terrain_usable(px,py,kind) ||
            zoning_development_at(px,py)<threshold)
@@ -168,10 +207,11 @@ static int find_slot(void)
 }
 static void fill_owner(unsigned int slot)
 {
-    unsigned int i,j,x,y,span;
+    unsigned int i,j,x,y,span,height;
     struct newer_record *rec=&records[slot];
     x=rec->x;y=rec->y;span=rec->span;
-    for(j=0U;j<span;++j)
+    height=lot_height(span,rec->id);
+    for(j=0U;j<height;++j)
         for(i=0U;i<span;++i)
             owner[offset(x+i,y+j)]=(unsigned char)(slot+1U);
 }
@@ -182,6 +222,14 @@ void newer_lot_clear(void)
     count=0U;
 }
 unsigned int newer_lot_count(void) {return count;}
+unsigned int newer_lot_height(unsigned int x,unsigned int y)
+{
+    unsigned int slot;
+    if(owner==0 || x>=CITY_WIDTH || y>=CITY_HEIGHT)return 0U;
+    slot=owner[offset(x,y)];
+    if(!slot || !records[slot-1U].used)return 0U;
+    return lot_height(records[slot-1U].span,records[slot-1U].id);
+}
 int newer_lot_has_art(void){return art!=0;}
 int newer_lot_load_art(const char *path)
 {
@@ -198,11 +246,17 @@ int newer_lot_load_art(const char *path)
     }
     fclose(f);
     art=candidate;
+    { unsigned int id;
+      for(id=SOURCE_FIRST;id<=0xc1U;++id)
+          cropped[id-SOURCE_FIRST]=(unsigned char)art_top_green(
+              art+(164U+9U*(id-SOURCE_FIRST))*PACK_TILE_BYTES);
+    }
     return 1;
 }
 void newer_lot_free_art(void)
 {
     if(art!=0){free(art);art=0;}
+    memset(cropped,0,sizeof(cropped));
 }
 int newer_lot_at(unsigned int x,unsigned int y)
 {
@@ -225,7 +279,7 @@ int newer_lot_info(unsigned int x,unsigned int y,
     if(top)*top=r->y;
     if(span)*span=r->span;
     if(kind)*kind=r->kind;
-    if(source_id)*source_id=r->id;
+    if(source_id)*source_id=unpack_source_id(r->id);
     return 1;
 }
 const unsigned char NEWER_FAR *newer_lot_pixels(
@@ -241,6 +295,12 @@ const unsigned char NEWER_FAR *newer_lot_pixels(
        rec->id<=ORIGINAL_STYLE_LAST)return 0;
     span=rec->span;
     lx=x-rec->x;ly=y-rec->y;
+    if(lot_height(span,rec->id)==2U) {
+        /* The upper source row is completely green. The displayed
+         * 3x2 uses original sprite rows 1 and 2, unscaled. */
+        part=3U+ly*3U+lx;
+        return art+(source_start(rec->id)+part)*PACK_TILE_BYTES;
+    }
     /* Display orientation mirrors the existing original-building
      * upright-part selection, without rotating any saved tile data.
      */
@@ -332,6 +392,7 @@ int newer_lot_retrofit_original(unsigned int cx,unsigned int cy,
     rec->y=(unsigned char)top;
     rec->kind=(unsigned char)kind;
     rec->span=3U;
+    /* A facelift must cover the entire hidden legacy 3x3 prefab. */
     rec->id=(unsigned char)select_id(kind,3U,left,top);
     rec->used=1U;
     fill_owner(index);
@@ -368,7 +429,7 @@ unsigned int newer_lot_try_grow(unsigned int x,unsigned int y,
                                  unsigned int kind,
                                  unsigned int *left,unsigned int *top)
 {
-    unsigned int slot,i,j,cx,cy,ax,ay;
+    unsigned int slot,i,j,cx,cy,ax,ay,selected,height;
     unsigned int index;
     int available;
     struct newer_record *rec;
@@ -389,7 +450,9 @@ unsigned int newer_lot_try_grow(unsigned int x,unsigned int y,
             unsigned int row,col;
             if(ax<i || ay<j)continue;
             cx=ax-i;cy=ay-j;
-            if(!valid_rect(cx,cy,kind,3U,slot,2U))continue;
+            selected=chosen_building_id(kind,cx,cy);
+            height=lot_height(3U,selected);
+            if(!valid_rect(cx,cy,kind,3U,height,slot,2U))continue;
             /* Free old owner cells, grow in place using SAME slot. */
             for(row=0U;row<2U;++row)
                 for(col=0U;col<2U;++col)
@@ -397,7 +460,7 @@ unsigned int newer_lot_try_grow(unsigned int x,unsigned int y,
             rec->x=(unsigned char)cx;
             rec->y=(unsigned char)cy;
             rec->span=3U;
-            rec->id=(unsigned char)select_id(kind,3U,cx,cy);
+            rec->id=(unsigned char)selected;
             fill_owner(slot-1U);
             if(left)*left=cx;
             if(top)*top=cy;
@@ -406,7 +469,7 @@ unsigned int newer_lot_try_grow(unsigned int x,unsigned int y,
         return 0U;
     }
     available=find_slot();
-    if(available<0 || !valid_rect(x,y,kind,2U,0U,3U))
+    if(available<0 || !valid_rect(x,y,kind,2U,2U,0U,3U))
         return 0U;
     index=(unsigned int)available;
     rec=&records[index];
@@ -423,13 +486,14 @@ unsigned int newer_lot_try_grow(unsigned int x,unsigned int y,
 unsigned int newer_lot_demolish(unsigned int x,unsigned int y,
                                 unsigned int *left,unsigned int *top)
 {
-    unsigned int slot,i,j,span,ax,ay;
+    unsigned int slot,i,j,span,height,ax,ay;
     struct newer_record *rec;
     if(owner==0 || x>=CITY_WIDTH || y>=CITY_HEIGHT)return 0U;
     slot=owner[offset(x,y)];
     if(!slot)return 0U;
     rec=&records[slot-1U];
     ax=rec->x;ay=rec->y;span=rec->span;
+    height=lot_height(span,rec->id);
     /* If this was a NewerSource facelift of an imported original
      * 3x3, also demolish the intact hidden original prefab.
      * Otherwise old source art would pop back through the cleared
@@ -438,7 +502,7 @@ unsigned int newer_lot_demolish(unsigned int x,unsigned int y,
     {
         int classic=(span==3U &&
             original_prefab_base(ax,ay,rec->kind)!=65535U);
-        for(j=0U;j<span;++j)for(i=0U;i<span;++i) {
+        for(j=0U;j<height;++j)for(i=0U;i<span;++i) {
             if(classic)city_set(ax+i,ay+j,0U);
             owner[offset(ax+i,ay+j)]=0U;
             (void)zoning_set_development(ax+i,ay+j,0U);
@@ -528,10 +592,10 @@ int newer_lot_load(const char *path)
         hash=hash_record(hash,rec);
         if(!source_valid(rec->kind,rec->span,rec->id) ||
            rec->x+rec->span>CITY_WIDTH ||
-           rec->y+rec->span>CITY_HEIGHT) {
+           rec->y+lot_height(rec->span,rec->id)>CITY_HEIGHT) {
             fclose(f);return 0;
         }
-        for(j=0U;j<rec->span;++j)
+        for(j=0U;j<lot_height(rec->span,rec->id);++j)
             for(k=0U;k<rec->span;++k) {
                 unsigned int xx=rec->x+k,yy=rec->y+j;
                 unsigned int old;
@@ -545,7 +609,8 @@ int newer_lot_load(const char *path)
                 for(old=0U;old<i;++old) {
                     struct newer_record *prev=&staged[old];
                     if(xx>=prev->x&&xx<prev->x+prev->span&&
-                       yy>=prev->y&&yy<prev->y+prev->span){
+                       yy>=prev->y&&
+                       yy<prev->y+lot_height(prev->span,prev->id)){
                         fclose(f);return 0;
                     }
                 }
