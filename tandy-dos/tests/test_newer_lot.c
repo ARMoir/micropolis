@@ -33,8 +33,9 @@ static void mature(unsigned int x,unsigned int y,
 static void expect_building(unsigned int x,unsigned int y,
                             unsigned int span,unsigned int kind)
 {
-    unsigned int a,b,w,k,id,i,j;
-    for(j=0U;j<span;++j)
+    unsigned int a,b,w,k,id,i,j,height=newer_lot_height(x,y);
+    assert(height==2U || height==span);
+    for(j=0U;j<height;++j)
         for(i=0U;i<span;++i) {
             assert(newer_lot_info(x+i,y+j,&a,&b,&w,&k,&id));
             assert(a==x && b==y && w==span && k==kind);
@@ -51,18 +52,19 @@ static unsigned int first_tile(unsigned int id)
 static void check_art(unsigned int x,unsigned int y,
                       unsigned int span)
 {
-    unsigned int ax,ay,s,k,id,turn,index;
+    unsigned int ax,ay,s,k,id,turn,index,height;
     unsigned char disk[32];
     FILE *f;
     assert(newer_lot_info(x,y,&ax,&ay,&s,&k,&id));
     assert(s==span);
+    height=newer_lot_height(x,y);
     f=fopen("resources/sc2k-buildings/SC2KM8.DAT","rb");
     assert(f!=NULL);
     for(turn=0U;turn<4U;++turn) {
         const unsigned char *p=newer_lot_pixels(x,y,turn);
-        unsigned int part=turn==0U?0U:
-            turn==1U?span-1U:turn==2U?span*span-1U:
-            (span-1U)*span;
+        unsigned int part=height==2U ? 3U :
+            turn==0U?0U:turn==1U?span-1U:
+            turn==2U?span*span-1U:(span-1U)*span;
         index=first_tile(id)+part;
         assert(p!=NULL);
         assert(fseek(f,(long)index*32L,SEEK_SET)==0);
@@ -120,6 +122,12 @@ int main(void)
     assert(newer_lot_try_grow(65U,30U,ZONE_IND,0,0)==2U);
     assert(newer_lot_try_grow(65U,30U,ZONE_IND,0,0)==3U);
     expect_building(65U,30U,3U,ZONE_IND);
+    /* Selected C0 has an all-green source top row: preserve all
+     * six lower sprite tiles, and leave row 3 independently zoned. */
+    assert(newer_lot_height(65U,30U)==2U);
+    assert(!newer_lot_at(65U,32U));
+    assert(newer_lot_at(67U,31U));
+    check_art(65U,30U,3U);
     assert(newer_lot_count()==3U);
 
     /* A genuine obstacle invalidates the build; a mixed zone cannot
@@ -139,6 +147,8 @@ int main(void)
     assert(newer_lot_count()==3U);
     expect_building(48U,30U,3U,ZONE_COM);
     expect_building(65U,30U,3U,ZONE_IND);
+    assert(newer_lot_height(65U,30U)==2U);
+    assert(!newer_lot_at(65U,32U));
     /* Bad data cannot destroy an existing valid populated overlay. */
     f=fopen("testnew.nbl","r+b");
     assert(f!=NULL);
@@ -177,6 +187,6 @@ int main(void)
     assert(!newer_lot_at(0U,CITY_HEIGHT));
     newer_lot_free_art();
     assert(!newer_lot_has_art());
-    puts("NewerSource R/C/I 2x2->3x3 growth, rotation, persistence and demolition passed");
+    puts("NewerSource R/C/I 2x2, 3x2 and 3x3 art, saves and demolition passed");
     return 0;
 }
