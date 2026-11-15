@@ -140,6 +140,7 @@ void tile_inspect_collect(unsigned int x,unsigned int y,
     if(o==0)return;
     memset(o,0,sizeof(*o));
     o->x=x;o->y=y;o->left=x;o->top=y;o->span=1U;
+    o->height=1U;
     if(x>=CITY_WIDTH||y>=CITY_HEIGHT)return;
     o->word=city_at(x,y);
     o->id=o->word&BASE_MASK;
@@ -151,9 +152,12 @@ void tile_inspect_collect(unsigned int x,unsigned int y,
     if(newer_lot_info(x,y,&o->left,&o->top,&o->span,0,
                       &o->source_id)) {
         o->newer=1U;
+        o->height=newer_lot_height(x,y);
         o->part_x=x-o->left;o->part_y=y-o->top;
-    } else
+    } else {
         (void)original_group(x,y,o->id,o);
+        o->height=o->span;
+    }
     o->neighbor[0]=y>0U?(city_at(x,y-1U)&BASE_MASK):1024U;
     o->neighbor[1]=x+1U<CITY_WIDTH?
                    (city_at(x+1U,y)&BASE_MASK):1024U;
@@ -240,7 +244,7 @@ void tile_inspect_line(const struct tile_inspect *o,
             else sprintf(out,"STAGE: NOT ZONED");
             break;
         case 3U:
-            if(o->newer)sprintf(out,"BUILDING: %uX%u NEWER",o->span,o->span);
+            if(o->newer)sprintf(out,"BUILDING: %uX%u NEWER",o->span,o->height);
             else if(o->original_group)
                 sprintf(out,"BUILDING: %uX%u ORIGINAL",o->span,o->span);
             else if(o->zone)
