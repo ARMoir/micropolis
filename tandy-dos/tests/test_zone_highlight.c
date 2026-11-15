@@ -33,16 +33,23 @@ static void mature(unsigned int x,unsigned int y,
 static void test_footprint(unsigned int x,unsigned int y,
                            unsigned int span)
 {
-    unsigned int i,j,t,mask,part,rotated,expected,has;
+    unsigned int i,j,t,mask,part,rotated,expected,has,height;
     int hatched;
-    for(j=0U;j<span;++j)
+    height=newer_lot_height(x,y);
+    if(height==0U)height=span; /* original prefab */
+    for(j=0U;j<height;++j)
         for(i=0U;i<span;++i) {
-            mask=zone_highlight_footprint_edges(
-                x+i,y+j,x,y,span);
-            assert(mask!=0U || (span==3U && i==1U && j==1U));
+            mask=zone_highlight_rect_edges(
+                x+i,y+j,x,y,span,height);
+            assert(mask!=0U ||
+                   (span==3U && height==3U && i==1U && j==1U));
             assert(zone_highlight_style(x+i,y+j,&hatched)==mask);
             assert(!hatched);
-            for(t=0U;t<4U;++t) {
+            /* Square source buildings rotate their footprint.
+             * Cropped source buildings stay 3x2 in world space,
+             * and are rendered upright without transposing ownership.
+             */
+            if(height==span)for(t=0U;t<4U;++t) {
                 part=j*span+i;
                 rotated=view_rotation_upright_part(t,span,part);
                 expected=zone_highlight_footprint_edges(
@@ -204,7 +211,8 @@ static void test_shared_local_roads(void)
             assert(zoning_set_development(42U+i,52U+j,3U) ||
                    zoning_development_at(42U+i,52U+j)==3U);
     assert(newer_lot_try_grow(42U,52U,ZONE_IND,0,0)==3U);
-    assert(zone_highlight_style(43U,53U,0)==0U);
+    assert(zone_highlight_style(43U,53U,0)==
+           (newer_lot_height(42U,52U)==2U?4U:0U));
     assert(zone_highlight_shared_edges(43U,53U,0U)==0U);
     assert(zone_highlight_style(44U,52U,0)==3U);
     assert(zone_highlight_shared_edges(44U,52U,3U)==0U);
@@ -308,7 +316,8 @@ int main(void)
                 }
         assert(newer_lot_try_grow(x,y,kind,0,0)==3U);
         test_footprint(x,y,3U);
-        assert(zone_highlight_style(x+1U,y+1U,&hatch)==0U);
+        assert(zone_highlight_style(x+1U,y+1U,&hatch)==
+               (newer_lot_height(x,y)==2U?4U:0U));
         assert(!hatch);
 
         /* Demolishing ANY part restores the whole set of vacant
