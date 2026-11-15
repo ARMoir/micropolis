@@ -299,7 +299,8 @@ void tile_inspect_line(const struct tile_inspect *o,
  */
 unsigned int tile_inspect_dialog_click(unsigned int px,unsigned int py)
 {
-    if(py>=144U && py<160U) {
+    if(py>=TILE_DIALOG_BUTTON_TOP &&
+       py<TILE_DIALOG_BUTTON_TOP+TILE_DIALOG_BUTTON_HEIGHT) {
         if(px>=232U && px<304U)return 3U; /* Done */
         if(px>=24U && px<88U)return 1U;   /* Prev */
         if(px>=112U && px<184U)return 2U; /* Next */

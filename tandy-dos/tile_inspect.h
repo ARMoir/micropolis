@@ -44,6 +44,15 @@ const char *tile_inspect_kind(unsigned int id);
 #define TILE_DIALOG_TEXT_BG 0U
 #define TILE_DIALOG_TEXT_FG 15U
 #define TILE_DIALOG_TEXT_COLUMNS 24U
+/* Flat dialog vertical layout in 320x200 pixels:
+ * preview ends at y=136, buttons y=140..155, footer y=160..167.
+ * The 8px BIOS labels sit centered at y=144..151, leaving 4px
+ * breathing room above and below and no overlap with the footer.
+ */
+#define TILE_DIALOG_BUTTON_TOP 140U
+#define TILE_DIALOG_BUTTON_HEIGHT 16U
+#define TILE_DIALOG_BUTTON_LABEL_ROW 18U
+#define TILE_DIALOG_FOOTER_ROW 20U
 unsigned int tile_inspect_dialog_click(unsigned int px,unsigned int py);
 unsigned int tile_inspect_preview_scale(unsigned int span);
 unsigned int tile_inspect_preview_original_id(

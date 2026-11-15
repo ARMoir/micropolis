@@ -71,14 +71,28 @@ int main(void)
      */
     assert(TILE_DIALOG_TEXT_BG==0U);
     assert(TILE_DIALOG_TEXT_FG==15U);
+    /* Frame/preview, button labels and footer now occupy distinct
+     * non-overlapping pixel rows with physical CRT breathing room.
+     */
+    assert(TILE_DIALOG_PREVIEW_Y+TILE_DIALOG_PREVIEW_SIZE+4U==
+           TILE_DIALOG_BUTTON_TOP);
+    assert(TILE_DIALOG_BUTTON_TOP<
+           TILE_DIALOG_BUTTON_LABEL_ROW*8U);
+    assert(TILE_DIALOG_BUTTON_LABEL_ROW*8U+8U<
+           TILE_DIALOG_BUTTON_TOP+TILE_DIALOG_BUTTON_HEIGHT);
+    assert(TILE_DIALOG_BUTTON_TOP+TILE_DIALOG_BUTTON_HEIGHT+4U==
+           TILE_DIALOG_FOOTER_ROW*8U);
+    assert(TILE_DIALOG_FOOTER_ROW*8U+8U<
+           TILE_DIALOG_Y+TILE_DIALOG_H);
     assert(tile_inspect_dialog_click(235U,150U)==3U);
-    assert(tile_inspect_dialog_click(303U,159U)==3U);
-    assert(tile_inspect_dialog_click(232U,143U)==0U);
+    assert(tile_inspect_dialog_click(303U,155U)==3U);
+    assert(tile_inspect_dialog_click(232U,139U)==0U);
+    assert(tile_inspect_dialog_click(232U,156U)==0U);
     assert(tile_inspect_dialog_click(304U,150U)==0U);
-    assert(tile_inspect_dialog_click(24U,144U)==1U);
-    assert(tile_inspect_dialog_click(87U,159U)==1U);
-    assert(tile_inspect_dialog_click(112U,144U)==2U);
-    assert(tile_inspect_dialog_click(183U,159U)==2U);
+    assert(tile_inspect_dialog_click(24U,140U)==1U);
+    assert(tile_inspect_dialog_click(87U,155U)==1U);
+    assert(tile_inspect_dialog_click(112U,140U)==2U);
+    assert(tile_inspect_dialog_click(183U,155U)==2U);
     assert(tile_inspect_dialog_click(10U,90U)==0U);
     assert(tile_inspect_preview_scale(1U)==6U);
     assert(tile_inspect_preview_scale(2U)==4U);

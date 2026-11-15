@@ -1602,18 +1602,26 @@ static void inspector_button(unsigned int px,unsigned int w,
                              const char *caption)
 {
     unsigned int x,y;
-    for(y=144U;y<160U;y+=8U)
+    for(y=TILE_DIALOG_BUTTON_TOP;
+        y<TILE_DIALOG_BUTTON_TOP+TILE_DIALOG_BUTTON_HEIGHT;y+=8U)
         for(x=px;x<px+w;x+=8U)
             solid_tile(x,y,TILE_DIALOG_TEXT_BG);
     for(x=px;x<px+w;++x) {
-        pixel(x,144U,8U);
-        pixel(x,159U,8U);
+        pixel(x,TILE_DIALOG_BUTTON_TOP,8U);
+        pixel(x,TILE_DIALOG_BUTTON_TOP+
+                TILE_DIALOG_BUTTON_HEIGHT-1U,8U);
     }
-    for(y=144U;y<160U;++y) {
+    for(y=TILE_DIALOG_BUTTON_TOP;
+        y<TILE_DIALOG_BUTTON_TOP+TILE_DIALOG_BUTTON_HEIGHT;++y) {
         pixel(px,y,8U);
         pixel(px+w-1U,y,8U);
     }
-    bios_text(19U,px/8U+1U,caption,TILE_DIALOG_TEXT_FG);
+    /* Center text within the 16px button, using the same 8px BIOS
+     * cells as the working DATE/POP status bar.
+     */
+    bios_text(TILE_DIALOG_BUTTON_LABEL_ROW,
+              (px+(w-(unsigned int)strlen(caption)*8U)/2U)/8U,
+              caption,TILE_DIALOG_TEXT_FG);
 }
 static void draw_inspector_shell(void)
 {
@@ -1667,12 +1675,15 @@ static void draw_inspector_shell(void)
     inspector_button(24U,64U,"PREV");
     inspector_button(112U,72U,"NEXT");
     inspector_button(232U,72U,"DONE");
-    /* Footer is a single 8px dark status strip below the buttons,
-     * kept away from the bottom border at screen y=175.
+    /* The compact buttons end at y=155, with a clear 4px gray gap
+     * before the footer text at y=160..167. The outer frame ends
+     * at y=175, leaving a further 8px breathing space.
      */
     for(x=3U;x<37U;++x)
-        solid_tile(x*8U,160U,TILE_DIALOG_TEXT_BG);
-    bios_text(20U,3U,"ARROWS / TAB: PAGES   ESC: DONE",
+        solid_tile(x*8U,TILE_DIALOG_FOOTER_ROW*8U,
+                   TILE_DIALOG_TEXT_BG);
+    bios_text(TILE_DIALOG_FOOTER_ROW,4U,
+              "ARROWS / TAB: PAGES   ESC: DONE",
               TILE_DIALOG_TEXT_FG);
     {
         char title[TILE_DIALOG_TEXT_COLUMNS+1U];

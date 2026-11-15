@@ -1540,3 +1540,20 @@ instead of waiting for an unrelated refresh. A zone paint stroke
 continues to refresh its neighboring boundaries. Source art and
 .CTY/.ZON/.NBL files are unchanged, and the site roads remain
 entirely decorative (not part of the transport network).
+
+## Inspector footer spacing refinement
+
+The flat inspector buttons used to extend through screen row 159,
+with their text on y=152..159 and the keyboard footer starting at
+y=160. On DOSBox and the Tandy CRT this made the instructions run
+directly into the PREV/NEXT/DONE controls. The buttons now occupy
+y=140..155 with labels centered on y=144..151. The single-row
+white-on-black footer stays at y=160..167 with 4 clear gray pixels
+between controls and footer, and the footer has a modest additional
+left margin. This also provides 4 pixels between the preview panel
+and buttons. Mouse hit boxes follow the new geometry.
+
+The inspector picture, four pages of text, palette, original sprite
+files, city data and DOS memory allocation remain unchanged.
+Host-side geometry and mouse-hitbox assertions prevent future
+overlap regressions.
