@@ -22,6 +22,8 @@
  * Legacy 0xae..0xc1 records remain authentic 3x3 across saves.
  */
 static unsigned char cropped[20];
+/* Only set during one growth attempt; original source always uses 3x3. */
+static unsigned int request_original=0U;
 static unsigned int unpack_source_id(unsigned int id)
 {
     return id>=CROP_FIRST && id<=CROP_LAST ?
@@ -178,7 +180,7 @@ static unsigned int chosen_building_id(unsigned int kind,
                                        unsigned int x,unsigned int y)
 {
     unsigned int id=select_id(kind,3U,x,y);
-    return id>=SOURCE_FIRST && id<=0xc1U &&
+    return !request_original && id>=SOURCE_FIRST && id<=0xc1U &&
            cropped[id-SOURCE_FIRST] ? CROP_FIRST+id-SOURCE_FIRST : id;
 }
 static int valid_rect(unsigned int x,unsigned int y,
@@ -411,7 +413,9 @@ unsigned int newer_lot_try_grow_with_style(unsigned int x,unsigned int y,
                                            unsigned int *top)
 {
     unsigned int span,ax=0U,ay=0U,slot;
+    request_original=choose_original!=0U;
     span=newer_lot_try_grow(x,y,kind,&ax,&ay);
+    request_original=0U;
     if(span==3U && choose_original && owner!=0 &&
        newer_lot_height(ax,ay)==3U) {
         slot=owner[offset(ax,ay)];
