@@ -25,6 +25,11 @@ unsigned int zone_highlight_footprint_edges(unsigned int x,
                                              unsigned int top,
                                              unsigned int span);
 
+/* Rectangle perimeter for NEWER 3x2 and other nonsquare footprints. */
+unsigned int zone_highlight_rect_edges(unsigned int x,unsigned int y,
+                                        unsigned int left,unsigned int top,
+                                        unsigned int width,unsigned int height);
+
 /* Gray asphalt-colored world edges ONLY between two developed
  * same-type R/C/I lots/buildings. A vacant stage-zero tile always
  * keeps zone-colored edges against BOTH vacant and developed neighbors.
