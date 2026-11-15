@@ -1565,17 +1565,19 @@ static void menu_set_highlight(unsigned int next)
 static void draw_inspector_preview(void)
 {
     unsigned int span=inspected_tile.span,scale,width,origin_x,origin_y;
+    unsigned int height=inspected_tile.height;
     unsigned int i,j,x,y,col,b,graphic,px,py;
     const unsigned char far *sprite;
     const unsigned char *small;
     if(span==0U || span>6U)span=1U;
+    if(height==0U || height>span)height=span;
     scale=tile_inspect_preview_scale(span);
     width=span*8U*scale;
     origin_x=TILE_DIALOG_PREVIEW_X+
              (TILE_DIALOG_PREVIEW_SIZE-width)/2U;
     origin_y=TILE_DIALOG_PREVIEW_Y+
-             (TILE_DIALOG_PREVIEW_SIZE-width)/2U;
-    for(j=0U;j<span;++j)
+             (TILE_DIALOG_PREVIEW_SIZE-height*8U*scale)/2U;
+    for(j=0U;j<height;++j)
         for(i=0U;i<span;++i) {
             sprite=0;
             if(inspected_tile.newer) {
