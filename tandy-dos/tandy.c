@@ -455,6 +455,10 @@ static void draw_newer_site_access(unsigned int px,unsigned int py,
     if(span==0U || span>3U || wx<left || wy<top ||
        wx-left>=span || wy-top>=span)
         return;
+    /* Existing curb geometry assumes a square; avoid drawing an
+     * imaginary southern driveway on 3x2 cropped NEWER buildings. */
+    if(newer_lot_at(wx,wy) &&
+       newer_lot_height(wx,wy)!=span)return;
     side=newer_site_road_side(left,top,span);
     if(side==0U)return; /* never paint a fake disconnected road */
     side=view_rotation_edges(map_turns,side);
