@@ -19,7 +19,7 @@
 #define CROP_LAST 0xd9U
 #define SOURCE_FIRST 0xaeU
 /* Encode a newly cropped 3x2 variant in previously unused source IDs.
- * Legacy 0xae..0xc1 records remain authentic 3x3 across saves.
+ * Legacy square records retain their footprint but use full-height art.
  */
 static unsigned char cropped[20];
 /* Only set during one growth attempt; original source always uses 3x3. */
@@ -176,6 +176,41 @@ static unsigned int select_id(unsigned int kind,unsigned int span,
     choice=(x*17U+y*29U+x*y+span*7U)%(last-first+1U);
     return first+choice;
 }
+/* Square facades must never select art classified as a 3x2 building.
+ * Keep the old deterministic starting choice, skipping rectangular art.
+ * If a custom pack has no square option, use a complete original style.
+ */
+static unsigned int select_square_id(unsigned int kind,
+                                      unsigned int x,unsigned int y)
+{
+    unsigned int first,last,id,start;
+    first=kind==ZONE_RES?0xaeU:kind==ZONE_COM?0xb2U:0xbcU;
+    last=kind==ZONE_RES?0xb1U:kind==ZONE_COM?0xbbU:0xc1U;
+    start=select_id(kind,3U,x,y);
+    id=start;
+    do {
+        if(!cropped[id-SOURCE_FIRST])return id;
+        id=id==last?first:id+1U;
+    } while(id!=start);
+    return 1U+((x*17U+y*29U+kind)&3U);
+}
+/* .NBL may load before artwork at startup or after it through the UI.
+ * Normalize only legacy square NEWER records, without changing ownership,
+ * original .CTY tiles, zoning, explicit 3x2 records or original styles.
+ */
+static void normalize_square_art(void)
+{
+    unsigned int i;
+    if(!art)return;
+    for(i=0U;i<NEWER_LOT_MAX;++i) {
+        struct newer_record *rec=&records[i];
+        if(rec->used && rec->span==3U &&
+           rec->id>=SOURCE_FIRST && rec->id<=0xc1U &&
+           cropped[rec->id-SOURCE_FIRST])
+            rec->id=(unsigned char)select_square_id(
+                rec->kind,rec->x,rec->y);
+    }
+}
 static unsigned int chosen_building_id(unsigned int kind,
                                        unsigned int x,unsigned int y)
 {
@@ -238,6 +273,7 @@ int newer_lot_load_art(const char *path)
     FILE *f;
     unsigned char NEWER_FAR *candidate;
     if(art!=0) {free(art);art=0;}
+    memset(cropped,0,sizeof(cropped));
     f=fopen(path,"rb");
     if(!f) return 0;
     candidate=(unsigned char NEWER_FAR*)malloc(NEWER_LOT_ART_BYTES);
@@ -253,6 +289,7 @@ int newer_lot_load_art(const char *path)
           cropped[id-SOURCE_FIRST]=(unsigned char)art_top_green(
               art+(164U+9U*(id-SOURCE_FIRST))*PACK_TILE_BYTES);
     }
+    normalize_square_art();
     return 1;
 }
 void newer_lot_free_art(void)
@@ -395,7 +432,7 @@ int newer_lot_retrofit_original(unsigned int cx,unsigned int cy,
     rec->kind=(unsigned char)kind;
     rec->span=3U;
     /* A facelift must cover the entire hidden legacy 3x3 prefab. */
-    rec->id=(unsigned char)select_id(kind,3U,left,top);
+    rec->id=(unsigned char)select_square_id(kind,left,top);
     rec->used=1U;
     fill_owner(index);
     ++count;
@@ -632,5 +669,6 @@ int newer_lot_load(const char *path)
         fill_owner(i);
     }
     count=count_in;
+    normalize_square_art();
     return 1;
 }

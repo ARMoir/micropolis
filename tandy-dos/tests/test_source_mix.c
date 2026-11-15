@@ -179,10 +179,85 @@ static void test_imported(unsigned int base,unsigned int kind)
     assert(!newer_lot_retrofit_original(x+1U,y+1U,kind));
     assert(!newer_lot_at(x,y));
 }
+
+static int rectangle_id(unsigned int id)
+{
+    return id==0xb0U || id==0xb2U || id==0xb4U || id==0xb6U ||
+           id==0xbcU || id==0xbeU || id==0xbfU || id==0xc0U ||
+           id==0xc1U;
+}
+static void test_square_facades(void)
+{
+    unsigned int kind,x,y,id;
+    for(kind=ZONE_RES;kind<=ZONE_IND;++kind)
+        for(y=10U;y<18U;++y)
+            for(x=10U;x<18U;++x) {
+                prefab(x,y,kind==ZONE_RES?261U:
+                       kind==ZONE_COM?432U:621U,kind);
+                assert(newer_lot_retrofit_original(x+1U,y+1U,kind));
+                assert(newer_lot_info(x,y,0,0,0,0,&id));
+                assert(!rectangle_id(id));
+                assert(newer_lot_height(x,y)==3U);
+                assert(newer_lot_at(x+2U,y+2U));
+            }
+}
+static void write_legacy_square(unsigned int kind,unsigned int id)
+{
+    unsigned char data[17]={'N','W','L','T',1,CITY_WIDTH,CITY_HEIGHT,0,
+                            1,0,20,30,0,3,0,0,0};
+    unsigned int i,hash=0x4961U;
+    FILE *f;
+    data[12]=(unsigned char)kind;data[14]=(unsigned char)id;
+    for(i=10U;i<15U;++i)
+        hash=(((hash<<5U)|(hash>>11U))^data[i])&65535U;
+    data[15]=(unsigned char)hash;data[16]=(unsigned char)(hash>>8U);
+    f=fopen("legacy-square.nbl","wb");
+    assert(f);
+    assert(fwrite(data,1U,sizeof(data),f)==sizeof(data));
+    assert(fclose(f)==0);
+}
+static void test_legacy_square_art(void)
+{
+    unsigned int id,kind,chosen;
+    /* Exhaustively check every legacy NEWER 3x3 ID and both load orders. */
+    for(id=0xaeU;id<=0xc1U;++id) {
+        kind=id<=0xb1U?ZONE_RES:id<=0xbbU?ZONE_COM:ZONE_IND;
+        flat();mature(20U,30U,3U,kind);
+        write_legacy_square(kind,id);
+        assert(newer_lot_load("legacy-square.nbl"));
+        assert(newer_lot_info(20U,30U,0,0,0,0,&chosen));
+        assert(!rectangle_id(chosen));
+        if(!rectangle_id(id))assert(chosen==id);
+        assert(newer_lot_height(20U,30U)==3U);
+        assert(newer_lot_at(22U,32U));
+        assert(city_at(22U,32U)==0U);
+        assert(newer_lot_save("square-fixed.nbl"));
+        newer_lot_clear();
+        assert(newer_lot_load("square-fixed.nbl"));
+        assert(newer_lot_info(20U,30U,0,0,0,0,&chosen));
+        assert(!rectangle_id(chosen));
+
+        newer_lot_free_art();
+        newer_lot_clear();
+        assert(newer_lot_load("legacy-square.nbl"));
+        assert(newer_lot_info(20U,30U,0,0,0,0,&chosen));
+        assert(chosen==id);
+        assert(newer_lot_load_art("resources/sc2k-buildings/SC2KM8.DAT"));
+        assert(newer_lot_info(20U,30U,0,0,0,0,&chosen));
+        assert(!rectangle_id(chosen));
+        assert(newer_lot_height(20U,30U)==3U);
+        assert(newer_lot_at(22U,32U));
+    }
+    assert(remove("legacy-square.nbl")==0);
+    assert(remove("square-fixed.nbl")==0);
+}
+
 int main(void)
 {
     assert(newer_lot_load_art(
         "resources/sc2k-buildings/SC2KM8.DAT"));
+    test_square_facades();
+    test_legacy_square_art();
     test_residential_one_tile();
     test_new_footprints(ZONE_RES,20U);
     test_new_footprints(ZONE_COM,40U);

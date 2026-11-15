@@ -1,3 +1,12 @@
+## Rectangular NEWER artwork is reserved for 3x2 lots
+
+NEWERM8 sprites whose entire top tile row is blank green are used only
+as 3x2 artwork, never as 3x3 facades. Imported-city 3x3 replacements
+select full-height artwork. Older .NBL square records using rectangular
+art receive a valid full-height replacement when artwork is loaded,
+preserving their footprint, zoning and underlying .CTY data. Existing
+3x2 records remain 3x2. The DAT files and save format are unchanged.
+
 ## VGA and Tandy automatic video selection
 
 The same MICROPOL.EXE now selects VGA mode 13h (320x200) when the BIOS
