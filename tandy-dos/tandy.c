@@ -1603,16 +1603,16 @@ static void inspector_button(unsigned int px,unsigned int w,
     unsigned int x,y;
     for(y=144U;y<160U;y+=8U)
         for(x=px;x<px+w;x+=8U)
-            solid_tile(x,y,7U);
+            solid_tile(x,y,TILE_DIALOG_TEXT_BG);
     for(x=px;x<px+w;++x) {
-        pixel(x,144U,0U);
-        pixel(x,159U,0U);
+        pixel(x,144U,8U);
+        pixel(x,159U,8U);
     }
     for(y=144U;y<160U;++y) {
-        pixel(px,y,0U);
-        pixel(px+w-1U,y,0U);
+        pixel(px,y,8U);
+        pixel(px+w-1U,y,8U);
     }
-    bios_text(19U,px/8U+1U,caption,0x70U);
+    bios_text(19U,px/8U+1U,caption,TILE_DIALOG_TEXT_FG);
 }
 static void draw_inspector_shell(void)
 {
@@ -1628,6 +1628,13 @@ static void draw_inspector_shell(void)
         pixel(8U,y,0U);
         pixel(311U,y,0U);
     }
+    /* The same white-on-black BIOS text as DATE/POP. The original
+     * gray-backed 0x70 graphics attribute made the glyphs render as
+     * black blocks in DOSBox/Tandy mode 9; explicitly draw the black
+     * cells and set ONLY the foreground ink (15).
+     */
+    for(x=2U;x<27U;++x)
+        solid_tile(x*8U,40U,TILE_DIALOG_TEXT_BG);
     /* Name field and picture surround are deliberately flat. */
     for(x=16U;x<216U;++x) {
         pixel(x,39U,8U);
@@ -1659,11 +1666,17 @@ static void draw_inspector_shell(void)
     inspector_button(24U,64U,"PREV");
     inspector_button(112U,72U,"NEXT");
     inspector_button(232U,72U,"DONE");
-    bios_text(21U,3U,"ARROWS / TAB: PAGES   ESC: DONE",0x70U);
+    /* Footer is a single 8px dark status strip below the buttons,
+     * kept away from the bottom border at screen y=175.
+     */
+    for(x=3U;x<37U;++x)
+        solid_tile(x*8U,160U,TILE_DIALOG_TEXT_BG);
+    bios_text(20U,3U,"ARROWS / TAB: PAGES   ESC: DONE",
+              TILE_DIALOG_TEXT_FG);
     {
         char title[TILE_DIALOG_TEXT_COLUMNS+1U];
         tile_inspect_dialog_title(&inspected_tile,title);
-        bios_text(5U,3U,title,0x70U);
+        bios_text(5U,3U,title,TILE_DIALOG_TEXT_FG);
     }
     draw_inspector_preview();
 }
@@ -1679,15 +1692,18 @@ static void draw_info_page(void)
             draw_inspector_shell();
             inspector_window_drawn=1;
         }
-        /* Page changes touch only 24x10 text cells; the original
-         * graphics preview, gray frame and buttons remain intact.
+        /* Match the known-working DATE/POP white-on-dark text path:
+         * black 8x8 character cells, then BIOS foreground ink 15.
+         * In Tandy graphics mode BL is a color, NOT a text-mode
+         * background/foreground attribute (0x70 corrupts glyphs).
+         * Page changes still redraw ONLY these 240 small cells.
          */
         for(j=7U;j<17U;++j)
             for(i=2U;i<2U+TILE_DIALOG_TEXT_COLUMNS;++i)
-                solid_tile(i*8U,j*8U,7U);
+                solid_tile(i*8U,j*8U,TILE_DIALOG_TEXT_BG);
         for(i=0U;i<TILE_INSPECT_ROWS;++i) {
             tile_inspect_dialog_line(&inspected_tile,page,i,line);
-            bios_text(7U+i,2U,line,0x70U);
+            bios_text(7U+i,2U,line,TILE_DIALOG_TEXT_FG);
         }
         return;
     }

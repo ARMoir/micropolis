@@ -35,6 +35,14 @@ const char *tile_inspect_kind(unsigned int id);
 #define TILE_DIALOG_PREVIEW_X 224U
 #define TILE_DIALOG_PREVIEW_Y 56U
 #define TILE_DIALOG_PREVIEW_SIZE 80U
+/* Same BIOS graphics-mode text as the readable DATE/POP/JOBS HUD:
+ * 0x0F = white pixels. 0x70 used in the old inspector interpreted
+ * as black ink / XOR in mode 9, producing unreadable glyph blocks.
+ * Fill the TEXT CELL background explicitly; never request a
+ * text-mode foreground/background attribute in graphics mode.
+ */
+#define TILE_DIALOG_TEXT_BG 0U
+#define TILE_DIALOG_TEXT_FG 15U
 #define TILE_DIALOG_TEXT_COLUMNS 24U
 unsigned int tile_inspect_dialog_click(unsigned int px,unsigned int py);
 unsigned int tile_inspect_preview_scale(unsigned int span);

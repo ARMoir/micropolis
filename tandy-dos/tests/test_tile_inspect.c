@@ -65,6 +65,12 @@ int main(void)
     /* Simple flat gray dialog: clickable Done/Next/Prev, plus
      * any other click still advances as previous inspector did.
      */
+    /* Do not regress to graphics-mode BIOS BL=0x70; this made
+     * black/inverted overlapping glyphs on DOSBox and real Tandy.
+     * DATE/POP uses text ink 15 with an explicitly cleared background.
+     */
+    assert(TILE_DIALOG_TEXT_BG==0U);
+    assert(TILE_DIALOG_TEXT_FG==15U);
     assert(tile_inspect_dialog_click(235U,150U)==3U);
     assert(tile_inspect_dialog_click(303U,159U)==3U);
     assert(tile_inspect_dialog_click(232U,143U)==0U);

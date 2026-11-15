@@ -1499,3 +1499,20 @@ compact label lengths are verified by the host-side C89 inspector
 regression, including every original tile ID and whole-building
 source-art tile ranges. Inspect remains read-only and does not change
 any existing source data or save format.
+
+## Inspect dialog text legibility (Tandy graphics mode)
+
+The original flat-gray inspector used BIOS character attribute
+`0x70` (a **text-mode** black-on-light-gray attribute). Tandy
+graphics mode 9 does **not** honor this as a background/foreground
+pair: it selects black or inverted glyph pixels, which appeared as
+unreadable overlapping black blocks in DOSBox.
+
+The inspector now uses the same proven `bios_text()` ink color
+**15 (white)** as the date/population/status HUD, with the text cells
+explicitly filled black **before** printing. Its title, ten detailed
+data rows, PREV/NEXT/DONE buttons, and footer are all clear
+white-on-black within the original flat-gray frame. The accurate
+building-art preview and all data pages are retained. No extra font
+ROM, buffer, graphics mode or per-frame work has been added. A
+regression asserts the graphics-mode color constants.
