@@ -62,7 +62,7 @@ static void check_art(unsigned int x,unsigned int y,
     assert(f!=NULL);
     for(turn=0U;turn<4U;++turn) {
         const unsigned char *p=newer_lot_pixels(x,y,turn);
-        unsigned int part=height==2U ? 3U :
+        unsigned int part=(span==3U && height==2U) ? 3U :
             turn==0U?0U:turn==1U?span-1U:
             turn==2U?span*span-1U:(span-1U)*span;
         index=first_tile(id)+part;
