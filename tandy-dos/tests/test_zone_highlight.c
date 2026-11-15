@@ -263,6 +263,13 @@ int main(void)
             }
         }
     assert(total==9U);
+    /* A cropped 3x2 has no internal border and leaves its third row
+     * outside the building footprint. */
+    assert(zone_highlight_rect_edges(30U,40U,30U,40U,3U,2U)==9U);
+    assert(zone_highlight_rect_edges(31U,40U,30U,40U,3U,2U)==1U);
+    assert(zone_highlight_rect_edges(31U,41U,30U,40U,3U,2U)==4U);
+    assert(zone_highlight_rect_edges(32U,41U,30U,40U,3U,2U)==6U);
+    assert(zone_highlight_rect_edges(30U,42U,30U,40U,3U,2U)==0U);
     assert(zone_highlight_footprint_edges(10U,10U,10U,10U,1U)==15U);
     assert(zone_highlight_footprint_edges(10U,10U,11U,10U,2U)==0U);
     assert(zone_highlight_footprint_edges(10U,10U,10U,10U,0U)==0U);
