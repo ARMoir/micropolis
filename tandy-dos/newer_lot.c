@@ -297,7 +297,7 @@ const unsigned char NEWER_FAR *newer_lot_pixels(
        rec->id<=ORIGINAL_STYLE_LAST)return 0;
     span=rec->span;
     lx=x-rec->x;ly=y-rec->y;
-    if(lot_height(span,rec->id)==2U) {
+    if(span==3U && lot_height(span,rec->id)==2U) {
         /* The upper source row is completely green. The displayed
          * 3x2 uses original sprite rows 1 and 2, unscaled. */
         part=3U+ly*3U+lx;
