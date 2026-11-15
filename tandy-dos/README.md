@@ -5,7 +5,7 @@ Automatic VGA and `/VGA` now load `VGATILES.DAT`, `VGANEWER.DAT` and
 VGA-only shading from the original full-color 16x16 Micropolis tiles and
 the higher-detail 16x16 NEWER library, preserving fine color mixtures
 lost in the 16-color conversion. The resolution remains 320x200.
-VGA ground uses smooth tan shades instead of the Tandy checker.
+VGA ground uses one solid tan shade, with no stipple or thatch pattern.
 
 `/VGA16` selects the previous compatibility output for comparison.
 Missing assets or insufficient conventional memory fall back to that
@@ -23,17 +23,19 @@ City formats, building selection and rectangular NEWER rules are unchanged.
 
 ## Light-brown ground and forest-edge grass
 
-Clear ground now uses a fine brown/light-gray checker for a lighter tan
-on the shared 16-color Tandy/VGA palette. Tiles touching forest keep green
-ground; touching includes all eight neighbors, and forest itself stays
-green. Developed lots covering old forest do not count as visible trees.
+Clear ground is now solid brown (Tandy palette 6), with no gray checker,
+stipple or thatching. Enhanced 256-color VGA uses one solid light-brown
+shade (index 226) instead of its earlier textured soil. Tiles touching
+forest keep green ground, including diagonals, and forests stay green.
+Developed lots covering old forest no longer count as visible trees.
 
-For other city artwork, dark-green background pixels (palette index 2)
-receive the same tan treatment away from forest. Other palette colors,
-including bright green, remain unchanged. NEWER driveway details are
-composited first; zoning outlines and construction previews are drawn
-after the soil pass. DAT assets and saved city data are untouched.
-Clearing forest repaints neighboring tiles, including diagonal neighbors.
+The original Micropolis XPM used a reddish background color for dirt.
+TILES.DAT now maps only that source ground symbol to background green;
+the renderer changes it to brown except at forest edges. Original
+red roofs, signs, fire and other building details retain their colors.
+NEWER source artwork and bright ink are preserved. NEWER driveways are
+composited first, then ground tint, then zoning and construction previews.
+Saved city data is untouched. Clearing trees repaints all eight neighbors.
 
 ## Rectangular NEWER artwork is reserved for 3x2 lots
 

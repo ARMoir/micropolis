@@ -89,7 +89,17 @@ def convert(source: Path, preserve_traffic: bool = False,
         match = re.search(r'\bc\s+([^\s]+)', line[1:])
         if not match:
             raise ValueError(f"Invalid XPM color definition: {line}")
-        lookup[token] = _nearest(_parse_rgb(match.group(1)))
+        rgb = _parse_rgb(match.group(1))
+        # The XPM's literal space is red-tinted dirt, not a red roof.
+        # Convert that *source material* to the grass-background key:
+        # forest edges remain green and dry cells render solid brown.
+        # All other red paint/shading keeps its original palette value.
+        if token == " ":
+            if rgb != (204, 127, 102):
+                raise ValueError("Unexpected Micropolis source soil color")
+            lookup[token] = 2
+        else:
+            lookup[token] = _nearest(rgb)
 
     rows = quoted[1 + colors:]
     packed = bytearray()

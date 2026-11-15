@@ -11,8 +11,8 @@ void ground_init(void)
     unsigned int p,b,hi,lo;
     for(p=0U;p<2U;++p)for(b=0U;b<256U;++b) {
         hi=b>>4;lo=b&15U;
-        if(hi==2U)hi=p?7U:6U;
-        if(lo==2U)lo=p?6U:7U;
+        if(hi==2U)hi=6U;
+        if(lo==2U)lo=6U;
         ground_tint[p][b]=(unsigned char)((hi<<4)|lo);
     }
 }

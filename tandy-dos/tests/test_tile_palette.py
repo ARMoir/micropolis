@@ -20,6 +20,13 @@ def main() -> None:
     updated = convert(source)
     assert len(baseline) == len(updated) == len(packaged) == 30720
     assert updated == packaged, "packaged TILES.DAT differs from converter"
+    # Original XPM used a reddish-pink symbol for the soil background.
+    # It now uses key 2 for conditional forest green/solid-brown rendering.
+    assert pixel(updated, 0, 0) == 2
+    assert pixel(updated, 0, 7) == 2
+    # Other intentional red inks, including building colors, still exist.
+    assert any(pixel(updated, t, i) == 12
+               for t in range(240, 900) for i in range(64))
 
     for tile in (0, 2, 22, 66, 79, 226, 240, 261, 270,
                  405, 409, 418, 423, 427, 431, 432, 441, 612, 745):

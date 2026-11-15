@@ -30,6 +30,11 @@ def desired_original(rows, low):
                 samples=[rows[src*16+y*2+dy][x*2+dx]
                          for dy in range(2) for dx in range(2)]
                 mean=tuple(sum(c[k] for c in samples)//4 for k in range(3))
+                # The original XPM dirt symbol now uses low key 2.
+                # Avoid restoring its reddish source hue on forest edges:
+                # dry soil is painted solid brown at presentation time.
+                if key==2 and (204,127,102) in samples:
+                    mean=PALETTE[2]
                 # Keep intentional concrete and recovered white road paint.
                 if (key in (7,8) and mean[1]>mean[0]*1.5) or (
                         64<=tile<=207 and key==15):

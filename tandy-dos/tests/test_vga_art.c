@@ -40,13 +40,24 @@ int main(void)
     vga_art_scroll(0,8);check(80,32);
     /* Smooth tan only on soil, never arbitrary brown building pixels. */
     vga_art_begin(80,32,1,1);
-    assert(vga_art_pixel(80,32,6)>=226U);
-    assert(vga_art_pixel(81,32,7)>=226U);
+    assert(vga_art_pixel(80,32,6)==226U);
+    assert(vga_art_pixel(81,32,7)==226U);
+    assert(vga_art_pixel(87,39,6)==226U); /* no 8-pixel texture */
+    assert(vga_art_pixel(80,32,12)==12U); /* red roofs not recolored */
     assert(vga_art_pixel(80,32,15)==15);
     vga_art_scroll(8,0);
-    assert(vga_art_pixel(88,32,6)>=226U);
+    assert(vga_art_pixel(88,32,6)==226U);
     vga_art_begin(88,32,0,1);
     assert(vga_art_pixel(88,32,2)==2);
+    /* Source dirt is no longer red even on the green side of a forest. */
+    read_tile(0U);
+    assert(tile[0]==2U);
+    vga_art_begin(80,32,0,1);
+    vga_art_stamp(80,32,0,0);
+    assert(vga_art_pixel(80,32,2)==2);
+    vga_art_begin(80,32,1,1);
+    vga_art_stamp(80,32,0,0);
+    assert(vga_art_pixel(80,32,6)==226U);
     vga_art_free();
     assert(!vga_art_palette());
     assert(vga_art_pixel(88,32,6)==6);
