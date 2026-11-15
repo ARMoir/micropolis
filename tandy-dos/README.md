@@ -288,6 +288,23 @@ cc -std=c89 -Wall -Wextra -pedantic -o test-small-lot-art \
 ./test-small-lot-art
 ```
 
+### Compact 3x2 NEWER buildings
+
+When `NEWERM8.DAT` loads, the Tandy engine examines the packed Tandy
+palette pixels in the three upper 8x8 sprites of each 3x3 NEWER design.
+Only a top row made entirely of palette color 2 (green ground) qualifies.
+A qualifying NEWER structure can develop as a genuine **3-wide x 2-high**
+lot, using the six original bottom sprites with no rescaling or changes to
+the DAT file. Other NEWER designs remain 3x3, and choosing an original
+TILES style continues to reserve a complete 3x3 building.
+
+The six-tile footprint is used for build validation, ownership, outer
+zone lines, demolition, save/load, and the tile inspector. The spare
+source-ID range 0xC6..0xD9 distinguishes new cropped records from older
+3x3 records in the existing five-byte NBL format: no old cities or
+sidecars require conversion. Frontage decals remain disabled on cropped
+sites until a rectangle-aware road-facing decal is available.
+
 ### Simulation work still outstanding
 
 The original implementation under `micropolis-activity/src/sim/s_*.c`
