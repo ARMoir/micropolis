@@ -26,6 +26,19 @@ unsigned int zone_highlight_footprint_edges(unsigned int x,
     if(x==left) edges|=8U; /* west */
     return edges;
 }
+unsigned int zone_highlight_rect_edges(unsigned int x,unsigned int y,
+                                        unsigned int left,unsigned int top,
+                                        unsigned int width,unsigned int height)
+{
+    unsigned int edges=0U;
+    if(!width || !height || x<left || y<top ||
+       x-left>=width || y-top>=height)return 0U;
+    if(y==top)edges|=1U;
+    if(x-left==width-1U)edges|=2U;
+    if(y-top==height-1U)edges|=4U;
+    if(x==left)edges|=8U;
+    return edges;
+}
 unsigned int zone_highlight_hatch_row(unsigned int y)
 {
     if(y==1U || y==5U) return 0x2aU;
@@ -67,7 +80,8 @@ unsigned int zone_highlight_style(unsigned int x,unsigned int y,
      * because of loss of services; no internal lines ever appear.
      */
     if(newer_lot_info(x,y,&left,&top,&span,0,0))
-        return zone_highlight_footprint_edges(x,y,left,top,span);
+        return zone_highlight_rect_edges(x,y,left,top,span,
+                                         newer_lot_height(x,y));
 
     /* Individually zoned 1x1 plots keep all four sides, regardless
      * of their neighbors. Only stage-zero vacant land is hatched.
