@@ -1,3 +1,17 @@
+## Light-brown ground and forest-edge grass
+
+Clear ground now uses a fine brown/light-gray checker for a lighter tan
+on the shared 16-color Tandy/VGA palette. Tiles touching forest keep green
+ground; touching includes all eight neighbors, and forest itself stays
+green. Developed lots covering old forest do not count as visible trees.
+
+For other city artwork, dark-green background pixels (palette index 2)
+receive the same tan treatment away from forest. Other palette colors,
+including bright green, remain unchanged. NEWER driveway details are
+composited first; zoning outlines and construction previews are drawn
+after the soil pass. DAT assets and saved city data are untouched.
+Clearing forest repaints neighboring tiles, including diagonal neighbors.
+
 ## Rectangular NEWER artwork is reserved for 3x2 lots
 
 NEWERM8 sprites whose entire top tile row is blank green are used only

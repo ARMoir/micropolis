@@ -11,6 +11,7 @@
 #include <string.h>
 #include <conio.h>
 #include "city.h"
+#include "ground.h"
 #include "editor.h"
 #include "engine.h"
 #include "ui.h"
@@ -541,7 +542,7 @@ static void draw_newer_site_access(unsigned int px,unsigned int py,
 /* All original multi-tile facility art uses the same host-tested
  * view_rotation_building_tile transform, including fire and police.
  */
-static void draw_city_tile(unsigned int px, unsigned int py,
+static void draw_city_tile_art(unsigned int px, unsigned int py,
                            unsigned int mx, unsigned int my)
 {
     unsigned short t = city_at(mx, my) & TILE_MASK;
@@ -580,8 +581,6 @@ static void draw_city_tile(unsigned int px, unsigned int py,
             pixel(px+2U,py+2U,15U);
             pixel(px+5U,py+2U,15U);
         }
-        draw_zone_border(px,py,mx,my);
-        draw_pending_tile(px,py,mx,my);
         return;
     }
     if (t == 0U || (t >= 21U && t <= 43U)) {
@@ -615,16 +614,12 @@ static void draw_city_tile(unsigned int px, unsigned int py,
                 }
             }
             draw_newer_site_access(px,py,mx,my,mx,my,1U,kind);
-            draw_zone_border(px,py,mx,my);
-            draw_pending_tile(px,py,mx,my);
             return;
         }
     }
 
     if (small != NULL) {
         draw_packed_tile(px,py,small);
-        draw_zone_border(px,py,mx,my);
-        draw_pending_tile(px,py,mx,my);
         return;
     }
 
@@ -673,8 +668,6 @@ static void draw_city_tile(unsigned int px, unsigned int py,
         } else
             graphic=view_rotation_building_tile(map_turns,mx,my,graphic);
         draw_original_tile(px,py,graphic);
-        draw_zone_border(px, py, mx, my);
-        draw_pending_tile(px, py, mx, my);
         return;
     }
 
@@ -738,8 +731,41 @@ static void draw_city_tile(unsigned int px, unsigned int py,
         pixel(px + 3U, py + 3U, 12);
     }
     /* Fallback artwork retains the same zone boundaries as TILES.DAT. */
-    draw_zone_border(px, py, mx, my);
-    draw_pending_tile(px, py, mx, my);
+}
+
+/* Apply soil before zoning/placement ink, and after NEWER driveway
+ * compositing. Work on packed bytes with a lookup, not per-pixel calls.
+ * The 8px-aligned map keeps the fine tan checker stable while scrolling.
+ */
+static void draw_city_tile(unsigned int px,unsigned int py,
+                           unsigned int mx,unsigned int my)
+{
+    unsigned int row,n,off;
+    unsigned char before,after;
+    int green=ground_keep_green(mx,my);
+    int clear=ground_is_clear(mx,my);
+    if(clear) {
+        if(green)solid_tile(px,py,2U);
+        else {
+            for(row=0U;row<8U;++row) {
+                off=vram_offset(px,py+row);
+                after=ground_tint[row&1U][0x22U];
+                for(n=0U;n<4U;++n)video[off+n]=after;
+            }
+        }
+    } else {
+        draw_city_tile_art(px,py,mx,my);
+        if(!green)for(row=0U;row<8U;++row) {
+            off=vram_offset(px,py+row);
+            for(n=0U;n<4U;++n) {
+                before=video[off+n];
+                after=ground_tint[row&1U][before];
+                if(after!=before)video[off+n]=after;
+            }
+        }
+    }
+    draw_zone_border(px,py,mx,my);
+    draw_pending_tile(px,py,mx,my);
 }
 
 /* AH=0Eh teletype can SCROLL the ENTIRE graphics screen when its
@@ -843,7 +869,8 @@ static unsigned char overview_color(unsigned int px, unsigned int py)
     view_rotation_to_world(map_turns,dx,dy,&mx,&my);
     id = city_at(mx,my) & TILE_MASK;
     kind = zoning_at(mx,my);
-    if (id >= 1U && id <= 20U) color = 1U;
+    if (id == 0U) color = ground_keep_green(mx,my)?2U:6U;
+    else if (id >= 1U && id <= 20U) color = 1U;
     else if (id >= 21U && id <= 43U) color = 10U;
     else if (id >= 64U && id <= 207U) color = 8U;
     else if (id >= 208U && id <= 239U) color = 7U;
@@ -1426,7 +1453,15 @@ static void redraw_recent_preview(void)
                 placement_recent_at(mx+1U,my)!=PREVIEW_NONE) ||
                (my>0U && placement_recent_at(mx,my-1U)!=PREVIEW_NONE) ||
                (my+1U<CITY_HEIGHT &&
-                placement_recent_at(mx,my+1U)!=PREVIEW_NONE))
+                placement_recent_at(mx,my+1U)!=PREVIEW_NONE) ||
+               (mx>0U && my>0U &&
+                placement_recent_at(mx-1U,my-1U)!=PREVIEW_NONE) ||
+               (mx+1U<CITY_WIDTH && my>0U &&
+                placement_recent_at(mx+1U,my-1U)!=PREVIEW_NONE) ||
+               (mx>0U && my+1U<CITY_HEIGHT &&
+                placement_recent_at(mx-1U,my+1U)!=PREVIEW_NONE) ||
+               (mx+1U<CITY_WIDTH && my+1U<CITY_HEIGHT &&
+                placement_recent_at(mx+1U,my+1U)!=PREVIEW_NONE))
                 draw_display_tile(sx,sy);
         }
     draw_cursor();
@@ -3427,6 +3462,7 @@ int main(int argc, char **argv)
     video = use_vga ? vga_buffer :
             (volatile unsigned char far *)MK_FP(0xb800, 0);
     tandy_init_scanlines();
+    ground_init();
     if(use_vga) init_vga_palette_font();
     (void)load_original_art();
     /* Canonical neutral filenames. The unchanged first-generation
