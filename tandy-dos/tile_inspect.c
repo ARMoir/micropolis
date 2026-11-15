@@ -200,7 +200,7 @@ void tile_inspect_line(const struct tile_inspect *o,
         case 3U:sprintf(out,"TILE ID: %u  HEX:%03X",o->id,o->id);break;
         case 4U:sprintf(out,"ZONING: %s",zone_name(o->zone));break;
         case 5U:sprintf(out,"SOURCE: %s",source);break;
-        case 6U:sprintf(out,"FOOTPRINT: %u X %u",o->span,o->span);break;
+        case 6U:sprintf(out,"FOOTPRINT: %u X %u",o->span,o->height);break;
         case 7U:sprintf(out,"ORIGIN: %03u,%03u",o->left,o->top);break;
         case 8U:sprintf(out,"PART: %u,%u IN FOOTPRINT",
                         o->part_x+1U,o->part_y+1U);break;
@@ -246,7 +246,7 @@ void tile_inspect_line(const struct tile_inspect *o,
         case 3U:
             if(o->newer)sprintf(out,"BUILDING: %uX%u NEWER",o->span,o->height);
             else if(o->original_group)
-                sprintf(out,"BUILDING: %uX%u ORIGINAL",o->span,o->span);
+                sprintf(out,"BUILDING: %uX%u ORIGINAL",o->span,o->height);
             else if(o->zone)
                 sprintf(out,"LOT: %s",
                         o->stage?"DEVELOPED":"VACANT");
@@ -255,7 +255,7 @@ void tile_inspect_line(const struct tile_inspect *o,
         case 4U:sprintf(out,"ANCHOR: %03u,%03u",o->left,o->top);break;
         case 5U:sprintf(out,"SECTION: %u,%u OF %uX%u",
                         o->part_x+1U,o->part_y+1U,
-                        o->span,o->span);break;
+                        o->span,o->height);break;
         case 6U:
             if(o->newer)
                 sprintf(out,"%s ID: %02X",
@@ -349,7 +349,7 @@ void tile_inspect_dialog_title(const struct tile_inspect *o,
     if(o->newer) {
         type=o->zone==ZONE_RES?"Residential":
              o->zone==ZONE_COM?"Commercial":"Industrial";
-        sprintf(out,"%s %ux%u",type,o->span,o->span);
+        sprintf(out,"%s %ux%u",type,o->span,o->height);
     } else if(o->zone!=ZONE_NONE && !o->original_group) {
         type=o->zone==ZONE_RES?"Residential":
              o->zone==ZONE_COM?"Commercial":"Industrial";
@@ -384,7 +384,7 @@ void tile_inspect_dialog_line(const struct tile_inspect *o,
         case 3U:sprintf(out,"Zone: %s",zone_name(o->zone));break;
         case 4U:sprintf(out,"Kind: %.17s",tile_inspect_kind(o->id));break;
         case 5U:sprintf(out,"Source: %s",type);break;
-        case 6U:sprintf(out,"Size: %ux%u tiles",o->span,o->span);break;
+        case 6U:sprintf(out,"Size: %ux%u tiles",o->span,o->height);break;
         case 7U:sprintf(out,"Anchor: %03u,%03u",o->left,o->top);break;
         case 8U:sprintf(out,"Section: %u,%u",o->part_x+1U,o->part_y+1U);break;
         case 9U:
@@ -423,9 +423,9 @@ void tile_inspect_dialog_line(const struct tile_inspect *o,
             if(o->newer)
                 sprintf(out,"%s: %ux%u",
                         o->source_original?"ORIGINAL ART":"NEWER ART",
-                        o->span,o->span);
+                        o->span,o->height);
             else if(o->original_group)
-                sprintf(out,"Original: %ux%u",o->span,o->span);
+                sprintf(out,"Original: %ux%u",o->span,o->height);
             else if(o->zone)sprintf(out,"Lot: %s",
                                     o->stage?"DEVELOPED":"VACANT");
             else sprintf(out,"No custom RCI zone");
@@ -433,7 +433,7 @@ void tile_inspect_dialog_line(const struct tile_inspect *o,
         case 4U:sprintf(out,"Anchor: %03u,%03u",o->left,o->top);break;
         case 5U:sprintf(out,"Part: %u,%u of %ux%u",
                         o->part_x+1U,o->part_y+1U,
-                        o->span,o->span);break;
+                        o->span,o->height);break;
         case 6U:
             if(o->newer)sprintf(out,"Design: %02X",o->source_id);
             else if(o->original_group)
