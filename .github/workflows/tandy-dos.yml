@@ -76,6 +76,9 @@ jobs:
             -o test-video-ops tandy-dos/video_ops.c tandy-dos/tests/test_video_ops.c
           ./test-video-ops
           cc -std=c89 -Wall -Wextra -pedantic \
+            -o test-vga tandy-dos/video_ops.c tandy-dos/tests/test_vga.c
+          ./test-vga
+          cc -std=c89 -Wall -Wextra -pedantic \
             -o test-zoning tandy-dos/city.c tandy-dos/zoning.c tandy-dos/newer_lot.c tandy-dos/tests/test_zoning.c
           ./test-zoning
           cc -std=c89 -Wall -Wextra -pedantic \
@@ -180,6 +183,28 @@ jobs:
             tandy-dos/placement.c tandy-dos/simulation.c tandy-dos/stadium_fx.c tandy-dos/video_ops.c tandy-dos/menu_font.c tandy-dos/view_rotation.c tandy-dos/tool_art.c tandy-dos/infrastructure.c tandy-dos/small_lot_art.c
           test -s MICROPOL.EXE
           file MICROPOL.EXE
+
+      - name: Smoke-test VGA and Tandy autodetection in DOSBox
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y dosbox xvfb
+          mkdir -p /tmp/micropol-smoke
+          cp MICROPOL.EXE TILES.DAT NEWER1.DAT NEWERM8.DAT /tmp/micropol-smoke/
+          for machine in vgaonly tandy; do
+            printf '[dosbox]\nmachine=%s\n[cpu]\ncycles=max\n[sdl]\noutput=surface\n' "$machine" > /tmp/micropol-smoke.conf
+            SDL_AUDIODRIVER=dummy timeout 90s xvfb-run -a dosbox \
+              -conf /tmp/micropol-smoke.conf \
+              -c "mount c /tmp/micropol-smoke" -c "c:" \
+              -c "micropol /timedemo > auto.txt" \
+              -c "micropol /$([ "$machine" = vgaonly ] && echo vga || echo tandy) /timedemo > force.txt" \
+              -c "exit"
+            cat /tmp/micropol-smoke/AUTO.TXT /tmp/micropol-smoke/FORCE.TXT
+            if [ "$machine" = vgaonly ]; then expected=VGA; else expected=Tandy; fi
+            grep -q "Video: $expected 320x200" /tmp/micropol-smoke/AUTO.TXT
+            grep -q "Video: $expected 320x200" /tmp/micropol-smoke/FORCE.TXT
+            grep -q 'City pan rate' /tmp/micropol-smoke/AUTO.TXT
+            rm /tmp/micropol-smoke/AUTO.TXT /tmp/micropol-smoke/FORCE.TXT
+          done
 
       - name: Upload hardware-test executable
         uses: actions/upload-artifact@v4

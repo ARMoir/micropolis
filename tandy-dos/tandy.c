@@ -45,13 +45,17 @@
 
 /* Tandy mode 9: 320x200x16, two pixels/byte, four 8KB interlaced banks.
  * Rows 0,4,... at B800:0000, rows 1,5,... at B800:2000 and so on.
- * See the Tandy 1000 technical reference. Avoid CGA mode 4 and VGA.
+ * VGA uses the same packed layout in RAM, expanded to mode 13h.
  */
 static volatile unsigned char far *video;
 static unsigned int scroll_x = 0, scroll_y = 0;
 /* View orientation only: tile artwork and the saved world stay fixed. */
 static unsigned int map_turns = 0U;
 static unsigned char old_mode;
+static int use_vga;
+static unsigned char far *vga_buffer;
+static const unsigned char far *vga_font;
+static unsigned char vga_dirty[200];
 static unsigned char far *art_data = NULL;
 static unsigned int cursor_x = VIEW_W / 2U;
 static unsigned int cursor_y = VIEW_H / 2U;
@@ -170,6 +174,7 @@ static unsigned char current_video_mode(void)
  */
 static unsigned int vram_offset(unsigned int x, unsigned int y)
 {
+    if (use_vga) vga_dirty[y] = 1U;
     return tandy_scanlines[y] + (x >> 1);
 }
 
@@ -185,6 +190,47 @@ static void pixel(unsigned int x, unsigned int y, unsigned char color)
         video[off] = (unsigned char)((old & 0xf0U) | (color & 15U));
     else
         video[off] = (unsigned char)((old & 0x0fU) | (color << 4));
+}
+
+/* VGA retains the packed renderer in RAM; only dirty rows are expanded. */
+static void present_video(void)
+{
+    if (use_vga)
+        vga_present_rows(video,
+            (volatile unsigned char far *)MK_FP(0xa000,0),vga_dirty);
+}
+
+static int detect_vga(void)
+{
+    union REGS r;
+    memset(&r,0,sizeof(r));
+    r.x.ax=0x1a00U;
+    int86(0x10,&r,&r);
+    return video_has_vga(r.h.al,r.h.bl);
+}
+
+static void init_vga_palette_font(void)
+{
+    union REGPACK font_regs;
+    unsigned int i;
+    static const unsigned char rgb[16][3] = {
+        {0,0,0},{0,0,42},{0,42,0},{0,42,42},
+        {42,0,0},{42,0,42},{42,21,0},{42,42,42},
+        {21,21,21},{21,21,63},{21,63,21},{21,63,63},
+        {63,21,21},{63,21,63},{63,63,21},{63,63,63}
+    };
+    outp(0x3c8,0);
+    for(i=0U;i<16U;++i) {
+        outp(0x3c9,rgb[i][0]);
+        outp(0x3c9,rgb[i][1]);
+        outp(0x3c9,rgb[i][2]);
+    }
+    memset(&font_regs,0,sizeof(font_regs));
+    font_regs.w.ax=0x1130U;
+    font_regs.h.bh=3U; /* BIOS 8x8 font, characters 0..127 */
+    intr(0x10,&font_regs);
+    vga_font=(const unsigned char far *)
+        MK_FP(font_regs.w.es,font_regs.w.bp);
 }
 
 static void solid_tile(unsigned int px, unsigned int py, unsigned char color)
@@ -741,6 +787,21 @@ static void bios_text(unsigned int row, unsigned int column,
     union REGS r;
     if (row >= 25U || column >= 40U)
         return;
+    if (use_vga) {
+        unsigned int x,y,ch,bits;
+        while (*s && column < 40U) {
+            ch=(unsigned char)*s++;
+            if(ch>127U) ch='?';
+            for(y=0U;y<8U;++y) {
+                bits=vga_font[ch*8U+y];
+                for(x=0U;x<8U;++x)
+                    pixel(column*8U+x,row*8U+y,
+                          (unsigned char)((bits & (128U>>x))?color:0U));
+            }
+            ++column;
+        }
+        return;
+    }
     while (*s && column < 40U) {
         r.h.ah = 2U;
         r.h.bh = 0U;
@@ -1779,7 +1840,7 @@ static void draw_info_page(void)
         bios_text(14U, 3U, "KEYBOARD ALWAYS WORKS", 14U);
         bios_text(16U, 3U, "ESC / CLICK TO RETURN", 15U);
     } else {
-        bios_text(6U, 3U, "MICROPOLIS TANDY 1000 DOS PORT", 15U);
+        bios_text(6U, 3U, "MICROPOLIS TANDY / VGA DOS", 15U);
         bios_text(8U, 3U, "NATIVE 8086 / V20, 16 COLORS", 14U);
         bios_text(9U, 3U, "MICROPOLIS GPLv3+ SOURCE", 14U);
         bios_text(10U, 3U, "ORIGINAL ART: ELECTRONIC ARTS", 14U);
@@ -2848,6 +2909,7 @@ static void keyboard_loop(void)
     enum ui_menu next_menu;
 
     while (!exit_requested) {
+        present_video();
         simulation_idle(); /* runs even with /NOMOUSE and no keyboard */
         if (mouse_on)
             handle_mouse();
@@ -3200,6 +3262,7 @@ static void timedemo_route(int include_hud)
             draw_overview_camera();
             draw_status();
         }
+        present_video();
     }
 }
 
@@ -3272,10 +3335,15 @@ int main(int argc, char **argv)
 {
     int i, have_city = 0, allow_mouse = 1, bench_mode = 0;
     int timedemo_mode = 0;
+    int requested_video = 0; /* 0 auto, 1 VGA, 2 Tandy */
     char sidecar[256];
     newer_lot_clear();
     for (i = 1; i < argc; ++i) {
-        if (dos_option_is(argv[i], "NOMOUSE")) {
+        if (dos_option_is(argv[i], "VGA")) {
+            requested_video=1;
+        } else if (dos_option_is(argv[i], "TANDY")) {
+            requested_video=2;
+        } else if (dos_option_is(argv[i], "NOMOUSE")) {
             allow_mouse = 0;
         } else if (dos_option_is(argv[i], "BENCH")) {
             bench_mode = 1;
@@ -3329,15 +3397,37 @@ int main(int argc, char **argv)
     }
     simulation_init();
 
-    old_mode = current_video_mode();
-    set_video_mode(9);
-    if (current_video_mode() != 9) {
-        set_video_mode(old_mode);
-        fputs("Tandy 1000 graphics mode 9 not available.\n", stderr);
+    use_vga=requested_video==1 ||
+            (requested_video==0 && detect_vga());
+    if (use_vga && !detect_vga()) {
+        fputs("VGA BIOS not detected. Use /TANDY for Tandy graphics.\n",stderr);
         return 1;
     }
-    video = (volatile unsigned char far *)MK_FP(0xb800, 0);
+    if (use_vga && bench_mode) {
+        fputs("/BENCH measures Tandy VRAM; use /TIMEDEMO for VGA.\n",stderr);
+        return 1;
+    }
+    if (use_vga) {
+        vga_buffer=(unsigned char far *)malloc(32768U);
+        if(vga_buffer==NULL) {
+            fputs("Not enough memory for VGA screen buffer (32 KB).\n",stderr);
+            return 1;
+        }
+        memset(vga_buffer,0,32768U);
+        memset(vga_dirty,1,sizeof(vga_dirty));
+    }
+    old_mode = current_video_mode();
+    set_video_mode((unsigned char)(use_vga?0x13U:9U));
+    if (current_video_mode() != (use_vga?0x13U:9U)) {
+        set_video_mode(old_mode);
+        free(vga_buffer);
+        fputs("Requested VGA/Tandy graphics mode not available.\n", stderr);
+        return 1;
+    }
+    video = use_vga ? vga_buffer :
+            (volatile unsigned char far *)MK_FP(0xb800, 0);
     tandy_init_scanlines();
+    if(use_vga) init_vga_palette_font();
     (void)load_original_art();
     /* Canonical neutral filenames. The unchanged first-generation
      * 1x1 byte pack remains accepted for existing installations.
@@ -3368,6 +3458,8 @@ int main(int argc, char **argv)
     engine_shutdown();
     newer_lot_free_art();
     set_video_mode(old_mode);
+    free(vga_buffer);
+    printf("Video: %s\n",use_vga?"VGA 320x200":"Tandy 320x200");
     if (art_data != NULL)
         free(art_data); /* art buffer used only in graphics mode */
     if (bench_mode) {

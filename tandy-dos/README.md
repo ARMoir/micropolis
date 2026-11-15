@@ -1,3 +1,24 @@
+## VGA and Tandy automatic video selection
+
+The same MICROPOL.EXE now selects VGA mode 13h (320x200) when the BIOS
+reports an active VGA display, otherwise it tries native Tandy mode 9.
+Use `MICROPOL /VGA` or `MICROPOL /TANDY` to override selection.
+Options can be combined with a city filename and `/NOMOUSE`.
+A forced VGA mode requires a VGA BIOS; unsupported modes report an error.
+
+Both outputs use the existing 16 colors, tile packs, UI, simulation and
+city saves. VGA allocates a separate 32 KB packed screen buffer and
+expands changed rows to VGA memory. Tandy still draws directly into
+B800 VRAM and does not allocate this buffer. VGA text uses the BIOS
+8x8 font drawn into the packed buffer, so later screen updates preserve it.
+
+`/TIMEDEMO` includes VGA presentation on every pan. `/BENCH` remains a
+Tandy-only live-VRAM benchmark and is rejected in VGA mode rather than
+reporting RAM-copy timings as video performance. VGA is a compatibility
+output path, not a higher-resolution or 256-color art upgrade.
+CI checks pixel expansion and runs automatic/forced VGA and Tandy timedemos
+in DOSBox. Physical VGA and Tandy hardware testing is still recommended.
+
 # Micropolis: Tandy 1000 EX native DOS port
 
 **Status: experimental playable city simulation with phased RCI development and annual taxation. Incomplete compared with original Micropolis.**

@@ -37,4 +37,9 @@ void tandy_fill_region(volatile unsigned char TANDY_FAR *screen,
 void tandy_move_words(volatile unsigned char TANDY_FAR *screen,
                       unsigned int dst_offset, unsigned int src_offset,
                       unsigned int words, int backwards);
+/* VGA BIOS display-combination response: only the active adapter counts. */
+int video_has_vga(unsigned int signature, unsigned int active_display);
+void vga_present_rows(const volatile unsigned char TANDY_FAR *packed,
+                      volatile unsigned char TANDY_FAR *vga,
+                      unsigned char *dirty);
 #endif

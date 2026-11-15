@@ -67,3 +67,29 @@ void tandy_move_words(volatile unsigned char TANDY_FAR *screen,
         }
     }
 }
+
+/* AL=1Ah confirms support. BL=7/8 is the active VGA display, not BH. */
+int video_has_vga(unsigned int signature, unsigned int active_display)
+{
+    return signature==0x1aU &&
+           (active_display==7U || active_display==8U);
+}
+
+void vga_present_rows(const volatile unsigned char TANDY_FAR *packed,
+                      volatile unsigned char TANDY_FAR *vga,
+                      unsigned char *dirty)
+{
+    unsigned int y,x,src,dst;
+    unsigned char pair;
+    for(y=0U;y<200U;++y) {
+        if(!dirty[y]) continue;
+        src=tandy_scanlines[y];
+        dst=y*320U;
+        for(x=0U;x<160U;++x) {
+            pair=packed[src+x];
+            vga[dst++]=(unsigned char)(pair>>4);
+            vga[dst++]=(unsigned char)(pair&15U);
+        }
+        dirty[y]=0U;
+    }
+}
