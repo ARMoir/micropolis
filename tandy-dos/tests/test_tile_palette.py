@@ -25,7 +25,7 @@ def main() -> None:
     assert pixel(updated, 0, 0) == 2
     assert pixel(updated, 0, 7) == 2
     # Other intentional red inks, including building colors, still exist.
-    assert any(pixel(updated, t, i) == 12
+    assert any(pixel(updated, t, i) == 4
                for t in range(240, 900) for i in range(64))
 
     for tile in (0, 2, 22, 66, 79, 226, 240, 261, 270,
