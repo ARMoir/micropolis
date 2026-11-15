@@ -25,12 +25,11 @@ unsigned int zone_highlight_footprint_edges(unsigned int x,
                                              unsigned int top,
                                              unsigned int span);
 
-/* World-space edges within a continuous SAME-TYPE zone group.
- * These shared edges get a muted road-asphalt gray in the renderer;
- * all genuine outer neighborhood edges stay the original zone color.
- * A 2x2/3x3 building has no internal edges to recolor.
- * Only mark shared edges when both actual tiles have a complete
- * facing perimeter, avoiding asymmetric gray lines on damaged art.
+/* Gray asphalt-colored world edges ONLY between two developed
+ * same-type R/C/I lots/buildings. A vacant stage-zero tile always
+ * keeps zone-colored edges against BOTH vacant and developed neighbors.
+ * No inner line ever crosses a complete original/NewerSource 2x2/3x3.
+ * Both sides must have a facing perimeter for symmetric rendering.
  */
 unsigned int zone_highlight_shared_edges(unsigned int x,unsigned int y,
                                           unsigned int edges);

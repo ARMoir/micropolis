@@ -308,12 +308,13 @@ static int world_to_visible(unsigned int wx, unsigned int wy,
     return 1;
 }
 
-/* The zone outline now reads as a small neighborhood street grid:
- *   - exterior district border = original R/C/I color;
- *   - shared boundary between separate SAME-KIND lots = road gray 8;
- *   - complete 2x2 / 3x3 building = perimeter only, never an inner
- *     road across its four/nine original sprite subtiles;
- *   - vacant 1x1 plots retain their original 9-pixel zone hatch.
+/* The zone outline now distinguishes reserved land from developed
+ * neighborhood roads:
+ *   - vacant stage-zero lot = ALL zone-colored edges plus hatch;
+ *   - vacant/developed boundary = zone-colored on BOTH sides;
+ *   - two adjacent DEVELOPED same-kind lots = road gray 8;
+ *   - complete 2x2/3x3 building = exterior perimeter only, never a
+ *     road across its original sprite subtiles;
  *
  * Compute both world edge sets once, then rotate them together.
  * Draw at most four packed bytes per scanline, with no buffer or
@@ -2761,6 +2762,13 @@ static void simulation_idle(void)
              * building sprite cells, not just its zone center.
              */
             redraw_zoning_brush(tx-1U,ty-1U,tx+1U,ty+1U);
+        } else if(zoning_at(tx,ty)!=ZONE_NONE) {
+            /* A developing/declining 1x1 lot also changes the
+             * road-gray status of its NEIGHBORS' facing borders.
+             * Refresh a local 3x3 only for zoned growth events,
+             * not every simulation event or the full viewport.
+             */
+            redraw_zoning_brush(tx,ty,tx,ty);
         } else {
             unsigned int sx,sy;
             if (world_to_visible(tx,ty,&sx,&sy)) {

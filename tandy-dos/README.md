@@ -1516,3 +1516,27 @@ white-on-black within the original flat-gray frame. The accurate
 building-art preview and all data pages are retained. No extra font
 ROM, buffer, graphics mode or per-frame work has been added. A
 regression asserts the graphics-mode color constants.
+
+## Vacant parcels keep zoning-colored outlines (no gray local roads)
+
+The visual local-street treatment now applies **only between two
+developed lots or intact buildings of the same R/C/I type**. Adjacent
+vacant parcels retain the existing green/blue/yellow outlines around
+each 1x1 lot, plus their nine-pixel placement-style hatching.
+At a vacant-to-developed boundary both sides stay zone-colored,
+even if both lots are zoned identically. Only after BOTH sides
+develop does the shared line become asphalt gray (palette 8).
+
+Completed original Micropolis 3x3 and NEWER 2x2/3x3 buildings count as
+developed even though they may not have an independent 1x1 growth stage.
+Their external edges may turn gray beside another developed,
+same-type structure, but no colored/gray lines cross their internal
+footprint. Bulldozing reverts all owned 1x1 lots to stage zero,
+returning their zone-colored outlines/hatch.
+
+Single-lot development/decline events now redraw that tile and
+immediate neighbors, so both sides change color at the same moment
+instead of waiting for an unrelated refresh. A zone paint stroke
+continues to refresh its neighboring boundaries. Source art and
+.CTY/.ZON/.NBL files are unchanged, and the site roads remain
+entirely decorative (not part of the transport network).

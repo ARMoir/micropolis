@@ -100,17 +100,39 @@ unsigned int zone_highlight_style(unsigned int x,unsigned int y,
         x,y,(unsigned int)(cx-1),(unsigned int)(cy-1),3U);
 }
 
-/* A neighborhood's internal 1x1 lot boundaries read more naturally
- * as narrow local roads. Never imply a transport connection in the
- * simulation: this is a display-only asphalt-color edge classification.
+/* Only developed-to-developed boundaries may resemble gray local
+ * streets. Both vacant-to-vacant and vacant-to-developed boundaries
+ * keep the original R/C/I zone color and permanent vacant-lot hatch.
+ * This is only a visual distinction, never a real road in simulation.
  *
- * Check that the adjoining tile is the SAME zone kind and has its
- * corresponding opposite outline. Composite multi-tile buildings
- * only expose their exterior perimeters, so no road-like grid gets
- * inserted across a complete 2x2/3x3 sprite.
+ * A developed 1x1 is one with stage 1..3. A complete NewerSource
+ * 2x2/3x3 is identified by its .NBL owner. Intact ORIGINAL 3x3
+ * structures are also developed even if their custom zoning stage
+ * is zero: zone_highlight_style() validates their original ZONEBIT.
+ */
+static int developed_zone_tile(unsigned int x,unsigned int y)
+{
+    unsigned int id;
+    if(x>=CITY_WIDTH || y>=CITY_HEIGHT ||
+       zoning_at(x,y)==ZONE_NONE)
+        return 0;
+    if(newer_lot_at(x,y))return 1;
+    id=city_at(x,y)&TILE_ID;
+    if(id==0U || (id>=21U && id<=43U))
+        return zoning_development_at(x,y)!=0U;
+    /* A stray original art fragment does not count as a complete
+     * developed structure without a real matching source center.
+     */
+    return zone_highlight_style(x,y,0)!=0U;
+}
+
+/* The caller supplies this tile's true footprint edges. An adjacent
+ * tile shares a gray line only if BOTH sides are developed, both
+ * belong to the SAME R/C/I zone, and both actually draw facing edges.
+ * Composite structures expose only their OUTSIDE edges, so no new
+ * lines ever appear across a 2x2/3x3 building's artwork.
  *
- * Each side has at most one neighboring tile lookup; this is used
- * only while painting a tile already due for redraw.
+ * Only local checks on tiles already being drawn: no buffer or scan.
  */
 unsigned int zone_highlight_shared_edges(unsigned int x,unsigned int y,
                                           unsigned int edges)
@@ -119,21 +141,26 @@ unsigned int zone_highlight_shared_edges(unsigned int x,unsigned int y,
     if(x>=CITY_WIDTH || y>=CITY_HEIGHT || edges==0U)
         return 0U;
     kind=zoning_at(x,y);
-    if(kind==ZONE_NONE)return 0U;
+    if(kind==ZONE_NONE || !developed_zone_tile(x,y))
+        return 0U;
     if((edges&1U) && y>0U &&
        zoning_at(x,y-1U)==kind &&
+       developed_zone_tile(x,y-1U) &&
        (zone_highlight_style(x,y-1U,0)&4U))
         shared|=1U;
     if((edges&2U) && x+1U<CITY_WIDTH &&
        zoning_at(x+1U,y)==kind &&
+       developed_zone_tile(x+1U,y) &&
        (zone_highlight_style(x+1U,y,0)&8U))
         shared|=2U;
     if((edges&4U) && y+1U<CITY_HEIGHT &&
        zoning_at(x,y+1U)==kind &&
+       developed_zone_tile(x,y+1U) &&
        (zone_highlight_style(x,y+1U,0)&1U))
         shared|=4U;
     if((edges&8U) && x>0U &&
        zoning_at(x-1U,y)==kind &&
+       developed_zone_tile(x-1U,y) &&
        (zone_highlight_style(x-1U,y,0)&2U))
         shared|=8U;
     return shared;
