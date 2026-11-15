@@ -58,4 +58,6 @@ unsigned int newer_lot_demolish(unsigned int x,unsigned int y,
 int newer_lot_save(const char *path);
 int newer_lot_load(const char *path);
 unsigned int newer_lot_count(void);
+/* Height of the occupied rectangle; 3-wide NEWER sprites may be 2-high. */
+unsigned int newer_lot_height(unsigned int x,unsigned int y);
 #endif
