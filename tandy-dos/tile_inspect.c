@@ -254,7 +254,9 @@ void tile_inspect_line(const struct tile_inspect *o,
                         o->span,o->span);break;
         case 6U:
             if(o->newer)
-                sprintf(out,"NEWER DESIGN ID: %02X",o->source_id);
+                sprintf(out,"%s ID: %02X",
+                        o->source_original?"ORIG STYLE":"NEWER DESIGN",
+                        o->source_id);
             else if(o->original_group)
                 sprintf(out,"BASE GRAPHIC: %u",o->source_id);
             else sprintf(out,"BUILDING DATA: NONE");
@@ -414,7 +416,10 @@ void tile_inspect_dialog_line(const struct tile_inspect *o,
             else sprintf(out,"Stage: not zoned");
             break;
         case 3U:
-            if(o->newer)sprintf(out,"NEWER building: %ux%u",o->span,o->span);
+            if(o->newer)
+                sprintf(out,"%s: %ux%u",
+                        o->source_original?"ORIGINAL ART":"NEWER ART",
+                        o->span,o->span);
             else if(o->original_group)
                 sprintf(out,"Original: %ux%u",o->span,o->span);
             else if(o->zone)sprintf(out,"Lot: %s",

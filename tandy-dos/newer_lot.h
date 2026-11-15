@@ -33,6 +33,23 @@ int newer_lot_info(unsigned int x,unsigned int y,
 unsigned int newer_lot_try_grow(unsigned int x,unsigned int y,
                                  unsigned int kind,
                                  unsigned int *left,unsigned int *top);
+/* New pure display/selection APIs: NEWERM8 1x1 residential (50%
+ * choice against original TILES), complete 3x3 original built-in
+ * graphics, and reversible in-place imported original prefab
+ * facelift. The 5-byte NBL record format remains unchanged.
+ */
+const unsigned char NEWER_FAR *newer_lot_residential_1x1(
+    unsigned int x,unsigned int y,unsigned int stage);
+int newer_lot_uses_original(unsigned int x,unsigned int y);
+unsigned int newer_lot_original_tile(unsigned int x,unsigned int y,
+                                      unsigned int turns);
+int newer_lot_retrofit_original(unsigned int cx,unsigned int cy,
+                                unsigned int kind);
+unsigned int newer_lot_try_grow_with_style(unsigned int x,unsigned int y,
+                                           unsigned int kind,
+                                           unsigned int choose_original,
+                                           unsigned int *left,
+                                           unsigned int *top);
 /* Demolition of ANY piece removes the whole building and resets
  * its original 1x1 zoned footprint to vacant, without removing zoning.
  */

@@ -249,7 +249,8 @@ static int process_zone(unsigned int x, unsigned int y,
     if(next==3U && stage==3U && road && power &&
        (roll&15U)==0U) {
         unsigned int bx=0U,by=0U;
-        unsigned int span=newer_lot_try_grow(x,y,kind,&bx,&by);
+        unsigned int span=newer_lot_try_grow_with_style(
+            x,y,kind,(roll&16U)!=0U,&bx,&by);
         if(span!=0U) {
             ++growth_this_month;
             changed=1U;
@@ -312,7 +313,8 @@ static int process_original_zone(unsigned int x, unsigned int y,
     unsigned int *count;
     int road, power;
     if (!(center & ZONE_BIT) || x < 2U || y < 2U ||
-        x + 2U >= CITY_WIDTH || y + 2U >= CITY_HEIGHT)
+        x + 2U >= CITY_WIDTH || y + 2U >= CITY_HEIGHT ||
+        newer_lot_at(x,y))
         return 0;
 
     if (id == 244U || (id >= 265U && id <= 400U &&
@@ -343,8 +345,12 @@ static int process_original_zone(unsigned int x, unsigned int y,
         delta = 0U; /* empty original plot */
     else
         delta = ((id - base) / 9U) % tiers;
-    if (delta + 1U == tiers)
-        return 0; /* full-density original building */
+    /* Fully developed imported originals may still be renovated to
+     * NewerSource in a later valid growth event; do not replace
+     * their CTY sprites simply because the city was imported.
+     */
+    if(delta+1U==tiers && !newer_lot_has_art())
+        return 0;
     road = original_zone_transport(x,y);
     power = has_power(x,y);
     if (!road) ++no_road_month;
@@ -367,6 +373,29 @@ static int process_original_zone(unsigned int x, unsigned int y,
                 first + j*3U + i)
                 return 0;
         }
+    /* Real original city structure is confirmed intact above.
+     * Roll a genuine 50/50 art choice on a successful development:
+     * keep an original (next original tier), or show a complete
+     * NEWER 3x3 building WITHOUT changing original CTY pixels.
+     * An existing maximum-tier original waits for a later NEWER
+     * renovation and never wraps into invalid old tile IDs.
+     */
+    if(newer_lot_has_art() &&
+       (delta+1U==tiers || (random16()&1U)!=0U)) {
+        if(newer_lot_retrofit_original(x,y,kind)) {
+            ++(*count);
+            ++growth_this_month;
+            changed=1U;
+            last_x=x;last_y=y;last_radius=1U;
+            last_change_valid=1U;
+            if(kind==ZONE_RES) {
+                last_home_x=x;last_home_y=y;
+                last_home_valid=1U;
+            }
+            return 1;
+        }
+    }
+    if(delta+1U==tiers)return 0;
     for (j = 0U; j < 3U; ++j)
         for (i = 0U; i < 3U; ++i) {
             unsigned short old_tile = city_at(x+i-1U,y+j-1U);

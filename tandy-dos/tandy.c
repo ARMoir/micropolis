@@ -511,15 +511,25 @@ static void draw_city_tile(unsigned int px, unsigned int py,
         unsigned int left=0U,top=0U,span=0U;
         kind=zoning_at(mx,my);
         (void)newer_lot_info(mx,my,&left,&top,&span,0,0);
-        if(large != NULL) draw_packed_tile(px,py,large);
-        else {
+        if(newer_lot_uses_original(mx,my) && art_data!=NULL) {
+            unsigned int original=newer_lot_original_tile(
+                mx,my,map_turns);
+            if(original<ART_TILES)
+                draw_original_tile(px,py,original);
+            else solid_tile(px,py,2U);
+        } else if(large != NULL) {
+            draw_packed_tile(px,py,large);
+            draw_newer_site_access(px,py,mx,my,left,top,span,kind);
+        } else {
+            /* No partial source sprites even if an optional pack
+             * is unavailable: retain the existing safe silhouette.
+             */
             solid_tile(px,py,kind==ZONE_RES?8U:
                              kind==ZONE_COM?1U:6U);
             box_pixels(px+1U,py+1U,6U,6U,7U);
             pixel(px+2U,py+2U,15U);
             pixel(px+5U,py+2U,15U);
         }
-        draw_newer_site_access(px,py,mx,my,left,top,span,kind);
         draw_zone_border(px,py,mx,my);
         draw_pending_tile(px,py,mx,my);
         return;
@@ -528,6 +538,12 @@ static void draw_city_tile(unsigned int px, unsigned int py,
         kind=zoning_at(mx,my);
         stage=zoning_development_at(mx,my);
         small=small_lot_art_pixels(t,kind,stage,mx,my);
+        /* Complete residential 1x1 homes exist in BOTH packs.
+         * Stable parity selects the original or NEWERM8 house.
+         * Commercial/industrial 1x1 never use partial TILES art.
+         */
+        if(kind==ZONE_RES && stage!=0U)
+            small=newer_lot_residential_1x1(mx,my,stage);
         /* Never use a single center piece of a legacy 3x3
          * commercial/industrial zone as a 1x1 structure. When the
          * optional original 12-sprite pack is missing, use a clean
@@ -1561,11 +1577,24 @@ static void draw_inspector_preview(void)
             if(inspected_tile.newer) {
                 sprite=newer_lot_pixels(inspected_tile.left+i,
                                         inspected_tile.top+j,0U);
+                if(sprite==0 &&
+                   newer_lot_uses_original(inspected_tile.left+i,
+                                           inspected_tile.top+j) &&
+                   art_data!=0) {
+                    graphic=newer_lot_original_tile(
+                        inspected_tile.left+i,inspected_tile.top+j,0U);
+                    if(graphic<ART_TILES)
+                        sprite=art_data+graphic*32U;
+                }
             } else if(span==1U) {
                 small=small_lot_art_pixels(inspected_tile.id,
                                           inspected_tile.zone,
                                           inspected_tile.stage,
                                           inspected_tile.x,inspected_tile.y);
+                if(inspected_tile.zone==ZONE_RES)
+                    small=newer_lot_residential_1x1(
+                        inspected_tile.x,inspected_tile.y,
+                        inspected_tile.stage);
                 if(small!=0)sprite=small;
             }
             if(sprite==0 && !inspected_tile.newer && art_data!=0) {

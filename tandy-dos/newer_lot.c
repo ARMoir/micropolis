@@ -15,6 +15,15 @@
 #define MAX_RECORD_BYTES (NEWER_LOT_MAX * 5U)
 #define BLD_VERSION 1U
 #define PACK_TILE_BYTES 32U
+/* 3x3 built-in Micropolis styles encoded in the formerly unused
+ * low SOURCE-ID range of the existing 5-byte NBL records. No
+ * save-format change or additional per-record RAM is needed.
+ * 1..4 index four complete original source building families.
+ */
+#define ORIGINAL_STYLE_FIRST 1U
+#define ORIGINAL_STYLE_LAST 4U
+#define ZONEBIT 1024U
+#define TILEID 1023U
 struct newer_record {
     unsigned char x,y,kind,span,id,used;
 };
@@ -52,6 +61,9 @@ static int terrain_usable(unsigned int x,unsigned int y,
 static int source_valid(unsigned int kind,unsigned int span,
                         unsigned int id)
 {
+    if(span==3U && id>=ORIGINAL_STYLE_FIRST &&
+       id<=ORIGINAL_STYLE_LAST &&
+       kind>=ZONE_RES && kind<=ZONE_IND)return 1;
     if(span==2U) {
         if(kind==ZONE_RES) return id>=0x8cU && id<=0x93U;
         if(kind==ZONE_COM) return id>=0x94U && id<=0x9dU;
@@ -64,6 +76,52 @@ static int source_valid(unsigned int kind,unsigned int span,
     return 0;
 }
 /* Offset into the checked-in, complete 797-tile library. */
+/* Every built-in option is a COMPLETE 3x3 sprite, not a cut
+ * down 1x1 commercial/industrial center tile.
+ */
+static unsigned int original_base(unsigned int kind,unsigned int id)
+{
+    if(id<ORIGINAL_STYLE_FIRST || id>ORIGINAL_STYLE_LAST)
+        return 65535U;
+    if(kind==ZONE_RES)return 261U+9U*(id-1U);
+    if(kind==ZONE_COM)return 432U+9U*(id-1U);
+    if(kind==ZONE_IND)return 621U+9U*(id-1U);
+    return 65535U;
+}
+static unsigned int original_prefab_base(unsigned int left,
+                                         unsigned int top,
+                                         unsigned int kind)
+{
+    unsigned int base,i,j,center;
+    unsigned short word;
+    if(left+3U>CITY_WIDTH || top+3U>CITY_HEIGHT)
+        return 65535U;
+    word=city_at(left+1U,top+1U);
+    center=word&TILEID;
+    if(!(word&ZONEBIT))return 65535U;
+    if(kind==ZONE_RES) {
+        if(center==244U)base=240U;
+        else if(center>=265U && center<=400U &&
+                (center-265U)%9U==0U)base=center-4U;
+        else return 65535U;
+    } else if(kind==ZONE_COM) {
+        if(center==427U)base=423U;
+        else if(center>=436U && center<=607U &&
+                (center-436U)%9U==0U)base=center-4U;
+        else return 65535U;
+    } else if(kind==ZONE_IND) {
+        if(center==616U)base=612U;
+        else if(center>=625U && center<=688U &&
+                (center-625U)%9U==0U)base=center-4U;
+        else return 65535U;
+    } else return 65535U;
+    for(j=0U;j<3U;++j)
+        for(i=0U;i<3U;++i)
+            if((city_at(left+i,top+j)&TILEID)!=base+j*3U+i ||
+               zoning_at(left+i,top+j)!=kind)
+                return 65535U;
+    return base;
+}
 static unsigned int source_start(unsigned int id)
 {
     if(id<0x8cU) return id-BASE_ID;
@@ -179,6 +237,8 @@ const unsigned char NEWER_FAR *newer_lot_pixels(
     slot=owner[offset(x,y)];
     if(!slot) return 0;
     rec=&records[slot-1U];
+    if(rec->id>=ORIGINAL_STYLE_FIRST &&
+       rec->id<=ORIGINAL_STYLE_LAST)return 0;
     span=rec->span;
     lx=x-rec->x;ly=y-rec->y;
     /* Display orientation mirrors the existing original-building
@@ -194,6 +254,115 @@ const unsigned char NEWER_FAR *newer_lot_pixels(
     index=first+part;
     if(index>=797U)return 0;
     return art+index*PACK_TILE_BYTES;
+}
+/* 50/50 across original detached houses and complete one-tile
+ * NewerSource houses, using existing NEWERM8.DAT 0x70..0x7B.
+ * Stable by world coordinates so saved cities do not change style
+ * on reload; density selects lower/middle/luxury house families.
+ */
+const unsigned char NEWER_FAR *newer_lot_residential_1x1(
+    unsigned int x,unsigned int y,unsigned int stage)
+{
+    unsigned int index,hash;
+    if(!art || stage<1U || stage>3U)return 0;
+    /* Mix coordinates so the 50/50 distribution looks organic,
+     * not like an artificial chessboard. No per-frame RNG state or
+     * extra save bytes: identical world locations render consistently.
+     */
+    hash=(x*117U+y*193U+x*y*13U)&65535U;
+    hash^=hash>>7U;
+    hash^=hash>>4U;
+    if((hash&1U)==0U)return 0;
+    index=(stage-1U)*4U+
+          ((hash>>3U)&3U);
+    return art+index*PACK_TILE_BYTES;
+}
+int newer_lot_uses_original(unsigned int x,unsigned int y)
+{
+    unsigned int slot;
+    if(owner==0 || x>=CITY_WIDTH || y>=CITY_HEIGHT)return 0;
+    slot=owner[offset(x,y)];
+    return slot!=0U && records[slot-1U].used &&
+           records[slot-1U].id>=ORIGINAL_STYLE_FIRST &&
+           records[slot-1U].id<=ORIGINAL_STYLE_LAST;
+}
+unsigned int newer_lot_original_tile(unsigned int x,unsigned int y,
+                                      unsigned int turns)
+{
+    unsigned int slot,span,lx,ly,part,base;
+    struct newer_record *rec;
+    if(!newer_lot_uses_original(x,y))return 65535U;
+    slot=owner[offset(x,y)];
+    rec=&records[slot-1U];
+    span=rec->span;
+    lx=x-rec->x;ly=y-rec->y;
+    switch(turns&3U) {
+    case 1U:part=lx*span+(span-1U-ly);break;
+    case 2U:part=(span-1U-ly)*span+(span-1U-lx);break;
+    case 3U:part=(span-1U-lx)*span+ly;break;
+    default:part=ly*span+lx;break;
+    }
+    base=original_base(rec->kind,rec->id);
+    return base==65535U?65535U:base+part;
+}
+/* Preserve an intact imported classic 3x3 prefab in .CTY, but
+ * register a NEWER facade on its same footprint when its real
+ * growth event selects NewerSource. The underlying original can
+ * still be recovered from the save with no destructive conversion.
+ */
+int newer_lot_retrofit_original(unsigned int cx,unsigned int cy,
+                                unsigned int kind)
+{
+    unsigned int left,top,i,j,index;
+    int available;
+    struct newer_record *rec;
+    if(!art || cx==0U || cy==0U ||
+       cx+1U>=CITY_WIDTH || cy+1U>=CITY_HEIGHT ||
+       !ensure_owner())return 0;
+    left=cx-1U;top=cy-1U;
+    if(original_prefab_base(left,top,kind)==65535U)return 0;
+    for(j=0U;j<3U;++j)
+        for(i=0U;i<3U;++i)
+            if(owner[offset(left+i,top+j)]!=0U)return 0;
+    available=find_slot();
+    if(available<0)return 0;
+    index=(unsigned int)available;
+    rec=&records[index];
+    rec->x=(unsigned char)left;
+    rec->y=(unsigned char)top;
+    rec->kind=(unsigned char)kind;
+    rec->span=3U;
+    rec->id=(unsigned char)select_id(kind,3U,left,top);
+    rec->used=1U;
+    fill_owner(index);
+    ++count;
+    return 1;
+}
+/* Simulated new 2x2->3x3 growth uses one independent 50/50
+ * source-style decision. Standalone 2x2 has no original COMPLETE
+ * source equivalent, so it always uses original unmodified NEWER art.
+ * The existing entry point remains for older callers/tests.
+ */
+unsigned int newer_lot_try_grow_with_style(unsigned int x,unsigned int y,
+                                           unsigned int kind,
+                                           unsigned int choose_original,
+                                           unsigned int *left,
+                                           unsigned int *top)
+{
+    unsigned int span,ax=0U,ay=0U,slot;
+    span=newer_lot_try_grow(x,y,kind,&ax,&ay);
+    if(span==3U && choose_original && owner!=0) {
+        slot=owner[offset(ax,ay)];
+        if(slot!=0U) {
+            records[slot-1U].id=(unsigned char)
+                (1U+((ax*17U+ay*29U+kind)&3U));
+        }
+    }
+    if(span!=0U) {
+        if(left)*left=ax;
+        if(top)*top=ay;
+    }
+    return span;
 }
 unsigned int newer_lot_try_grow(unsigned int x,unsigned int y,
                                  unsigned int kind,
@@ -261,9 +430,19 @@ unsigned int newer_lot_demolish(unsigned int x,unsigned int y,
     if(!slot)return 0U;
     rec=&records[slot-1U];
     ax=rec->x;ay=rec->y;span=rec->span;
-    for(j=0U;j<span;++j)for(i=0U;i<span;++i) {
-        owner[offset(ax+i,ay+j)]=0U;
-        (void)zoning_set_development(ax+i,ay+j,0U);
+    /* If this was a NewerSource facelift of an imported original
+     * 3x3, also demolish the intact hidden original prefab.
+     * Otherwise old source art would pop back through the cleared
+     * overlay after bulldozing a single piece.
+     */
+    {
+        int classic=(span==3U &&
+            original_prefab_base(ax,ay,rec->kind)!=65535U);
+        for(j=0U;j<span;++j)for(i=0U;i<span;++i) {
+            if(classic)city_set(ax+i,ay+j,0U);
+            owner[offset(ax+i,ay+j)]=0U;
+            (void)zoning_set_development(ax+i,ay+j,0U);
+        }
     }
     memset(rec,0,sizeof(*rec));
     --count;
@@ -356,8 +535,11 @@ int newer_lot_load(const char *path)
             for(k=0U;k<rec->span;++k) {
                 unsigned int xx=rec->x+k,yy=rec->y+j;
                 unsigned int old;
-                if(!terrain_usable(xx,yy,rec->kind) ||
-                   zoning_development_at(xx,yy)<2U) {
+                if((!terrain_usable(xx,yy,rec->kind) ||
+                     zoning_development_at(xx,yy)<2U) &&
+                   !(rec->span==3U &&
+                     original_prefab_base(rec->x,rec->y,
+                                          rec->kind)!=65535U)) {
                     fclose(f);return 0;
                 }
                 for(old=0U;old<i;++old) {

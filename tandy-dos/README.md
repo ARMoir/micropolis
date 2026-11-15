@@ -1557,3 +1557,61 @@ The inspector picture, four pages of text, palette, original sprite
 files, city data and DOS memory allocation remain unchanged.
 Host-side geometry and mouse-hitbox assertions prevent future
 overlap regressions.
+
+## Mixed original + NewerSource RCI artwork, including imported cities
+
+Complete original Micropolis **TILES.DAT** and complete NewerSource
+**NEWER1.DAT/NEWERM8.DAT** stay unmodified and fully usable.
+
+All three R/C/I zone types share a genuine 50/50 source-art choice
+**where both sources contain a complete building of the correct
+footprint**. The actual available sprites matter:
+
+- **1x1 residential:** about half original complete detached-house
+  tiles; half complete NewerSource homes `0x70..0x7B` from NEWERM8.
+  A mixed-coordinate 50/50 selection is *stable through save/load*
+  and camera rotation, with different source families for each
+  density stage. Never use an incomplete original 3x3 center sprite
+  as a 1x1 commercial or industrial building.
+- **1x1 commercial/industrial:** always full-size NEWER1 shop/
+  warehouse artwork. The original TILES.DAT contains no complete
+  independent 1x1 C/I building.
+- **2x2 residential/commercial/industrial:** still NEWERM8 complete
+  source buildings. TILES.DAT does not include complete original
+  2x2 RCI structures. No cropping original 3x3 art to fake one.
+- **3x3 residential/commercial/industrial:** every eligible upgrade
+  chooses **50/50** between an authentic full original Micropolis
+  3x3 TILES building and a full NEWERM8 3x3 structure. An extra
+  `source` marker is encoded in unused bits of the existing 5-byte
+  .NBL structure-design ID; there is NO saved-file format change.
+  The original 3x3 remains upright and coherent in all rotations.
+
+**Imported original cities:** Original 3x3 prefabs are already seeded
+as independently zoned R/C/I lots in .ZON. They remain visually and
+physically **unchanged when imported**. At a later real, serviced
+development event, an original prefab gets the same 50/50 opportunity:
+either mature using its normal next original TILES 3x3 sprite, or
+transition *visually* to a complete NewerSource 3x3 building. A full
+density original may be visually renovated when demand eventually
+permits. For a NEWER retrofit, the entire original .CTY footprint and
+flags remain underneath, untouched. The additional .NBL owner record
+is saved beside .CTY and .ZON. If a game with no optional NEWERM8 art
+is loaded, imported prefabs continue to evolve with original graphics.
+
+Bulldozing any subtile of a retrofitted old 3x3 removes the complete
+new facade **and its hidden original 3x3 background**, restoring
+nine individually vacant, still-zoned 1x1 lots. On NBL load, both
+ordinary mature bare-ground 2x2/3x3 records and intact original 3x3
+retrofits are validated for correct terrain/zone/footprint/overlap.
+An incomplete source city block cannot be converted or bulldozed
+as a whole building. All source IDs and graphics remain auditable in
+the four-page inspector, including whether a structure is displayed
+with original or NEWER art.
+
+The Tandy DOS runtime does not need extra heap arrays, city-wide
+redraws, new assets, larger .CTY/.ZON files or a new .NBL version.
+The same sparse building index, real source sprites and on-demand
+tile drawing are used. Dedicated host tests verify both source
+alternatives, actual original source tile IDs in every orientation,
+50/50 residential variety, backward-compatible NBL round trips,
+non-destructive imported prefab facades, and safe demolition.

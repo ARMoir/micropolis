@@ -85,6 +85,10 @@ jobs:
             tandy-dos/tests/test_newer_lot.c
           ./test-newer-lot
           cc -std=c89 -Wall -Wextra -pedantic \
+            -o test-source-mix tandy-dos/city.c tandy-dos/zoning.c \
+            tandy-dos/newer_lot.c tandy-dos/tests/test_source_mix.c
+          ./test-source-mix
+          cc -std=c89 -Wall -Wextra -pedantic \
             -o test-game-save tandy-dos/city.c tandy-dos/zoning.c \
             tandy-dos/newer_lot.c tandy-dos/game_save.c \
             tandy-dos/tests/test_game_save.c

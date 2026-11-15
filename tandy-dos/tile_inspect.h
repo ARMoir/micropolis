@@ -11,7 +11,7 @@
 struct tile_inspect {
     unsigned int x,y,word,id,zone,stage;
     unsigned int left,top,span,part_x,part_y,source_id;
-    unsigned int newer,original_group;
+    unsigned int newer,original_group,source_original;
     unsigned int service,network_valid,needs_warning;
     unsigned int neighbor[4];
     unsigned int roads,rails,wires;
