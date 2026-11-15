@@ -412,7 +412,8 @@ unsigned int newer_lot_try_grow_with_style(unsigned int x,unsigned int y,
 {
     unsigned int span,ax=0U,ay=0U,slot;
     span=newer_lot_try_grow(x,y,kind,&ax,&ay);
-    if(span==3U && choose_original && owner!=0) {
+    if(span==3U && choose_original && owner!=0 &&
+       newer_lot_height(ax,ay)==3U) {
         slot=owner[offset(ax,ay)];
         if(slot!=0U) {
             records[slot-1U].id=(unsigned char)
