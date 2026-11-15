@@ -323,14 +323,20 @@ int main(void)
         /* Demolishing ANY part restores the whole set of vacant
          * 1x1 outlines/hatches without altering zone assignments.
          */
-        assert(newer_lot_demolish(x+1U,y+1U,0,0)==3U);
-        for(j=0U;j<3U;++j)
-            for(i=0U;i<3U;++i) {
-                assert(zoning_at(x+i,y+j)==kind);
-                assert(zoning_development_at(x+i,y+j)==0U);
-                assert(zone_highlight_style(x+i,y+j,&hatch)==15U);
-                assert(hatch);
-            }
+        {
+            unsigned int actual_height=newer_lot_height(x,y);
+            assert(newer_lot_demolish(x+1U,y+1U,0,0)==3U);
+            for(j=0U;j<3U;++j)
+                for(i=0U;i<3U;++i) {
+                    assert(zoning_at(x+i,y+j)==kind);
+                    /* The freed top/third row is an independent
+                     * developed lot, not owned by the 3x2 building. */
+                    assert(zoning_development_at(x+i,y+j)==
+                           (j<actual_height?0U:3U));
+                    assert(zone_highlight_style(x+i,y+j,&hatch)==15U);
+                    assert(hatch==(j<actual_height));
+                }
+        }
     }
 
     /* Genuine original 3x3 artwork has one perimeter too; never
