@@ -293,3 +293,174 @@ void tile_inspect_line(const struct tile_inspect *o,
         }
     }
 }
+
+/* Compact, flat Tandy inspector dialog (no bevel or shadow).
+ * Button hit testing stays independent of the BIOS/Tandy renderer.
+ */
+unsigned int tile_inspect_dialog_click(unsigned int px,unsigned int py)
+{
+    if(py>=144U && py<160U) {
+        if(px>=232U && px<304U)return 3U; /* Done */
+        if(px>=24U && px<88U)return 1U;   /* Prev */
+        if(px>=112U && px<184U)return 2U; /* Next */
+    }
+    return 0U;
+}
+unsigned int tile_inspect_preview_scale(unsigned int span)
+{
+    if(span==1U)return 6U;
+    if(span==2U)return 4U;
+    if(span<=4U)return 2U;
+    return 1U;
+}
+unsigned int tile_inspect_preview_original_id(
+    const struct tile_inspect *info,unsigned int col,unsigned int row)
+{
+    unsigned int id;
+    if(!info || !info->span || col>=info->span ||
+       row>=info->span || info->newer)return 65535U;
+    if(info->original_group)
+        id=info->source_id+row*info->span+col;
+    else {
+        if(col!=0U || row!=0U)return 65535U;
+        id=info->id;
+        if(info->zone==ZONE_RES && info->stage!=0U &&
+           (id==0U || (id>=21U && id<=43U))) {
+            static const unsigned short residential[4]={
+                0U,249U,252U,258U
+            };
+            id=residential[info->stage<=3U?info->stage:3U];
+        }
+    }
+    return id<960U?id:65535U;
+}
+void tile_inspect_dialog_title(const struct tile_inspect *o,
+                               char out[TILE_DIALOG_TEXT_COLUMNS+1U])
+{
+    const char *type;
+    if(!o){out[0]='\0';return;}
+    if(o->newer) {
+        type=o->zone==ZONE_RES?"Residential":
+             o->zone==ZONE_COM?"Commercial":"Industrial";
+        sprintf(out,"%s %ux%u",type,o->span,o->span);
+    } else if(o->zone!=ZONE_NONE && !o->original_group) {
+        type=o->zone==ZONE_RES?"Residential":
+             o->zone==ZONE_COM?"Commercial":"Industrial";
+        sprintf(out,"%s lot",type);
+    } else {
+        type=tile_inspect_kind(o->id);
+        /* Names from the type catalog are intentionally short.
+         * Trim here only for 24-column dialog title compatibility.
+         */
+        strncpy(out,type,TILE_DIALOG_TEXT_COLUMNS);
+        out[TILE_DIALOG_TEXT_COLUMNS]='\0';
+    }
+}
+void tile_inspect_dialog_line(const struct tile_inspect *o,
+                              unsigned int page,unsigned int row,
+                              char out[TILE_DIALOG_TEXT_COLUMNS+1U])
+{
+    const char *type;
+    unsigned int flags;
+    if(!out)return;
+    out[0]='\0';
+    if(!o || row>=TILE_INSPECT_ROWS)return;
+    type=o->newer?"NEWER":
+         o->original_group?"ORIGINAL PREFAB":
+         o->zone!=ZONE_NONE?"ZONED LOT":"ORIGINAL MAP";
+    page%=TILE_INSPECT_PAGES;
+    if(page==0U) {
+        switch(row) {
+        case 0U:sprintf(out,"IDENTITY  (1/4)");break;
+        case 1U:sprintf(out,"World X:%03u Y:%03u",o->x,o->y);break;
+        case 2U:sprintf(out,"Tile:%u Hex:%03X",o->id,o->id);break;
+        case 3U:sprintf(out,"Zone: %s",zone_name(o->zone));break;
+        case 4U:sprintf(out,"Kind: %.17s",tile_inspect_kind(o->id));break;
+        case 5U:sprintf(out,"Source: %s",type);break;
+        case 6U:sprintf(out,"Size: %ux%u tiles",o->span,o->span);break;
+        case 7U:sprintf(out,"Anchor: %03u,%03u",o->left,o->top);break;
+        case 8U:sprintf(out,"Section: %u,%u",o->part_x+1U,o->part_y+1U);break;
+        case 9U:
+            if(o->newer)sprintf(out,"Design ID: %02X",o->source_id);
+            else if(o->original_group)
+                sprintf(out,"Base art: %u",o->source_id);
+            else sprintf(out,"Art: individual tile");
+            break;
+        }
+    } else if(page==1U) {
+        switch(row) {
+        case 0U:sprintf(out,"SERVICES  (2/4)");break;
+        case 1U:sprintf(out,"Network: %s",
+                        o->network_valid?"READY":"PENDING");break;
+        case 2U:sprintf(out,"Road/rail <=6: %s",
+                        yn(o->service&SIM_SERVICE_TRANSPORT));break;
+        case 3U:sprintf(out,"Power nearby: %s",
+                        yn(o->service&SIM_SERVICE_POWER));break;
+        case 4U:sprintf(out,"Energized: %s",yn(o->word&PWR_BIT));break;
+        case 5U:sprintf(out,"Conductive: %s",yn(o->word&COND_BIT));break;
+        case 6U:sprintf(out,"Power warning: %s",yn(o->needs_warning));break;
+        case 7U:sprintf(out,"Adj road:%u rail:%u",o->roads,o->rails);break;
+        case 8U:sprintf(out,"Adj power lines: %u",o->wires);break;
+        case 9U:sprintf(out,"Crime/pollution: N/A");break;
+        }
+    } else if(page==2U) {
+        switch(row) {
+        case 0U:sprintf(out,"DEVELOPMENT  (3/4)");break;
+        case 1U:sprintf(out,"Zone: %s",zone_name(o->zone));break;
+        case 2U:
+            if(o->original_group)sprintf(out,"Stage: original prefab");
+            else if(o->zone)sprintf(out,"Stage: %u / 3",o->stage);
+            else sprintf(out,"Stage: not zoned");
+            break;
+        case 3U:
+            if(o->newer)sprintf(out,"NEWER building: %ux%u",o->span,o->span);
+            else if(o->original_group)
+                sprintf(out,"Original: %ux%u",o->span,o->span);
+            else if(o->zone)sprintf(out,"Lot: %s",
+                                    o->stage?"DEVELOPED":"VACANT");
+            else sprintf(out,"No custom RCI zone");
+            break;
+        case 4U:sprintf(out,"Anchor: %03u,%03u",o->left,o->top);break;
+        case 5U:sprintf(out,"Part: %u,%u of %ux%u",
+                        o->part_x+1U,o->part_y+1U,
+                        o->span,o->span);break;
+        case 6U:
+            if(o->newer)sprintf(out,"Design: %02X",o->source_id);
+            else if(o->original_group)
+                sprintf(out,"Base tile: %u",o->source_id);
+            else sprintf(out,"Design: individual");
+            break;
+        case 7U:
+            if(o->zone && !o->original_group && !o->newer) {
+                unsigned int estimate=o->stage*
+                    (o->zone==ZONE_COM?3U:4U);
+                sprintf(out,"Est. %s: %u",
+                        o->zone==ZONE_RES?"people":"jobs",estimate);
+            } else sprintf(out,"1x1 estimate: N/A");
+            break;
+        case 8U:sprintf(out,"Road:%s Power:%s",
+                        yn(o->service&SIM_SERVICE_TRANSPORT),
+                        yn(o->service&SIM_SERVICE_POWER));break;
+        case 9U:sprintf(out,"Simplified growth model");break;
+        }
+    } else {
+        flags=o->word;
+        switch(row) {
+        case 0U:sprintf(out,"RAW TILE DATA  (4/4)");break;
+        case 1U:sprintf(out,"Word:%04X Base:%03X",flags,o->id);break;
+        case 2U:sprintf(out,"PWR:%u  COND:%u",
+                        !!(flags&PWR_BIT),!!(flags&COND_BIT));break;
+        case 3U:sprintf(out,"BURN:%u BULL:%u",
+                        !!(flags&BURN_BIT),!!(flags&BULL_BIT));break;
+        case 4U:sprintf(out,"ANIM:%u ZONE:%u",
+                        !!(flags&ANIM_BIT),!!(flags&ZONE_BIT));break;
+        case 5U:sprintf(out,"N:%04u E:%04u",
+                        o->neighbor[0],o->neighbor[1]);break;
+        case 6U:sprintf(out,"S:%04u W:%04u",
+                        o->neighbor[2],o->neighbor[3]);break;
+        case 7U:sprintf(out,"Source: %s",type);break;
+        case 8U:sprintf(out,"Original CTY flags");break;
+        case 9U:sprintf(out,"1024 = outside map");break;
+        }
+    }
+}

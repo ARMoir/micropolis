@@ -78,6 +78,10 @@ static unsigned int menu_highlight = 0U;
  */
 static int info_page = 0;
 static struct tile_inspect inspected_tile;
+/* Repaint 8x8 graphics and dialog frame only when opening Inspect.
+ * Changing the info page rewrites just the ten text rows.
+ */
+static int inspector_window_drawn=0;
 static int exit_requested = 0;
 static int mouse_on = 0;
 static unsigned int mouse_x = 160U, mouse_y = 100U;
@@ -1529,26 +1533,168 @@ static void menu_set_highlight(unsigned int next)
     draw_menu_row(next);
 }
 
+/* The graphics preview uses the ACTUAL current sprite tables.
+ * For original source prefabs, assemble every 8x8 original subtile.
+ * For NewerSource compounds, use the real .NBL footprint and art.
+ * Never scale or copy any sprite into a permanent image buffer.
+ *
+ * 1x1 -> 48px, 2x2/4x4 -> 64px, 3x3/6x6 -> 48px.
+ * The Tandy 320x200 mode-9 preview is one-time per Inspect open.
+ */
+static void draw_inspector_preview(void)
+{
+    unsigned int span=inspected_tile.span,scale,width,origin_x,origin_y;
+    unsigned int i,j,x,y,col,b,graphic,px,py;
+    const unsigned char far *sprite;
+    const unsigned char *small;
+    if(span==0U || span>6U)span=1U;
+    scale=tile_inspect_preview_scale(span);
+    width=span*8U*scale;
+    origin_x=TILE_DIALOG_PREVIEW_X+
+             (TILE_DIALOG_PREVIEW_SIZE-width)/2U;
+    origin_y=TILE_DIALOG_PREVIEW_Y+
+             (TILE_DIALOG_PREVIEW_SIZE-width)/2U;
+    for(j=0U;j<span;++j)
+        for(i=0U;i<span;++i) {
+            sprite=0;
+            if(inspected_tile.newer) {
+                sprite=newer_lot_pixels(inspected_tile.left+i,
+                                        inspected_tile.top+j,0U);
+            } else if(span==1U) {
+                small=small_lot_art_pixels(inspected_tile.id,
+                                          inspected_tile.zone,
+                                          inspected_tile.stage,
+                                          inspected_tile.x,inspected_tile.y);
+                if(small!=0)sprite=small;
+            }
+            if(sprite==0 && !inspected_tile.newer && art_data!=0) {
+                graphic=tile_inspect_preview_original_id(
+                    &inspected_tile,i,j);
+                if(graphic<ART_TILES)
+                    sprite=art_data+graphic*32U;
+            }
+            if(sprite==0)continue;
+            px=origin_x+i*8U*scale;
+            py=origin_y+j*8U*scale;
+            if(scale==1U) {
+                draw_packed_tile(px,py,sprite);
+            } else {
+                /* Sprite pixels are packed high/low nibbles.
+                 * The little preview is nearest-neighbor only.
+                 * All 16 original colors and pixel shapes survive.
+                 */
+                for(y=0U;y<8U;++y)
+                    for(x=0U;x<8U;++x) {
+                        b=sprite[y*4U+(x>>1U)];
+                        col=(x&1U)?(b&15U):(b>>4U);
+                        box_pixels(px+x*scale,py+y*scale,
+                                   scale,scale,(unsigned char)col);
+                    }
+            }
+        }
+}
+
+/* Simple flat gray dialog: no drop shadow, beveling, animation,
+ * extra asset or framebuffer. 2px edge and three DOS-style buttons.
+ */
+static void inspector_button(unsigned int px,unsigned int w,
+                             const char *caption)
+{
+    unsigned int x,y;
+    for(y=144U;y<160U;y+=8U)
+        for(x=px;x<px+w;x+=8U)
+            solid_tile(x,y,7U);
+    for(x=px;x<px+w;++x) {
+        pixel(x,144U,0U);
+        pixel(x,159U,0U);
+    }
+    for(y=144U;y<160U;++y) {
+        pixel(px,y,0U);
+        pixel(px+w-1U,y,0U);
+    }
+    bios_text(19U,px/8U+1U,caption,0x70U);
+}
+static void draw_inspector_shell(void)
+{
+    unsigned int x,y;
+    for(y=4U;y<22U;++y)
+        for(x=1U;x<39U;++x)
+            solid_tile(x*8U,y*8U,7U);
+    for(x=8U;x<312U;++x) {
+        pixel(x,32U,0U);
+        pixel(x,175U,0U);
+    }
+    for(y=32U;y<176U;++y) {
+        pixel(8U,y,0U);
+        pixel(311U,y,0U);
+    }
+    /* Name field and picture surround are deliberately flat. */
+    for(x=16U;x<216U;++x) {
+        pixel(x,39U,8U);
+        pixel(x,49U,8U);
+    }
+    for(y=39U;y<50U;++y) {
+        pixel(16U,y,8U);
+        pixel(215U,y,8U);
+    }
+    for(y=TILE_DIALOG_PREVIEW_Y;
+        y<TILE_DIALOG_PREVIEW_Y+TILE_DIALOG_PREVIEW_SIZE;
+        y+=8U)
+        for(x=TILE_DIALOG_PREVIEW_X;
+            x<TILE_DIALOG_PREVIEW_X+TILE_DIALOG_PREVIEW_SIZE;
+            x+=8U)
+            solid_tile(x,y,8U);
+    for(x=TILE_DIALOG_PREVIEW_X;x<TILE_DIALOG_PREVIEW_X+
+                                      TILE_DIALOG_PREVIEW_SIZE;++x) {
+        pixel(x,TILE_DIALOG_PREVIEW_Y,0U);
+        pixel(x,TILE_DIALOG_PREVIEW_Y+
+                TILE_DIALOG_PREVIEW_SIZE-1U,0U);
+    }
+    for(y=TILE_DIALOG_PREVIEW_Y;y<TILE_DIALOG_PREVIEW_Y+
+                                       TILE_DIALOG_PREVIEW_SIZE;++y) {
+        pixel(TILE_DIALOG_PREVIEW_X,y,0U);
+        pixel(TILE_DIALOG_PREVIEW_X+
+              TILE_DIALOG_PREVIEW_SIZE-1U,y,0U);
+    }
+    inspector_button(24U,64U,"PREV");
+    inspector_button(112U,72U,"NEXT");
+    inspector_button(232U,72U,"DONE");
+    bios_text(21U,3U,"ARROWS / TAB: PAGES   ESC: DONE",0x70U);
+    {
+        char title[TILE_DIALOG_TEXT_COLUMNS+1U];
+        tile_inspect_dialog_title(&inspected_tile,title);
+        bios_text(5U,3U,title,0x70U);
+    }
+    draw_inspector_preview();
+}
+
 static void draw_info_page(void)
 {
     unsigned int i, j;
-    if (info_page == 0)
+    if(info_page == 0)return;
+    if(info_page>=4 && info_page<8) {
+        char line[TILE_DIALOG_TEXT_COLUMNS+1U];
+        unsigned int page=(unsigned int)(info_page-4);
+        if(!inspector_window_drawn) {
+            draw_inspector_shell();
+            inspector_window_drawn=1;
+        }
+        /* Page changes touch only 24x10 text cells; the original
+         * graphics preview, gray frame and buttons remain intact.
+         */
+        for(j=7U;j<17U;++j)
+            for(i=2U;i<2U+TILE_DIALOG_TEXT_COLUMNS;++i)
+                solid_tile(i*8U,j*8U,7U);
+        for(i=0U;i<TILE_INSPECT_ROWS;++i) {
+            tile_inspect_dialog_line(&inspected_tile,page,i,line);
+            bios_text(7U+i,2U,line,0x70U);
+        }
         return;
+    }
+    inspector_window_drawn=0;
     for (j = 5U; j <= 17U; ++j)
         for (i = 1U; i < 39U; ++i)
             solid_tile(i * 8U, j * 8U, 1U);
-
-    if(info_page>=4 && info_page<8) {
-        char line[TILE_INSPECT_LINE+1U];
-        unsigned int page=(unsigned int)(info_page-4);
-        for(i=0U;i<TILE_INSPECT_ROWS;++i) {
-            tile_inspect_line(&inspected_tile,page,i,line);
-            bios_text(6U+i,2U,line,(unsigned char)(i==0U?15U:14U));
-        }
-        bios_text(16U,2U,"ARROWS / TAB / CLICK: NEXT",11U);
-        bios_text(17U,2U,"ESC / RIGHT CLICK: CLOSE",15U);
-        return;
-    }
     if (info_page == 1) {
         bios_text(6U, 3U, "KEYBOARD CONTROLS", 15U);
         bios_text(8U, 3U, "ARROWS / WASD  PAN CITY", 14U);
@@ -1945,6 +2091,7 @@ static void apply_selected_tool(void)
          */
         tile_inspect_collect(mx,my,&inspected_tile);
         info_page=4;
+        inspector_window_drawn=0;
         last_action="INSPECT TILE";
         draw_info_page();
     } else {
@@ -2261,12 +2408,23 @@ static void handle_mouse(void)
             if(item>=0) picker_choose((unsigned int)item);
             else picker_close();
         } else if (info_page >= 4 && info_page < 8) {
-            /* Each left click advances through Identity / Services /
-             * Development / Raw, without returning to the map.
-             * A right click or Escape closes the inspector.
+            /* The lower-right DONE button closes the panel.
+             * PREV/NEXT navigate. A click elsewhere still advances
+             * pages for users accustomed to the previous inspector.
              */
-            info_page=4+((info_page-3)%4);
-            draw_info_page();
+            unsigned int action=tile_inspect_dialog_click(
+                state.x,state.y);
+            if(action==3U) {
+                info_page=0;
+                inspector_window_drawn=0;
+                render_full();
+            } else {
+                if(action==1U)
+                    info_page=4+((info_page-1)%4);
+                else
+                    info_page=4+((info_page-3)%4);
+                draw_info_page();
+            }
         } else if (info_page != 0) {
             info_page = 0;
             render_full();
@@ -2646,6 +2804,7 @@ static void keyboard_loop(void)
                 draw_info_page();
             } else {
                 info_page=0;
+                inspector_window_drawn=0;
                 render_full();
             }
             mouse_pointer_show();

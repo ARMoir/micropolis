@@ -1469,3 +1469,33 @@ and artwork remain unchanged. Unit tests cover all 1024 possible IDs,
 four pages of bounded 40-column text, complete original and NewerSource
 building footprints, stage changes, tile flags, neighboring terrain,
 map boundaries and non-mutating reads.
+
+## Flat gray picture-based tile inspector
+
+The Inspect magnifier now opens a **simple flat gray bordered dialog**,
+in the style of the classic later city-simulator property windows.
+The top left identifies the selected tile/building and the right side
+shows a genuine preview from the loaded original `TILES.DAT` or
+optional `NEWER1.DAT`/`NEWERM8.DAT`. Complete original and
+NewerSource buildings show their entire 1x1, 2x2, 3x3, 4x4 or 6x6
+footprint, rather than a disconnected single tile. The preview uses
+nearest-neighbor scaling (6x for 1x1, 4x for 2x2, 2x for 3x3/4x4,
+1x for 6x6); all original pixels/colors are preserved.
+
+There are **no bevels, shadows, graphic assets or extra framebuffers**.
+The normal 320x200x16 Tandy display routines fill a flat gray panel;
+BIOS text uses black on gray. The 4 inspector pages retain the
+identity, services, development and raw tile/flag information in
+compact 24-character rows next to the picture. The dialog has
+mouse-clickable **PREV**, **NEXT**, and **DONE** buttons.
+Click DONE (bottom-right) or press Esc/right-click to close.
+Left/right arrows or Tab continue to change pages. Other clicks
+on the panel still advance one page, retaining the prior behavior.
+
+The one-time preview is drawn only on first opening the inspector.
+Moving between pages updates only ten text rows, not the preview,
+whole viewport, simulation, or mouse cursor. All geometry and
+compact label lengths are verified by the host-side C89 inspector
+regression, including every original tile ID and whole-building
+source-art tile ranges. Inspect remains read-only and does not change
+any existing source data or save format.

@@ -25,4 +25,28 @@ void tile_inspect_line(const struct tile_inspect *info,
                        unsigned int page,unsigned int row,
                        char out[TILE_INSPECT_LINE+1U]);
 const char *tile_inspect_kind(unsigned int id);
+/* Compact graphic-dialog layout. All coordinates in 320x200 pixels.
+ * Click action: 0 = next page, 1 = previous, 2 = next, 3 = Done.
+ */
+#define TILE_DIALOG_X 8U
+#define TILE_DIALOG_Y 32U
+#define TILE_DIALOG_W 304U
+#define TILE_DIALOG_H 144U
+#define TILE_DIALOG_PREVIEW_X 224U
+#define TILE_DIALOG_PREVIEW_Y 56U
+#define TILE_DIALOG_PREVIEW_SIZE 80U
+#define TILE_DIALOG_TEXT_COLUMNS 24U
+unsigned int tile_inspect_dialog_click(unsigned int px,unsigned int py);
+unsigned int tile_inspect_preview_scale(unsigned int span);
+unsigned int tile_inspect_preview_original_id(
+    const struct tile_inspect *info,unsigned int col,unsigned int row);
+/* Text fits to the left of the preview while retaining all 4 pages.
+ * Buffers are at least TILE_DIALOG_TEXT_COLUMNS+1 bytes.
+ */
+void tile_inspect_dialog_line(const struct tile_inspect *info,
+                              unsigned int page,unsigned int row,
+                              char out[TILE_DIALOG_TEXT_COLUMNS+1U]);
+void tile_inspect_dialog_title(const struct tile_inspect *info,
+                               char out[TILE_DIALOG_TEXT_COLUMNS+1U]);
+
 #endif

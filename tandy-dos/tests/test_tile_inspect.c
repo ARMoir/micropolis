@@ -25,9 +25,16 @@ static void reset(void)
 static void pages(const struct tile_inspect *info)
 {
     unsigned int page,row,i;
+    char title[TILE_DIALOG_TEXT_COLUMNS+2U];
+    memset(title,0xa5,sizeof(title));
+    title[TILE_DIALOG_TEXT_COLUMNS+1U]=0x5a;
+    tile_inspect_dialog_title(info,title);
+    assert(title[TILE_DIALOG_TEXT_COLUMNS+1U]==0x5a);
+    assert(strlen(title)<=TILE_DIALOG_TEXT_COLUMNS);
     for(page=0U;page<TILE_INSPECT_PAGES;++page)
         for(row=0U;row<TILE_INSPECT_ROWS;++row) {
             char line[TILE_INSPECT_LINE+2U];
+            char compact[TILE_DIALOG_TEXT_COLUMNS+2U];
             memset(line,0xa5,sizeof(line));
             line[TILE_INSPECT_LINE+1U]=0x5a;
             tile_inspect_line(info,page,row,line);
@@ -36,6 +43,14 @@ static void pages(const struct tile_inspect *info)
             for(i=0U;i<strlen(line);++i)
                 assert((unsigned char)line[i]>=32U);
             if(row==0U)assert(strstr(line,"PAGE")!=0);
+            memset(compact,0xa5,sizeof(compact));
+            compact[TILE_DIALOG_TEXT_COLUMNS+1U]=0x5a;
+            tile_inspect_dialog_line(info,page,row,compact);
+            assert(compact[TILE_DIALOG_TEXT_COLUMNS+1U]==0x5a);
+            assert(strlen(compact)<=TILE_DIALOG_TEXT_COLUMNS);
+            for(i=0U;i<strlen(compact);++i)
+                assert((unsigned char)compact[i]>=32U);
+            if(row==0U)assert(strchr(compact,'/')!=0);
         }
 }
 static void check_type(unsigned int id,const char *name)
@@ -47,6 +62,26 @@ int main(void)
     unsigned int id,x,y,i,j,kind;
     struct tile_inspect t;
     char line[TILE_INSPECT_LINE+1U];
+    /* Simple flat gray dialog: clickable Done/Next/Prev, plus
+     * any other click still advances as previous inspector did.
+     */
+    assert(tile_inspect_dialog_click(235U,150U)==3U);
+    assert(tile_inspect_dialog_click(303U,159U)==3U);
+    assert(tile_inspect_dialog_click(232U,143U)==0U);
+    assert(tile_inspect_dialog_click(304U,150U)==0U);
+    assert(tile_inspect_dialog_click(24U,144U)==1U);
+    assert(tile_inspect_dialog_click(87U,159U)==1U);
+    assert(tile_inspect_dialog_click(112U,144U)==2U);
+    assert(tile_inspect_dialog_click(183U,159U)==2U);
+    assert(tile_inspect_dialog_click(10U,90U)==0U);
+    assert(tile_inspect_preview_scale(1U)==6U);
+    assert(tile_inspect_preview_scale(2U)==4U);
+    assert(tile_inspect_preview_scale(3U)==2U);
+    assert(tile_inspect_preview_scale(4U)==2U);
+    assert(tile_inspect_preview_scale(6U)==1U);
+    for(i=1U;i<=6U;++i)
+        assert(i*8U*tile_inspect_preview_scale(i)<=
+               TILE_DIALOG_PREVIEW_SIZE);
     reset();
     /* Exhaust every possible original 10-bit tile value: even unknown
      * IDs have a safe type and always produce complete info pages.
@@ -149,6 +184,7 @@ int main(void)
         tile_inspect_collect(x+2U,y+2U,&t);
         assert(t.newer&&t.span==3U&&t.part_x==2U);
         assert(t.part_y==2U);
+        assert(tile_inspect_preview_original_id(&t,0U,0U)==65535U);
         pages(&t);
         assert(newer_lot_demolish(x+1U,y+1U,0,0)==3U);
         tile_inspect_collect(x+2U,y+2U,&t);
@@ -180,6 +216,11 @@ int main(void)
             tile_inspect_collect(70U+span-1U,40U+span-1U,&t);
             assert(t.original_group&&t.span==span);
             assert(t.part_x==span-1U&&t.part_y==span-1U);
+            for(j=0U;j<span;++j)
+                for(i=0U;i<span;++i)
+                    assert(tile_inspect_preview_original_id(&t,i,j)==
+                           id0+j*span+i);
+            assert(tile_inspect_preview_original_id(&t,span,0U)==65535U);
             tile_inspect_line(&t,0U,6U,line);
             assert(strstr(line,"FOOTPRINT")!=0);
             /* A removed center ZONEBIT invalidates all fragments. */
@@ -188,6 +229,6 @@ int main(void)
             assert(!t.original_group);
         }
     }
-    puts("Inspector exhaustive 1024 tile types, 4 pages, original/NEWER footprints, flags, services and boundaries passed");
+    puts("Inspector exhaustive 1024 tile types, compact gray dialog, clickable DONE/PREV/NEXT, original/NEWER whole-building preview and 4 pages passed");
     return 0;
 }
