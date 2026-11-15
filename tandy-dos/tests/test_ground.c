@@ -22,11 +22,13 @@ int main(void)
      * road gray, red roofs, blue water and all sixteen foreground colors. */
     for(p=0;p<2;++p)for(b=0;b<256;++b) {
         hi=b>>4;lo=b&15U;
-        assert((ground_tint[p][b]>>4)==(hi==2U?(p?7U:6U):hi));
-        assert((ground_tint[p][b]&15U)==(lo==2U?(p?6U:7U):lo));
+        assert((ground_tint[p][b]>>4)==(hi==2U?6U:hi));
+        assert((ground_tint[p][b]&15U)==(lo==2U?6U:lo));
     }
-    assert(ground_tint[0][0x22]==0x67);
-    assert(ground_tint[1][0x22]==0x76);
+    assert(ground_tint[0][0x22]==0x66);
+    assert(ground_tint[1][0x22]==0x66);
+    assert(ground_tint[0][0x2c]==0x6c); /* roof red remains red */
+    assert(ground_tint[1][0xc2]==0xc6); /* red paint remains red */
     assert(ground_is_clear(20,20));
     assert(!ground_keep_green(20,20));
     /* Center plus all eight neighbors, including diagonal-only contact. */
@@ -64,6 +66,6 @@ int main(void)
     assert(ground_is_clear(20,20)); /* vacant zoning is clear ground */
     assert(zoning_set_development(20,20,3));
     assert(!ground_is_clear(20,20));
-    puts("Tan ground, forest diagonals, edges, clearing and pixel ink passed");
+    puts("Solid brown ground, forest diagonals, edges, clearing and red ink passed");
     return 0;
 }

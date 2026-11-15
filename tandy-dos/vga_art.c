@@ -83,8 +83,8 @@ unsigned char vga_art_pixel(unsigned int x,unsigned int y,unsigned char ink)
     flags=soil[(y/8U)*40U+x/8U];
     if((flags&1U) && (ink==6U || ink==7U) &&
        ((flags&2U) || (high&15U)==2U)) {
-        /* Subtle soil texture replaces the Tandy checker, never roads. */
-        return (unsigned char)(226U+(((x*3U+y*5U)&7U)==0U?16U:0U));
+        /* A single solid light brown, never red roofing or road paint. */
+        return 226U;
     }
     return (high&15U)==ink?high:ink;
 }

@@ -758,7 +758,7 @@ static void draw_city_tile_art(unsigned int px, unsigned int py,
 
 /* Apply soil before zoning/placement ink, and after NEWER driveway
  * compositing. Work on packed bytes with a lookup, not per-pixel calls.
- * The 8px-aligned map keeps the fine tan checker stable while scrolling.
+ * Uniform brown uses no dither pattern and stays consistent while scrolling.
  */
 static void draw_city_tile(unsigned int px,unsigned int py,
                            unsigned int mx,unsigned int my)
@@ -770,14 +770,7 @@ static void draw_city_tile(unsigned int px,unsigned int py,
     detail_capture=enhanced_vga;
     if(detail_capture)vga_art_begin(px,py,!green,clear);
     if(clear) {
-        if(green)solid_tile(px,py,2U);
-        else {
-            for(row=0U;row<8U;++row) {
-                off=vram_offset(px,py+row);
-                after=ground_tint[row&1U][0x22U];
-                for(n=0U;n<4U;++n)video[off+n]=after;
-            }
-        }
+        solid_tile(px,py,(unsigned char)(green?2U:6U));
     } else {
         draw_city_tile_art(px,py,mx,my);
         if(!green)for(row=0U;row<8U;++row) {
